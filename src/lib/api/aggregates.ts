@@ -1,0 +1,216 @@
+import {
+  formatScheduledLabel,
+  mapJobStatusForDisplay,
+  netProfit,
+  totalExpenses,
+} from '../calculations'
+import type {
+  DashboardKpis,
+  Invoice,
+  Job,
+  JobWithRelations,
+  RecentJobRow,
+  WeekDay,
+} from '../types'
+import type { DateRangeKey } from './reports'
+
+export interface PLReport {
+  revenue: number
+  expenses: {
+    supplies: number
+    travel: number
+    equipment: number
+    marketing: number
+    labor: number
+    overhead: number
+    other: number
+  }
+  totalExpenses: number
+  netProfit: number
+  marginPct: number
+  jobCount: number
+}
+
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+function endOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+}
+
+function startOfWeek(d: Date): Date {
+  const day = d.getDay()
+  const diff = d.getDate() - day
+  return new Date(d.getFullYear(), d.getMonth(), diff)
+}
+
+function endOfWeek(d: Date): Date {
+  const start = startOfWeek(d)
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59)
+}
+
+export function rangeFor(key: DateRangeKey, now = new Date()): { start: Date; end: Date } {
+  const y = now.getFullYear()
+  const m = now.getMonth()
+
+  switch (key) {
+    case 'this_week': {
+      const start = startOfWeek(now)
+      const end = endOfWeek(now)
+      return { start, end }
+    }
+    case 'this_month':
+      return { start: new Date(y, m, 1), end: endOfMonth(now) }
+    case 'last_month':
+      return { start: new Date(y, m - 1, 1), end: new Date(y, m, 0, 23, 59, 59) }
+    case 'this_year':
+      return { start: new Date(y, 0, 1), end: new Date(y, 11, 31, 23, 59, 59) }
+  }
+}
+
+function jobInRange(job: Job, start: Date, end: Date): boolean {
+  const d = new Date(job.date + 'T12:00:00')
+  return d >= start && d <= end
+}
+
+export function computePLReport(jobs: Job[], range: DateRangeKey, overhead = 0): PLReport {
+  const { start, end } = rangeFor(range)
+  const filtered = jobs.filter((j) => jobInRange(j, start, end))
+
+  const expenses = { supplies: 0, travel: 0, equipment: 0, marketing: 0, labor: 0, overhead: 0, other: 0 }
+  let revenue = 0
+  let profit = 0
+
+  for (const job of filtered) {
+    revenue += job.revenue + job.tip
+    profit += netProfit(job)
+    for (const e of job.expenses) {
+      expenses[e.category] += e.amount
+    }
+    expenses.travel += job.travel_cost
+    expenses.equipment += job.equipment_depreciation
+    expenses.marketing += job.marketing_cost
+  }
+
+  expenses.overhead = overhead
+  profit -= overhead
+
+  const totalExp = Object.values(expenses).reduce((s, v) => s + v, 0)
+  const marginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0
+
+  return {
+    revenue,
+    expenses,
+    totalExpenses: totalExp,
+    netProfit: profit,
+    marginPct,
+    jobCount: filtered.length,
+  }
+}
+
+export function computeJobsCSV(jobs: Job[], range: DateRangeKey, labelResolver: (job: Job) => { client: string; pkg: string }): string {
+  const { start, end } = rangeFor(range)
+  const filtered = jobs.filter((j) => jobInRange(j, start, end))
+  const headers = ['Date', 'Client', 'Package', 'Revenue', 'Tip', 'Expenses', 'Net Profit', 'Status']
+  const rows = filtered.map((j) => {
+    const { client, pkg } = labelResolver(j)
+    return [j.date, client, pkg, j.revenue, j.tip, totalExpenses(j), netProfit(j), j.status].join(',')
+  })
+  return [headers.join(','), ...rows].join('\n')
+}
+
+export function computeDashboard(
+  jobs: JobWithRelations[],
+  invoices: Invoice[]
+): { kpis: DashboardKpis; recentJobs: RecentJobRow[]; jobsToday: number } {
+  const now = new Date()
+  const monthStart = startOfMonth(now)
+  const monthEnd = endOfMonth(now)
+  const weekStart = startOfWeek(now)
+  const weekEnd = endOfWeek(now)
+  const todayStr = now.toISOString().split('T')[0]
+
+  const mtdJobs = jobs.filter((j) => {
+    const d = new Date(j.date + 'T12:00:00')
+    return d >= monthStart && d <= monthEnd
+  })
+
+  const revenueMtd = mtdJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
+  const profitMtd = mtdJobs.reduce((s, j) => s + netProfit(j), 0)
+
+  const outstanding = invoices
+    .filter((i) => i.status === 'sent' || i.status === 'partial' || i.status === 'overdue')
+    .reduce((s, i) => s + i.balance_due, 0)
+
+  const jobsThisWeek = jobs.filter((j) => {
+    const d = new Date(j.date + 'T12:00:00')
+    return d >= weekStart && d <= weekEnd
+  }).length
+
+  const jobsToday = jobs.filter((j) => j.date === todayStr).length
+
+  const recentJobs: RecentJobRow[] = [...jobs]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5)
+    .map((j) => {
+      const status = mapJobStatusForDisplay(j)
+      return {
+        id: j.id,
+        clientName: j.client?.name ?? 'Unknown',
+        package: j.package?.name ?? '—',
+        vehicleType: j.vehicle_type.charAt(0).toUpperCase() + j.vehicle_type.slice(1),
+        locationType: j.location_type,
+        revenue: j.revenue,
+        profit: netProfit(j),
+        status,
+        scheduledDate: status === 'scheduled' ? formatScheduledLabel(j.date, j.start_time) : undefined,
+      }
+    })
+
+  return {
+    kpis: { revenueMtd, profitMtd, outstanding, jobsThisWeek },
+    recentJobs,
+    jobsToday,
+  }
+}
+
+export function computeWeekDays(jobs: Job[]): WeekDay[] {
+  const now = new Date()
+  const weekStart = startOfWeek(now)
+  const todayStr = now.toISOString().split('T')[0]
+  const days: WeekDay[] = []
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + i)
+    const dateStr = d.toISOString().split('T')[0]
+    days.push({
+      date: dateStr,
+      label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayNum: d.getDate(),
+      isToday: dateStr === todayStr,
+      jobCount: jobs.filter((j) => j.date === dateStr).length,
+    })
+  }
+  return days
+}
+
+export function computeJobsForDate(jobs: JobWithRelations[], date: string): RecentJobRow[] {
+  return jobs
+    .filter((j) => j.date === date)
+    .map((j) => {
+      const status = mapJobStatusForDisplay(j)
+      return {
+        id: j.id,
+        clientName: j.client?.name ?? 'Unknown',
+        package: j.package?.name ?? '—',
+        vehicleType: j.vehicle_type.charAt(0).toUpperCase() + j.vehicle_type.slice(1),
+        locationType: j.location_type,
+        revenue: j.revenue,
+        profit: netProfit(j),
+        status,
+        scheduledDate: status === 'scheduled' ? formatScheduledLabel(j.date, j.start_time) : undefined,
+      }
+    })
+}

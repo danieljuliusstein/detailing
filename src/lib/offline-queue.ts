@@ -1,0 +1,102 @@
+/**
+ * IndexedDB-backed FIFO queue for PocketBase writes made while offline.
+ */
+
+export type QueueOperation =
+  | { type: 'createJob'; params: import('./types').QuickJobData; localJobId: string }
+  | { type: 'updateJob'; params: { id: string; data: import('./types').JobEditData } }
+  | { type: 'createInvoiceForJob'; params: { jobId: string } }
+  | { type: 'markInvoiceSent'; params: { invoiceId: string } }
+  | { type: 'addPayment'; params: { invoiceId: string; payment: import('./types').Payment } }
+  | { type: 'markInvoicePaid'; params: { invoiceId: string; method: string } }
+  | { type: 'createSupply'; params: import('./types').SupplyInput; localSupplyId: string }
+  | { type: 'updateSupply'; params: { id: string; input: Partial<import('./types').SupplyInput> } }
+  | { type: 'restockSupply'; params: { id: string; quantity: number } }
+  | { type: 'createOverheadExpense'; params: import('./types').OverheadInput; localOverheadId: string }
+  | { type: 'updateOverheadExpense'; params: { id: string; input: Partial<import('./types').OverheadInput> } }
+  | { type: 'deleteOverheadExpense'; params: { id: string } }
+  | { type: 'uploadJobPhoto'; params: { jobId: string; dataUrl: string; photoType: import('./types').PhotoType; filename: string } }
+  | { type: 'deleteJobPhoto'; params: { jobId: string; filename: string } }
+
+export interface QueueItem {
+  id: string
+  operation: QueueOperation
+  createdAt: string
+  retries: number
+}
+
+const DB_NAME = 'detailing_offline_v1'
+const STORE = 'queue'
+const DB_VERSION = 1
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB unavailable'))
+      return
+    }
+    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onerror = () => reject(req.error)
+    req.onsuccess = () => resolve(req.result)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(STORE)) {
+        const store = db.createObjectStore(STORE, { keyPath: 'id' })
+        store.createIndex('createdAt', 'createdAt', { unique: false })
+      }
+    }
+  })
+}
+
+function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+  return openDb().then(
+    (db) =>
+      new Promise<T>((resolve, reject) => {
+        const transaction = db.transaction(STORE, mode)
+        const store = transaction.objectStore(STORE)
+        const request = fn(store)
+        request.onsuccess = () => resolve(request.result as T)
+        request.onerror = () => reject(request.error)
+      })
+  )
+}
+
+export function generateQueueId(): string {
+  return `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+export async function enqueue(operation: QueueOperation): Promise<QueueItem> {
+  const item: QueueItem = {
+    id: generateQueueId(),
+    operation,
+    createdAt: new Date().toISOString(),
+    retries: 0,
+  }
+  await tx('readwrite', (store) => store.add(item))
+  return item
+}
+
+export async function getQueueItems(): Promise<QueueItem[]> {
+  const items = await tx<QueueItem[]>('readonly', (store) => store.getAll())
+  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+export async function getQueueCount(): Promise<number> {
+  return tx('readonly', (store) => store.count())
+}
+
+export async function removeQueueItem(id: string): Promise<void> {
+  await tx('readwrite', (store) => store.delete(id))
+}
+
+export async function incrementRetries(id: string): Promise<void> {
+  const items = await getQueueItems()
+  const item = items.find((i) => i.id === id)
+  if (!item) return
+  item.retries += 1
+  await tx('readwrite', (store) => store.put(item))
+}
+
+export async function clearQueue(): Promise<void> {
+  await tx('readwrite', (store) => store.clear())
+}

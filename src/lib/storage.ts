@@ -1,0 +1,202 @@
+import type { Client, Invoice, Job, OverheadExpense, Package, Supply } from './types'
+
+const STORAGE_KEY = 'detailing_app_data_v1'
+
+export interface JobPhotoLocal {
+  id: string
+  data_url: string
+  type: 'before' | 'after'
+}
+
+export interface AppData {
+  packages: Package[]
+  clients: Client[]
+  jobs: Job[]
+  invoices: Invoice[]
+  supplies: Supply[]
+  overhead_expenses: OverheadExpense[]
+  job_photos: Record<string, JobPhotoLocal[]>
+}
+
+function generateId(): string {
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+export function createSeedData(): AppData {
+  const packages: Package[] = [
+    { id: 'pkg_basic', name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry', default_supplies: [{ supply_id: 'sup_soap', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 2 }] },
+    { id: 'pkg_full', name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail', default_supplies: [{ supply_id: 'sup_soap', default_qty: 8 }, { supply_id: 'sup_interior', default_qty: 6 }, { supply_id: 'sup_towel', default_qty: 4 }] },
+    { id: 'pkg_paint', name: 'Paint Correct', base_price: 450, active: true, description: 'Single-stage paint correction', default_supplies: [{ supply_id: 'sup_soap', default_qty: 6 }, { supply_id: 'sup_wax', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 6 }] },
+    { id: 'pkg_ceramic', name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application', default_supplies: [{ supply_id: 'sup_ceramic', default_qty: 8 }, { supply_id: 'sup_towel', default_qty: 4 }] },
+  ]
+
+  const supplies: Supply[] = [
+    { id: 'sup_soap', name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys' },
+    { id: 'sup_towel', name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon' },
+    { id: 'sup_interior', name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars' },
+    { id: 'sup_wax', name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys' },
+    { id: 'sup_ceramic', name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq' },
+  ]
+
+  const overhead_expenses: OverheadExpense[] = [
+    { id: 'oh_van', name: 'Van payment', amount: 450, category: 'vehicle', billing_cycle: 'monthly' },
+    { id: 'oh_ins', name: 'Business insurance', amount: 120, category: 'insurance', billing_cycle: 'monthly' },
+    { id: 'oh_soft', name: 'Scheduling software', amount: 29, category: 'software', billing_cycle: 'monthly' },
+    { id: 'oh_polish', name: 'Polisher replacement', amount: 350, category: 'equipment', billing_cycle: 'one_time', next_due: '2026-09-01' },
+  ]
+
+  const clients: Client[] = [
+    { id: 'cli_marcus', name: 'Marcus Thompson', phone: '(555) 234-8901', email: 'marcus.t@email.com', lead_source: 'referral', tags: ['repeat', 'vip'], created: '2026-03-01T10:00:00Z' },
+    { id: 'cli_sarah', name: 'Sarah K.', phone: '(555) 876-5432', email: 'sarah.k@email.com', lead_source: 'google', created: '2026-04-15T10:00:00Z' },
+    { id: 'cli_james', name: 'James R.', phone: '(555) 111-2233', lead_source: 'instagram', created: '2026-05-01T10:00:00Z' },
+  ]
+
+  const today = new Date()
+  const fmtDate = (d: Date) => d.toISOString().split('T')[0]
+
+  const jobs: Job[] = [
+    {
+      id: 'job_001',
+      date: fmtDate(today),
+      start_time: '09:00',
+      hours_worked: 3.5,
+      location_type: 'mobile',
+      package_id: 'pkg_full',
+      vehicle_type: 'truck',
+      client_id: 'cli_marcus',
+      status: 'paid',
+      revenue: 320,
+      tip: 20,
+      expenses: [{ category: 'supplies', description: 'Supplies used', amount: 38 }],
+      supplies_used: [{ supply_id: 'sup_soap', quantity_used: 8 }, { supply_id: 'sup_interior', quantity_used: 6 }],
+      travel_cost: 22,
+      marketing_cost: 0,
+      equipment_depreciation: 0,
+      photo_count: 6,
+      invoice_id: 'inv_001',
+    },
+    {
+      id: 'job_002',
+      date: fmtDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2)),
+      hours_worked: 2,
+      location_type: 'fixed',
+      package_id: 'pkg_basic',
+      vehicle_type: 'sedan',
+      client_id: 'cli_sarah',
+      status: 'invoiced',
+      revenue: 80,
+      tip: 0,
+      expenses: [],
+      supplies_used: [],
+      travel_cost: 0,
+      marketing_cost: 0,
+      equipment_depreciation: 0,
+      photo_count: 0,
+      invoice_id: 'inv_002',
+    },
+    {
+      id: 'job_003',
+      date: fmtDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)),
+      start_time: '10:00',
+      hours_worked: 0,
+      location_type: 'mobile',
+      package_id: 'pkg_paint',
+      vehicle_type: 'suv',
+      client_id: 'cli_james',
+      status: 'scheduled',
+      revenue: 450,
+      tip: 0,
+      expenses: [],
+      supplies_used: [],
+      travel_cost: 0,
+      marketing_cost: 0,
+      equipment_depreciation: 0,
+      photo_count: 0,
+    },
+    {
+      id: 'job_004',
+      date: fmtDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 5)),
+      hours_worked: 4,
+      location_type: 'mobile',
+      package_id: 'pkg_ceramic',
+      vehicle_type: 'sedan',
+      client_id: 'cli_marcus',
+      status: 'completed',
+      revenue: 800,
+      tip: 50,
+      expenses: [{ category: 'supplies', description: 'Ceramic supplies', amount: 120 }],
+      supplies_used: [{ supply_id: 'sup_ceramic', quantity_used: 8 }],
+      travel_cost: 15,
+      marketing_cost: 0,
+      equipment_depreciation: 0,
+      photo_count: 4,
+    },
+  ]
+
+  const invoices: Invoice[] = [
+    {
+      id: 'inv_001',
+      invoice_number: 'DET-2026-06-031',
+      job_id: 'job_001',
+      client_id: 'cli_marcus',
+      subtotal: 320,
+      tip: 20,
+      total: 340,
+      status: 'paid',
+      payments: [{ amount: 340, method: 'Venmo', date: fmtDate(today) }],
+      amount_paid: 340,
+      balance_due: 0,
+      paid_at: new Date().toISOString(),
+      terms: 'Due on receipt',
+    },
+    {
+      id: 'inv_002',
+      invoice_number: 'DET-2026-06-028',
+      job_id: 'job_002',
+      client_id: 'cli_sarah',
+      subtotal: 80,
+      tip: 0,
+      total: 80,
+      status: 'sent',
+      payments: [],
+      amount_paid: 0,
+      balance_due: 80,
+      sent_at: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2).toISOString(),
+      terms: 'Due on receipt',
+    },
+  ]
+
+  return { packages, clients, jobs, invoices, supplies, overhead_expenses, job_photos: {} }
+}
+
+export function loadData(): AppData {
+  if (typeof window === 'undefined') return createSeedData()
+
+  const raw = localStorage.getItem(STORAGE_KEY)
+  if (!raw) {
+    const seed = createSeedData()
+    saveData(seed)
+    return seed
+  }
+
+  const parsed = JSON.parse(raw) as Partial<AppData>
+  const seed = createSeedData()
+  return {
+    packages: parsed.packages ?? seed.packages,
+    clients: parsed.clients ?? seed.clients,
+    jobs: parsed.jobs ?? seed.jobs,
+    invoices: parsed.invoices ?? seed.invoices,
+    supplies: parsed.supplies ?? seed.supplies,
+    overhead_expenses: parsed.overhead_expenses ?? seed.overhead_expenses,
+    job_photos: parsed.job_photos ?? {},
+  }
+}
+
+export function saveData(data: AppData): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+}
+
+export function newId(): string {
+  return generateId()
+}

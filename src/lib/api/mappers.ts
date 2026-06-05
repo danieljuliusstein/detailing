@@ -1,0 +1,261 @@
+import type {
+  Client,
+  ExpenseLine,
+  Invoice,
+  Job,
+  JobWithRelations,
+  OverheadExpense,
+  Package,
+  PhotoMeta,
+  Supply,
+  SupplyUsage,
+} from '../types'
+
+/** PocketBase record shape (partial — expand fields vary) */
+export interface PbRecord {
+  id: string
+  created?: string
+  updated?: string
+  expand?: Record<string, PbRecord | undefined>
+  collectionId?: string
+  collectionName?: string
+  [key: string]: unknown
+}
+
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' ? v : undefined
+}
+
+function num(v: unknown, fallback = 0): number {
+  return typeof v === 'number' ? v : fallback
+}
+
+function bool(v: unknown, fallback = false): boolean {
+  return typeof v === 'boolean' ? v : fallback
+}
+
+function jsonArray<T>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : []
+}
+
+function relationId(v: unknown): string {
+  if (typeof v === 'string') return v
+  if (v && typeof v === 'object' && 'id' in v) return String((v as PbRecord).id)
+  return ''
+}
+
+export function pbPackageToApp(r: PbRecord): Package {
+  return {
+    id: r.id,
+    name: String(r.name ?? ''),
+    base_price: num(r.base_price),
+    description: str(r.description),
+    default_supplies: jsonArray(r.default_supplies),
+    active: bool(r.active, true),
+  }
+}
+
+export function pbClientToApp(r: PbRecord): Client {
+  return {
+    id: r.id,
+    name: String(r.name ?? ''),
+    phone: str(r.phone),
+    email: str(r.email),
+    address: str(r.address),
+    lead_source: str(r.lead_source),
+    tags: jsonArray<string>(r.tags),
+    notes: str(r.notes),
+    created: r.created,
+  }
+}
+
+export function pbInvoiceToApp(r: PbRecord): Invoice {
+  return {
+    id: r.id,
+    invoice_number: String(r.invoice_number ?? ''),
+    job_id: relationId(r.job_id),
+    client_id: relationId(r.client_id),
+    subtotal: num(r.subtotal),
+    tip: num(r.tip),
+    total: num(r.total),
+    status: (r.status as Invoice['status']) ?? 'draft',
+    payments: jsonArray(r.payments),
+    amount_paid: num(r.amount_paid),
+    balance_due: num(r.balance_due),
+    sent_at: str(r.sent_at),
+    paid_at: str(r.paid_at),
+    terms: str(r.terms),
+    notes: str(r.notes),
+  }
+}
+
+export function pbJobToApp(r: PbRecord): Job {
+  const photos = r.photos
+  const photoCount = Array.isArray(photos) ? photos.length : 0
+
+  return {
+    id: r.id,
+    date: String(r.date ?? '').slice(0, 10),
+    start_time: str(r.start_time),
+    hours_worked: num(r.hours_worked),
+    location_type: (r.location_type as Job['location_type']) ?? 'mobile',
+    package_id: relationId(r.package_id),
+    vehicle_type: (r.vehicle_type as Job['vehicle_type']) ?? 'sedan',
+    client_id: relationId(r.client_id),
+    status: (r.status as Job['status']) ?? 'completed',
+    revenue: num(r.revenue),
+    tip: num(r.tip),
+    expenses: jsonArray<ExpenseLine>(r.expenses),
+    supplies_used: jsonArray<SupplyUsage>(r.supplies_used),
+    travel_cost: num(r.travel_cost),
+    marketing_cost: num(r.marketing_cost),
+    equipment_depreciation: num(r.equipment_depreciation),
+    notes: str(r.notes),
+    photo_count: photoCount,
+    photo_meta: jsonArray<PhotoMeta>(r.photo_meta),
+    invoice_id: relationId(r.invoice_id) || undefined,
+    created: r.created,
+    updated: r.updated,
+  }
+}
+
+export function pbJobToAppWithRelations(r: PbRecord): JobWithRelations {
+  const job = pbJobToApp(r)
+  const expand = r.expand ?? {}
+
+  return {
+    ...job,
+    client: expand.client_id ? pbClientToApp(expand.client_id) : undefined,
+    package: expand.package_id ? pbPackageToApp(expand.package_id) : undefined,
+    invoice: expand.invoice_id ? pbInvoiceToApp(expand.invoice_id) : undefined,
+  }
+}
+
+export function appJobCreateToPb(input: {
+  date: string
+  location_type: string
+  package_id: string
+  vehicle_type: string
+  client_id: string
+  status: string
+  revenue: number
+  tip: number
+}) {
+  return {
+    date: input.date,
+    location_type: input.location_type,
+    package_id: input.package_id,
+    vehicle_type: input.vehicle_type,
+    client_id: input.client_id,
+    status: input.status,
+    revenue: input.revenue,
+    tip: input.tip,
+    hours_worked: 0,
+    expenses: [],
+    supplies_used: [],
+    travel_cost: 0,
+    marketing_cost: 0,
+    equipment_depreciation: 0,
+  }
+}
+
+export function appJobEditToPb(updates: {
+  packageId: string
+  vehicleType: string
+  locationType: string
+  revenue: number
+  tip: number
+  hours_worked: number
+  start_time?: string
+  status: string
+  notes?: string
+  supplies_used?: SupplyUsage[]
+  travel_cost?: number
+  marketing_cost?: number
+  equipment_depreciation?: number
+  expenses?: ExpenseLine[]
+}) {
+  const payload: Record<string, unknown> = {
+    package_id: updates.packageId,
+    vehicle_type: updates.vehicleType,
+    location_type: updates.locationType,
+    revenue: updates.revenue,
+    tip: updates.tip,
+    hours_worked: updates.hours_worked,
+    start_time: updates.start_time ?? '',
+    status: updates.status,
+    notes: updates.notes ?? '',
+  }
+  if (updates.supplies_used !== undefined) payload.supplies_used = updates.supplies_used
+  if (updates.travel_cost !== undefined) payload.travel_cost = updates.travel_cost
+  if (updates.marketing_cost !== undefined) payload.marketing_cost = updates.marketing_cost
+  if (updates.equipment_depreciation !== undefined) {
+    payload.equipment_depreciation = updates.equipment_depreciation
+  }
+  if (updates.expenses !== undefined) payload.expenses = updates.expenses
+  return payload
+}
+
+export function pbSupplyToApp(r: PbRecord): Supply {
+  return {
+    id: r.id,
+    name: String(r.name ?? ''),
+    unit: String(r.unit ?? ''),
+    quantity_on_hand: num(r.quantity_on_hand),
+    reorder_threshold: typeof r.reorder_threshold === 'number' ? r.reorder_threshold : undefined,
+    cost_per_unit: typeof r.cost_per_unit === 'number' ? r.cost_per_unit : undefined,
+    supplier: str(r.supplier),
+  }
+}
+
+export function appSupplyToPb(input: {
+  name: string
+  unit: string
+  quantity_on_hand: number
+  reorder_threshold?: number
+  cost_per_unit?: number
+  supplier?: string
+}) {
+  return {
+    name: input.name,
+    unit: input.unit,
+    quantity_on_hand: input.quantity_on_hand,
+    reorder_threshold: input.reorder_threshold ?? 0,
+    cost_per_unit: input.cost_per_unit ?? 0,
+    supplier: input.supplier ?? '',
+  }
+}
+
+export function pbOverheadToApp(r: PbRecord): OverheadExpense {
+  return {
+    id: r.id,
+    name: String(r.name ?? ''),
+    amount: num(r.amount),
+    category: str(r.category) as OverheadExpense['category'],
+    billing_cycle: str(r.billing_cycle) as OverheadExpense['billing_cycle'],
+    next_due: str(r.next_due)?.slice(0, 10),
+    notes: str(r.notes),
+  }
+}
+
+export function appOverheadToPb(input: {
+  name: string
+  amount: number
+  category?: string
+  billing_cycle?: string
+  next_due?: string
+  notes?: string
+}) {
+  return {
+    name: input.name,
+    amount: input.amount,
+    category: input.category ?? 'other',
+    billing_cycle: input.billing_cycle ?? 'monthly',
+    next_due: input.next_due ?? '',
+    notes: input.notes ?? '',
+  }
+}
+
+export function escapeFilterValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}

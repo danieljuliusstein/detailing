@@ -1,0 +1,40 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import JobEdit from '@/components/JobEdit'
+import { getJob, getPackages, getSupplies, updateJob } from '@/lib/api'
+import type { JobWithRelations, Package, Supply } from '@/lib/types'
+
+export default function JobEditPage() {
+  const params = useParams()
+  const id = params.id as string
+  const [job, setJob] = useState<JobWithRelations | null | undefined>(undefined)
+  const [packages, setPackages] = useState<Package[]>([])
+  const [supplies, setSupplies] = useState<Supply[]>([])
+
+  useEffect(() => {
+    Promise.all([getJob(id), getPackages(), getSupplies()]).then(([j, pkgs, sups]) => {
+      setJob(j)
+      setPackages(pkgs)
+      setSupplies(sups)
+    })
+  }, [id])
+
+  if (job === undefined || packages.length === 0) {
+    return <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+  }
+
+  if (!job) {
+    return <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Job not found</div>
+  }
+
+  return (
+    <JobEdit
+      job={job}
+      packages={packages}
+      supplies={supplies}
+      onSave={async (data) => { await updateJob(id, data) }}
+    />
+  )
+}
