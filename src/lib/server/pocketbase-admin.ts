@@ -34,5 +34,5 @@ export async function fetchCollection<T = Record<string, unknown>>(
   name: string
 ): Promise<T[]> {
   const pb = await authenticateServerPocketBase()
-  return pb.collection(name).getFullList<T>({ sort: '-created' })
+  return pb.collection(name).getFullList<T>({ sort: '-id' })
 }

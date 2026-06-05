@@ -23,7 +23,7 @@ export async function createPocketBaseBackup(): Promise<BackupPayload> {
 
   for (const name of COLLECTIONS) {
     try {
-      collections[name] = await pb.collection(name).getFullList({ sort: '-created' })
+      collections[name] = await pb.collection(name).getFullList({ sort: '-id' })
     } catch {
       collections[name] = []
     }

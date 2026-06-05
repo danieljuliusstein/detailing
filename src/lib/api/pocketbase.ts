@@ -59,7 +59,7 @@ async function fetchJobsExpanded(): Promise<JobWithRelations[]> {
 }
 
 async function fetchInvoices(): Promise<Invoice[]> {
-  const records = await pb().collection('invoices').getFullList<PbRecord>({ sort: '-created' })
+  const records = await pb().collection('invoices').getFullList<PbRecord>({ sort: '-id' })
   return records.map((r) => normalizeInvoice(pbInvoiceToApp(r)))
 }
 
@@ -77,7 +77,7 @@ export async function getPackages(): Promise<Package[]> {
 }
 
 export async function getClients(): Promise<Client[]> {
-  const records = await pb().collection('clients').getFullList<PbRecord>({ sort: '-created' })
+  const records = await pb().collection('clients').getFullList<PbRecord>({ sort: '-id' })
   return records.map(pbClientToApp)
 }
 

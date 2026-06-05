@@ -10,7 +10,7 @@ function pb() {
 }
 
 export async function getInvoices(): Promise<Invoice[]> {
-  const records = await pb().collection('invoices').getFullList<PbRecord>({ sort: '-created' })
+  const records = await pb().collection('invoices').getFullList<PbRecord>({ sort: '-id' })
   return records.map((r) => normalizeInvoice(pbInvoiceToApp(r)))
 }
 
