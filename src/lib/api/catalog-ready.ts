@@ -1,7 +1,5 @@
 import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
-import * as pb from './pocketbase'
-import * as suppliesPb from './supplies-pocketbase'
 
 const CATALOG_OK_KEY = 'pb_catalog_ready_v1'
 
@@ -36,33 +34,7 @@ export async function syncCatalogReadyFlag(): Promise<void> {
   }
 }
 
-/** Seed defaults only when authenticated and collections are actually empty (migration). */
+/** Migration hook — mark ready if catalog exists; never auto-seed (use scripts/seed-*.mjs). */
 export async function ensureDefaultCatalog(): Promise<void> {
-  if (isCatalogMarkedReady()) return
-  if (!(await ensurePocketBaseAuth())) return
-
-  const client = getPocketBase()
-  if (!client) return
-
-  const [packages, supplies] = await Promise.all([
-    client.collection('packages').getList(1, 1),
-    client.collection('supplies').getList(1, 1),
-  ])
-
-  if (packages.totalItems > 0 && supplies.totalItems > 0) {
-    markCatalogReady()
-    return
-  }
-
-  if (packages.totalItems === 0) await pb.seedPackagesIfEmpty()
-  if (supplies.totalItems === 0) await suppliesPb.seedSuppliesIfEmpty()
-
-  const [pkgAfter, supAfter] = await Promise.all([
-    client.collection('packages').getList(1, 1),
-    client.collection('supplies').getList(1, 1),
-  ])
-
-  if (pkgAfter.totalItems > 0 && supAfter.totalItems > 0) {
-    markCatalogReady()
-  }
+  return syncCatalogReadyFlag()
 }
