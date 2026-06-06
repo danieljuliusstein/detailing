@@ -152,6 +152,19 @@ export default function SupplyEditSheet({
           </div>
         )}
 
+        {mode === 'edit' && supply && (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
+            <div>
+              On hand: <strong style={{ color: 'var(--text-primary)' }}>{supply.quantity_on_hand} {supply.unit}</strong>
+            </div>
+            <div>
+              {supply.cost_per_unit != null && supply.cost_per_unit > 0
+                ? <>Cost: <strong style={{ color: 'var(--green-text)' }}>{fmtDetailed(supply.cost_per_unit)}/{supply.unit}</strong></>
+                : <span style={{ color: 'var(--amber-text)' }}>No cost set — use Restock after a purchase to calculate $/unit</span>}
+            </div>
+          </div>
+        )}
+
         {mode !== 'restock' && (
           <>
             <label className="inv-field-label">NAME</label>

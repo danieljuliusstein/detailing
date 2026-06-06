@@ -118,6 +118,9 @@ function SupplyRow({
         <div className="inv-item-row-right">
           <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 6 }}>
             {supply.quantity_on_hand} {supply.unit}
+            {supply.cost_per_unit != null && supply.cost_per_unit > 0
+              ? ` · ${fmtDetailed(supply.cost_per_unit)}/${supply.unit}`
+              : ''}
           </span>
           <span className={`inv-status-badge inv-status-badge--${low ? 'low' : 'ok'}`}>
             {low ? 'LOW' : 'OK'}
