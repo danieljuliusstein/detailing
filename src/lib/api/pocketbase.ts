@@ -1,8 +1,9 @@
 import { normalizeInvoice } from '../invoices'
 import {
-  buildSupplyExpenseLine,
+  applySupplyExpenses,
+  inventoryDeltaFromUsageChange,
+  isCompletedStatus,
   isCompletingJob,
-  mergeSupplyExpense,
   overheadAmountForDates,
   resolveSuppliesUsed,
 } from '../supplies-logic'
@@ -212,9 +213,23 @@ export async function createJob(input: QuickJobData): Promise<Job> {
     status: 'completed',
     revenue: input.revenue,
     tip: input.tip,
-  })
+  }) as Record<string, unknown>
+
+  const { getSupplies, deductSupplies } = await import('./supplies-pocketbase')
+  const [catalog, pkgRecord] = await Promise.all([
+    getSupplies(),
+    pb().collection('packages').getOne<PbRecord>(input.packageId),
+  ])
+  const pkg = pbPackageToApp(pkgRecord)
+  const suppliesUsed = resolveSuppliesUsed({ supplies_used: [] }, pkg, input.supplies_used)
+  const { supplies_used, expenses } = applySupplyExpenses(suppliesUsed, catalog)
+  payload.supplies_used = supplies_used
+  payload.expenses = expenses
 
   const record = await pb().collection('jobs').create<PbRecord>(payload)
+  if (supplies_used.length > 0) {
+    await deductSupplies(suppliesUsed)
+  }
   return pbJobToApp(record)
 }
 
@@ -224,17 +239,27 @@ export async function updateJob(id: string, updates: JobEditData): Promise<Job |
     const currentJob = pbJobToApp(current)
     const pkg = current.expand?.package_id ? pbPackageToApp(current.expand.package_id) : undefined
     const completing = isCompletingJob(currentJob.status, updates.status)
+    const alreadyCompleted = isCompletedStatus(currentJob.status)
 
     const payload = appJobEditToPb(updates) as Record<string, unknown>
 
-    if (completing) {
+    if (completing || (alreadyCompleted && updates.supplies_used !== undefined)) {
       const { getSupplies, deductSupplies } = await import('./supplies-pocketbase')
       const catalog = await getSupplies()
       const suppliesUsed = resolveSuppliesUsed(currentJob, pkg, updates.supplies_used)
-      const supplyLine = buildSupplyExpenseLine(suppliesUsed, catalog)
-      payload.supplies_used = suppliesUsed
-      payload.expenses = mergeSupplyExpense(currentJob.expenses, supplyLine)
-      await deductSupplies(suppliesUsed)
+
+      if (completing) {
+        const { supplies_used, expenses } = applySupplyExpenses(suppliesUsed, catalog, currentJob.expenses)
+        payload.supplies_used = supplies_used
+        payload.expenses = expenses
+        await deductSupplies(suppliesUsed)
+      } else {
+        const { supplies_used, expenses } = applySupplyExpenses(suppliesUsed, catalog, currentJob.expenses)
+        payload.supplies_used = supplies_used
+        payload.expenses = expenses
+        const delta = inventoryDeltaFromUsageChange(currentJob.supplies_used, suppliesUsed)
+        if (delta.length > 0) await deductSupplies(delta)
+      }
     }
 
     const record = await pb().collection('jobs').update<PbRecord>(id, payload)

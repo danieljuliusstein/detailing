@@ -5,46 +5,71 @@ import { useRouter } from 'next/navigation'
 import { Plus, Warning } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import { createSupply, getSupplies, restockSupply } from '@/lib/api'
-import { isLowStock } from '@/lib/supplies-logic'
+import { costPerUnitFromPurchase } from '@/lib/supplies-logic'
 import { fmtDetailed } from '@/lib/calculations'
-import type { Supply } from '@/lib/types'
+import type { Supply, SupplyKind } from '@/lib/types'
+
+const KIND_LABELS: Record<SupplyKind, string> = {
+  chemical: 'Chemical',
+  consumable: 'Consumable',
+  other: 'Other',
+}
 
 export default function Inventory() {
   const router = useRouter()
   const [supplies, setSupplies] = useState<Supply[]>([])
   const [showAdd, setShowAdd] = useState(false)
+  const [restockId, setRestockId] = useState<string | null>(null)
   const [name, setName] = useState('')
-  const [unit, setUnit] = useState('each')
-  const [qty, setQty] = useState(0)
-  const [threshold, setThreshold] = useState(0)
-  const [cost, setCost] = useState(0)
+  const [unit, setUnit] = useState('oz')
+  const [kind, setKind] = useState<SupplyKind>('other')
+  const [qty, setQty] = useState('')
+  const [totalCost, setTotalCost] = useState('')
+  const [threshold, setThreshold] = useState('')
+  const [restockQty, setRestockQty] = useState('')
+  const [restockCost, setRestockCost] = useState('')
 
   const load = async () => setSupplies(await getSupplies())
   useEffect(() => { load() }, [])
 
-  const handleRestock = async (id: string) => {
-    const amount = prompt('How many to add?')
-    if (!amount) return
-    const delta = Number(amount)
-    if (!Number.isFinite(delta) || delta <= 0) return
-    await restockSupply(id, delta)
+  const computedCost =
+    Number(qty) > 0 && Number(totalCost) > 0
+      ? costPerUnitFromPurchase(Number(qty), Number(totalCost))
+      : 0
+
+  const handleRestock = async () => {
+    if (!restockId) return
+    const quantity = Number(restockQty)
+    if (!quantity || quantity <= 0) return
+    const cost = Number(restockCost)
+    await restockSupply(restockId, {
+      quantity,
+      total_cost: cost > 0 ? cost : undefined,
+    })
+    setRestockId(null)
+    setRestockQty('')
+    setRestockCost('')
     await load()
   }
 
   const handleAdd = async () => {
     if (!name.trim()) return
+    const quantity = Number(qty)
+    if (!quantity) return
     await createSupply({
       name: name.trim(),
       unit: unit.trim() || 'each',
-      quantity_on_hand: qty,
-      reorder_threshold: threshold || undefined,
-      cost_per_unit: cost || undefined,
+      quantity_on_hand: quantity,
+      reorder_threshold: Number(threshold) || undefined,
+      cost_per_unit: computedCost || undefined,
+      kind,
     })
     setShowAdd(false)
     setName('')
-    setQty(0)
-    setThreshold(0)
-    setCost(0)
+    setQty('')
+    setTotalCost('')
+    setThreshold('')
+    setKind('other')
     await load()
   }
 
@@ -67,14 +92,38 @@ export default function Inventory() {
           <div className="section-title">New supply</div>
           <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ marginBottom: 8 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <select className="input" value={kind} onChange={(e) => setKind(e.target.value as SupplyKind)}>
+              <option value="chemical">Chemical</option>
+              <option value="consumable">Consumable</option>
+              <option value="other">Other</option>
+            </select>
             <input className="input" placeholder="Unit (oz, each…)" value={unit} onChange={(e) => setUnit(e.target.value)} />
-            <input type="number" className="input" placeholder="Qty on hand" value={qty || ''} onChange={(e) => setQty(Number(e.target.value))} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <input type="number" className="input" placeholder="Reorder at" value={threshold || ''} onChange={(e) => setThreshold(Number(e.target.value))} />
-            <input type="number" step="0.01" className="input" placeholder="Cost/unit" value={cost || ''} onChange={(e) => setCost(Number(e.target.value))} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <input type="number" className="input" placeholder="Qty on hand" value={qty} onChange={(e) => setQty(e.target.value)} />
+            <input type="number" step="0.01" className="input" placeholder="Total paid ($)" value={totalCost} onChange={(e) => setTotalCost(e.target.value)} />
           </div>
+          {computedCost > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
+              Cost/unit: {fmtDetailed(computedCost)}
+            </div>
+          )}
+          <input type="number" className="input" placeholder="Reorder at" value={threshold} onChange={(e) => setThreshold(e.target.value)} style={{ marginBottom: 12 }} />
           <button className="btn-primary" onClick={handleAdd} style={{ width: '100%' }}>Add supply</button>
+        </div>
+      )}
+
+      {restockId && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="section-title">Restock</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <input type="number" className="input" placeholder="Qty added" value={restockQty} onChange={(e) => setRestockQty(e.target.value)} />
+            <input type="number" step="0.01" className="input" placeholder="Total paid ($)" value={restockCost} onChange={(e) => setRestockCost(e.target.value)} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <button className="btn-primary" onClick={handleRestock}>Confirm restock</button>
+            <button className="btn-ghost" onClick={() => setRestockId(null)}>Cancel</button>
+          </div>
         </div>
       )}
 
@@ -83,14 +132,14 @@ export default function Inventory() {
       )}
 
       {supplies.map((s) => {
-        const low = isLowStock(s)
+        const low = s.reorder_threshold != null && s.quantity_on_hand <= s.reorder_threshold
         return (
           <div key={s.id} className="card" style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {s.quantity_on_hand} {s.unit}
+                  {KIND_LABELS[s.kind ?? 'other']} · {s.quantity_on_hand} {s.unit}
                   {s.cost_per_unit ? ` · ${fmtDetailed(s.cost_per_unit)}/${s.unit}` : ''}
                 </div>
               </div>
@@ -105,7 +154,7 @@ export default function Inventory() {
                 Reorder at {s.reorder_threshold} {s.unit}
               </div>
             )}
-            <button className="btn-ghost" onClick={() => handleRestock(s.id)} style={{ width: '100%', fontSize: 13 }}>
+            <button className="btn-ghost" onClick={() => setRestockId(s.id)} style={{ width: '100%', fontSize: 13 }}>
               Restock
             </button>
           </div>

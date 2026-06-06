@@ -12,6 +12,58 @@ import { rangeFor } from './api/aggregates'
 
 const COMPLETED_STATUSES: JobStatus[] = ['completed', 'invoiced', 'paid']
 
+export function isCompletedStatus(status: JobStatus): boolean {
+  return COMPLETED_STATUSES.includes(status)
+}
+
+export function weightedAverageCostPerUnit(
+  currentQty: number,
+  currentCostPerUnit: number | undefined,
+  addQty: number,
+  purchaseTotal: number
+): number {
+  if (addQty <= 0) return currentCostPerUnit ?? 0
+  const purchaseCostPerUnit = purchaseTotal / addQty
+  if (currentQty <= 0 || currentCostPerUnit == null || currentCostPerUnit <= 0) {
+    return Math.round(purchaseCostPerUnit * 10000) / 10000
+  }
+  const blended = (currentQty * currentCostPerUnit + purchaseTotal) / (currentQty + addQty)
+  return Math.round(blended * 10000) / 10000
+}
+
+export function costPerUnitFromPurchase(quantity: number, totalCost: number): number {
+  if (quantity <= 0 || totalCost <= 0) return 0
+  return Math.round((totalCost / quantity) * 10000) / 10000
+}
+
+export function filterSuppliesByKind(supplies: Supply[], kind: Supply['kind']): Supply[] {
+  return supplies.filter((s) => (s.kind ?? 'other') === kind)
+}
+
+export function inventoryDeltaFromUsageChange(
+  oldUsed: SupplyUsage[],
+  newUsed: SupplyUsage[]
+): SupplyUsage[] {
+  const map = new Map<string, number>()
+  for (const u of newUsed) map.set(u.supply_id, (map.get(u.supply_id) ?? 0) + u.quantity_used)
+  for (const u of oldUsed) map.set(u.supply_id, (map.get(u.supply_id) ?? 0) - u.quantity_used)
+  return [...map.entries()]
+    .filter(([, delta]) => delta !== 0)
+    .map(([supply_id, quantity_used]) => ({ supply_id, quantity_used }))
+}
+
+export function applySupplyExpenses(
+  suppliesUsed: SupplyUsage[],
+  catalog: Supply[],
+  existingExpenses: ExpenseLine[] = []
+): { supplies_used: SupplyUsage[]; expenses: ExpenseLine[] } {
+  const supplyLine = buildSupplyExpenseLine(suppliesUsed, catalog)
+  return {
+    supplies_used: suppliesUsed,
+    expenses: mergeSupplyExpense(existingExpenses, supplyLine),
+  }
+}
+
 export function isCompletingJob(oldStatus: JobStatus, newStatus: JobStatus): boolean {
   return !COMPLETED_STATUSES.includes(oldStatus) && COMPLETED_STATUSES.includes(newStatus)
 }
@@ -122,7 +174,7 @@ export function overheadAmountForRange(
 }
 
 export function resolveSuppliesUsed(
-  job: Job,
+  job: Pick<Job, 'supplies_used'>,
   pkg: Package | undefined,
   explicit?: SupplyUsage[]
 ): SupplyUsage[] {

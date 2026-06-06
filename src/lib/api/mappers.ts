@@ -1,5 +1,6 @@
 import type {
   Client,
+  Equipment,
   ExpenseLine,
   Invoice,
   Job,
@@ -8,6 +9,7 @@ import type {
   Package,
   PhotoMeta,
   Supply,
+  SupplyKind,
   SupplyUsage,
 } from '../types'
 
@@ -197,6 +199,7 @@ export function appJobEditToPb(updates: {
 }
 
 export function pbSupplyToApp(r: PbRecord): Supply {
+  const kind = str(r.kind) as SupplyKind | undefined
   return {
     id: r.id,
     name: String(r.name ?? ''),
@@ -205,6 +208,8 @@ export function pbSupplyToApp(r: PbRecord): Supply {
     reorder_threshold: typeof r.reorder_threshold === 'number' ? r.reorder_threshold : undefined,
     cost_per_unit: typeof r.cost_per_unit === 'number' ? r.cost_per_unit : undefined,
     supplier: str(r.supplier),
+    kind: kind && ['chemical', 'consumable', 'other'].includes(kind) ? kind : 'other',
+    notes: str(r.notes),
   }
 }
 
@@ -215,6 +220,8 @@ export function appSupplyToPb(input: {
   reorder_threshold?: number
   cost_per_unit?: number
   supplier?: string
+  kind?: SupplyKind
+  notes?: string
 }) {
   return {
     name: input.name,
@@ -223,6 +230,38 @@ export function appSupplyToPb(input: {
     reorder_threshold: input.reorder_threshold ?? 0,
     cost_per_unit: input.cost_per_unit ?? 0,
     supplier: input.supplier ?? '',
+    kind: input.kind ?? 'other',
+    notes: input.notes ?? '',
+  }
+}
+
+export function pbEquipmentToApp(r: PbRecord): Equipment {
+  return {
+    id: r.id,
+    name: String(r.name ?? ''),
+    purchase_price: typeof r.purchase_price === 'number' ? r.purchase_price : undefined,
+    purchase_date: str(r.purchase_date)?.slice(0, 10),
+    supplier: str(r.supplier),
+    notes: str(r.notes),
+    status: (str(r.status) as Equipment['status']) ?? 'active',
+  }
+}
+
+export function appEquipmentToPb(input: {
+  name: string
+  purchase_price?: number
+  purchase_date?: string
+  supplier?: string
+  notes?: string
+  status?: Equipment['status']
+}) {
+  return {
+    name: input.name,
+    purchase_price: input.purchase_price ?? 0,
+    purchase_date: input.purchase_date ?? '',
+    supplier: input.supplier ?? '',
+    notes: input.notes ?? '',
+    status: input.status ?? 'active',
   }
 }
 

@@ -16,6 +16,7 @@ import * as invPb from './invoices-pocketbase'
 import * as overheadPb from './overhead-pocketbase'
 import * as photosPb from './photos-pocketbase'
 import * as pb from './pocketbase'
+import * as equipmentPb from './equipment-pocketbase'
 import * as suppliesPb from './supplies-pocketbase'
 import {
   preloadIdMaps,
@@ -54,6 +55,7 @@ export interface SyncStatus {
 export class IdMaps {
   jobs = new Map<string, string>()
   supplies = new Map<string, string>()
+  equipment = new Map<string, string>()
   overhead = new Map<string, string>()
   invoices = new Map<string, string>()
 
@@ -63,6 +65,10 @@ export class IdMaps {
 
   resolveSupply(id: string): string {
     return this.supplies.get(id) ?? id
+  }
+
+  resolveEquipment(id: string): string {
+    return this.equipment.get(id) ?? id
   }
 
   resolveOverhead(id: string): string {
@@ -152,7 +158,22 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
     }
     case 'restockSupply': {
       const supplyId = maps.resolveSupply(op.params.id)
-      await suppliesPb.updateSupplyQty(supplyId, op.params.quantity)
+      await suppliesPb.restockSupply(supplyId, op.params.input)
+      break
+    }
+    case 'createEquipment': {
+      const item = await equipmentPb.createEquipment(op.params)
+      maps.equipment.set(op.localEquipmentId, item.id)
+      break
+    }
+    case 'updateEquipment': {
+      const equipmentId = maps.resolveEquipment(op.params.id)
+      await equipmentPb.updateEquipment(equipmentId, op.params.input)
+      break
+    }
+    case 'deleteEquipment': {
+      const equipmentId = maps.resolveEquipment(op.params.id)
+      await equipmentPb.deleteEquipment(equipmentId)
       break
     }
     case 'createOverheadExpense': {

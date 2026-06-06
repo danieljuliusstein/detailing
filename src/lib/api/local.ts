@@ -6,9 +6,10 @@ import {
 import { normalizeInvoice } from '../invoices'
 import {
   applyInventoryDeduction,
-  buildSupplyExpenseLine,
+  applySupplyExpenses,
+  inventoryDeltaFromUsageChange,
+  isCompletedStatus,
   isCompletingJob,
-  mergeSupplyExpense,
   resolveSuppliesUsed,
 } from '../supplies-logic'
 import { loadData, newId, saveData } from '../storage'
@@ -172,6 +173,9 @@ export function findOrCreateClient(name: string, existingId: string | null): Cli
 export function createJob(input: QuickJobData): Job {
   const data = loadData()
   const client = findOrCreateClient(input.clientName, input.clientId)
+  const pkg = data.packages.find((p) => p.id === input.packageId)
+  const suppliesUsed = resolveSuppliesUsed({ supplies_used: [] }, pkg, input.supplies_used)
+  const { supplies_used, expenses } = applySupplyExpenses(suppliesUsed, data.supplies)
 
   const job: Job = {
     id: newId(),
@@ -184,14 +188,18 @@ export function createJob(input: QuickJobData): Job {
     status: 'completed',
     revenue: input.revenue,
     tip: input.tip,
-    expenses: [],
-    supplies_used: [],
+    expenses,
+    supplies_used,
     travel_cost: 0,
     marketing_cost: 0,
     equipment_depreciation: 0,
     photo_count: 0,
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
+  }
+
+  if (supplies_used.length > 0) {
+    data.supplies = applyInventoryDeduction(data.supplies, supplies_used)
   }
 
   data.jobs.unshift(job)
@@ -217,15 +225,26 @@ export function updateJob(id: string, updates: JobEditData): Job | null {
   const current = data.jobs[idx]
   const pkg = data.packages.find((p) => p.id === updates.packageId)
   const completing = isCompletingJob(current.status, updates.status)
+  const alreadyCompleted = isCompletedStatus(current.status)
 
   let suppliesUsed = updates.supplies_used ?? current.supplies_used
   let expenses = current.expenses
 
   if (completing) {
     suppliesUsed = resolveSuppliesUsed(current, pkg, updates.supplies_used)
-    const supplyLine = buildSupplyExpenseLine(suppliesUsed, data.supplies)
-    expenses = mergeSupplyExpense(current.expenses, supplyLine)
+    const applied = applySupplyExpenses(suppliesUsed, data.supplies, current.expenses)
+    suppliesUsed = applied.supplies_used
+    expenses = applied.expenses
     data.supplies = applyInventoryDeduction(data.supplies, suppliesUsed)
+  } else if (alreadyCompleted && updates.supplies_used !== undefined) {
+    suppliesUsed = resolveSuppliesUsed(current, pkg, updates.supplies_used)
+    const applied = applySupplyExpenses(suppliesUsed, data.supplies, current.expenses)
+    suppliesUsed = applied.supplies_used
+    expenses = applied.expenses
+    const delta = inventoryDeltaFromUsageChange(current.supplies_used, suppliesUsed)
+    if (delta.length > 0) {
+      data.supplies = applyInventoryDeduction(data.supplies, delta)
+    }
   }
 
   data.jobs[idx] = {

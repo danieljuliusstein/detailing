@@ -11,7 +11,10 @@ export type QueueOperation =
   | { type: 'markInvoicePaid'; params: { invoiceId: string; method: string } }
   | { type: 'createSupply'; params: import('./types').SupplyInput; localSupplyId: string }
   | { type: 'updateSupply'; params: { id: string; input: Partial<import('./types').SupplyInput> } }
-  | { type: 'restockSupply'; params: { id: string; quantity: number } }
+  | { type: 'restockSupply'; params: { id: string; input: import('./types').RestockInput } }
+  | { type: 'createEquipment'; params: import('./types').EquipmentInput; localEquipmentId: string }
+  | { type: 'updateEquipment'; params: { id: string; input: Partial<import('./types').EquipmentInput> } }
+  | { type: 'deleteEquipment'; params: { id: string } }
   | { type: 'createOverheadExpense'; params: import('./types').OverheadInput; localOverheadId: string }
   | { type: 'updateOverheadExpense'; params: { id: string; input: Partial<import('./types').OverheadInput> } }
   | { type: 'deleteOverheadExpense'; params: { id: string } }

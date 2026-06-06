@@ -7,6 +7,7 @@ import {
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
 import type { JobEditData, JobStatus, JobWithRelations, Package, Supply, SupplyUsage, VehicleType } from '@/lib/types'
 
 const VEHICLE_TYPES: { id: VehicleType; label: string; Icon: PhosphorIcon }[] = [
@@ -60,15 +61,6 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
       })))
     }
   }, [])
-
-  const updateSupplyQty = (supplyId: string, qty: number) => {
-    setSuppliesUsed((prev) => {
-      const existing = prev.find((u) => u.supply_id === supplyId)
-      if (qty <= 0) return prev.filter((u) => u.supply_id !== supplyId)
-      if (existing) return prev.map((u) => u.supply_id === supplyId ? { ...u, quantity_used: qty } : u)
-      return [...prev, { supply_id: supplyId, quantity_used: qty }]
-    })
-  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -161,18 +153,18 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
         <div>
           <div className="section-title">Revenue</div>
-          <input type="number" className="input money" value={revenue} onChange={(e) => setRevenue(Number(e.target.value))} style={{ fontWeight: 700, color: 'var(--green)' }} />
+          <input type="number" className="input money" value={revenue || ''} onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))} style={{ fontWeight: 700, color: 'var(--green)' }} />
         </div>
         <div>
           <div className="section-title">Tip</div>
-          <input type="number" className="input money" value={tip} onChange={(e) => setTip(Number(e.target.value))} />
+          <input type="number" className="input money" value={tip || ''} onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))} />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
         <div>
           <div className="section-title">Hours worked</div>
-          <input type="number" step="0.5" className="input" value={hoursWorked} onChange={(e) => setHoursWorked(Number(e.target.value))} />
+          <input type="number" step="0.5" className="input" value={hoursWorked || ''} onChange={(e) => setHoursWorked(e.target.value === '' ? 0 : Number(e.target.value))} />
         </div>
         <div>
           <div className="section-title">Start time</div>
@@ -194,41 +186,21 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Travel</div>
-          <input type="number" className="input money" value={travelCost} onChange={(e) => setTravelCost(Number(e.target.value))} />
+          <input type="number" className="input money" value={travelCost || ''} onChange={(e) => setTravelCost(e.target.value === '' ? 0 : Number(e.target.value))} />
         </div>
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Marketing</div>
-          <input type="number" className="input money" value={marketingCost} onChange={(e) => setMarketingCost(Number(e.target.value))} />
+          <input type="number" className="input money" value={marketingCost || ''} onChange={(e) => setMarketingCost(e.target.value === '' ? 0 : Number(e.target.value))} />
         </div>
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Equipment</div>
-          <input type="number" className="input money" value={equipmentCost} onChange={(e) => setEquipmentCost(Number(e.target.value))} />
+          <input type="number" className="input money" value={equipmentCost || ''} onChange={(e) => setEquipmentCost(e.target.value === '' ? 0 : Number(e.target.value))} />
         </div>
       </div>
 
       <div className="section-title">Supplies used</div>
       <div className="card" style={{ marginBottom: 20 }}>
-        {supplies.map((s) => {
-          const usage = suppliesUsed.find((u) => u.supply_id === s.id)
-          return (
-            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.quantity_on_hand} {s.unit} on hand</div>
-              </div>
-              <input
-                type="number"
-                min={0}
-                step={s.unit === 'each' ? 1 : 0.5}
-                className="input"
-                style={{ width: 72, textAlign: 'center' }}
-                value={usage?.quantity_used ?? ''}
-                placeholder="0"
-                onChange={(e) => updateSupplyQty(s.id, Number(e.target.value))}
-              />
-            </div>
-          )
-        })}
+        <JobSuppliesPicker supplies={supplies} value={suppliesUsed} onChange={setSuppliesUsed} />
       </div>
 
       <div className="section-title">Notes</div>

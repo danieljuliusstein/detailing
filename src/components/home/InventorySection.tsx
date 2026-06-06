@@ -11,35 +11,84 @@ import {
   Wrench,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
+import EquipmentEditSheet, { type EquipmentSheetMode } from './EquipmentEditSheet'
 import InventoryEditSheet from './InventoryEditSheet'
+import SupplyEditSheet, { type SupplySheetMode } from './SupplyEditSheet'
 import {
-  countLowItems,
+  createEquipment,
+  createSupply,
+  deleteEquipment,
+  deleteSupply,
+  getEquipment,
+  getSupplies,
+  restockSupply,
+  updateEquipment,
+  updateSupply,
+} from '@/lib/api'
+import { fmtDetailed } from '@/lib/calculations'
+import {
   deleteHomeInventoryItem,
   getItemsByCategory,
   loadHomeInventory,
   saveHomeInventory,
   upsertHomeInventoryItem,
   type HomeInventoryItem,
-  type InventoryCategory,
   type InventoryStatus,
 } from '@/lib/home-inventory'
+import { filterSuppliesByKind, isLowStock } from '@/lib/supplies-logic'
+import type { Equipment, Supply, SupplyKind } from '@/lib/types'
 
-type OpenSections = Record<InventoryCategory, boolean>
+type SectionKey = 'chemicals' | 'equipment' | 'supplies' | 'wishlist'
+
+type OpenSections = Record<SectionKey, boolean>
 
 const SECTIONS: {
-  key: InventoryCategory
+  key: SectionKey
   title: string
   Icon: PhosphorIcon
   iconBg: string
   iconColor: string
   addLabel: string
-  hasStatus?: boolean
+  supplyKind?: SupplyKind
   isWishlist?: boolean
+  isEquipment?: boolean
 }[] = [
-  { key: 'chemicals', title: 'Chemicals', Icon: Flask, iconBg: 'var(--green-dim)', iconColor: 'var(--green-text)', addLabel: 'chemical', hasStatus: true },
-  { key: 'equipment', title: 'Equipment', Icon: Wrench, iconBg: 'var(--blue-dim)', iconColor: 'var(--blue-text)', addLabel: 'equipment' },
-  { key: 'supplies', title: 'Supplies', Icon: Package, iconBg: 'var(--amber-dim)', iconColor: 'var(--amber-text)', addLabel: 'supply', hasStatus: true },
-  { key: 'wishlist', title: 'Wish List', Icon: Star, iconBg: 'var(--red-dim)', iconColor: 'var(--amber-text)', addLabel: 'item', isWishlist: true },
+  {
+    key: 'chemicals',
+    title: 'Chemicals',
+    Icon: Flask,
+    iconBg: 'var(--green-dim)',
+    iconColor: 'var(--green-text)',
+    addLabel: 'chemical',
+    supplyKind: 'chemical',
+  },
+  {
+    key: 'equipment',
+    title: 'Equipment',
+    Icon: Wrench,
+    iconBg: 'var(--blue-dim)',
+    iconColor: 'var(--blue-text)',
+    addLabel: 'equipment',
+    isEquipment: true,
+  },
+  {
+    key: 'supplies',
+    title: 'Supplies',
+    Icon: Package,
+    iconBg: 'var(--amber-dim)',
+    iconColor: 'var(--amber-text)',
+    addLabel: 'supply',
+    supplyKind: 'consumable',
+  },
+  {
+    key: 'wishlist',
+    title: 'Wish List',
+    Icon: Star,
+    iconBg: 'var(--red-dim)',
+    iconColor: 'var(--amber-text)',
+    addLabel: 'item',
+    isWishlist: true,
+  },
 ]
 
 function notifyLowStock(name: string) {
@@ -52,29 +101,42 @@ function notifyLowStock(name: string) {
   }
 }
 
-function sectionSubtitle(
-  section: (typeof SECTIONS)[number],
-  sectionItems: HomeInventoryItem[]
-): string {
-  if (section.isWishlist) {
-    const total = sectionItems.reduce((sum, i) => sum + (i.priceEstimate ?? 0), 0)
-    return `$${total} total`
-  }
-  const low = sectionItems.filter((i) => i.status === 'low').length
-  if (section.hasStatus) {
-    return `${sectionItems.length} item${sectionItems.length === 1 ? '' : 's'} · ${low} low`
-  }
-  return `${sectionItems.length} item${sectionItems.length === 1 ? '' : 's'}`
-}
-
-function ItemRow({
-  item,
-  section,
+function SupplyRow({
+  supply,
   onEdit,
   showDivider,
 }: {
-  item: HomeInventoryItem
-  section: (typeof SECTIONS)[number]
+  supply: Supply
+  onEdit: () => void
+  showDivider: boolean
+}) {
+  const low = isLowStock(supply)
+  return (
+    <div className={`inv-item-row-wrap${showDivider ? ' inv-item-row-wrap--divider' : ''}`}>
+      <button type="button" className="inv-item-row" onClick={onEdit}>
+        <span className="inv-item-name">{supply.name}</span>
+        <div className="inv-item-row-right">
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 6 }}>
+            {supply.quantity_on_hand} {supply.unit}
+          </span>
+          <span className={`inv-status-badge inv-status-badge--${low ? 'low' : 'ok'}`}>
+            {low ? 'LOW' : 'OK'}
+          </span>
+          <span className="inv-item-edit" aria-hidden>
+            <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
+          </span>
+        </div>
+      </button>
+    </div>
+  )
+}
+
+function EquipmentRow({
+  item,
+  onEdit,
+  showDivider,
+}: {
+  item: Equipment
   onEdit: () => void
   showDivider: boolean
 }) {
@@ -83,13 +145,11 @@ function ItemRow({
       <button type="button" className="inv-item-row" onClick={onEdit}>
         <span className="inv-item-name">{item.name}</span>
         <div className="inv-item-row-right">
-          {section.hasStatus && item.status && (
-            <span className={`inv-status-badge inv-status-badge--${item.status}`}>
-              {item.status === 'low' ? 'LOW' : 'OK'}
-            </span>
+          {item.purchase_price != null && item.purchase_price > 0 && (
+            <span className="inv-item-price">{fmtDetailed(item.purchase_price)}</span>
           )}
-          {section.isWishlist && (
-            <span className="inv-item-price">${item.priceEstimate ?? 0}</span>
+          {item.status === 'retired' && (
+            <span className="inv-status-badge inv-status-badge--low">RETIRED</span>
           )}
           <span className="inv-item-edit" aria-hidden>
             <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
@@ -100,8 +160,35 @@ function ItemRow({
   )
 }
 
+function WishlistRow({
+  item,
+  onEdit,
+  showDivider,
+}: {
+  item: HomeInventoryItem
+  onEdit: () => void
+  showDivider: boolean
+}) {
+  return (
+    <div className={`inv-item-row-wrap${showDivider ? ' inv-item-row-wrap--divider' : ''}`}>
+      <button type="button" className="inv-item-row" onClick={onEdit}>
+        <span className="inv-item-name">{item.name}</span>
+        <div className="inv-item-row-right">
+          <span className="inv-item-price">${item.priceEstimate ?? 0}</span>
+          <span className="inv-item-edit" aria-hidden>
+            <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
+          </span>
+        </div>
+      </button>
+    </div>
+  )
+}
+
 export default function InventorySection() {
-  const [items, setItems] = useState<HomeInventoryItem[]>([])
+  const [catalog, setCatalog] = useState<Supply[]>([])
+  const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [wishlist, setWishlist] = useState<HomeInventoryItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [inventoryOpen, setInventoryOpen] = useState(true)
   const [openSections, setOpenSections] = useState<OpenSections>({
     chemicals: true,
@@ -109,22 +196,36 @@ export default function InventorySection() {
     supplies: true,
     wishlist: true,
   })
-  const [editingItem, setEditingItem] = useState<HomeInventoryItem | null>(null)
-  const [addingCategory, setAddingCategory] = useState<InventoryCategory | null>(null)
+
+  const [editingSupply, setEditingSupply] = useState<Supply | null>(null)
+  const [supplyKind, setSupplyKind] = useState<SupplyKind>('chemical')
+  const [supplyMode, setSupplyMode] = useState<SupplySheetMode>('add')
+  const [addingSupplyKind, setAddingSupplyKind] = useState<SupplyKind | null>(null)
+
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+  const [equipmentMode, setEquipmentMode] = useState<EquipmentSheetMode>('add')
+  const [addingEquipment, setAddingEquipment] = useState(false)
+
+  const [editingWishlist, setEditingWishlist] = useState<HomeInventoryItem | null>(null)
+  const [addingWishlist, setAddingWishlist] = useState(false)
+
+  const reload = useCallback(async () => {
+    const [supplies, equip] = await Promise.all([getSupplies(), getEquipment()])
+    setCatalog(supplies)
+    setEquipment(equip.filter((e) => (e.status ?? 'active') !== 'retired'))
+    setWishlist(getItemsByCategory(loadHomeInventory(), 'wishlist'))
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    setItems(loadHomeInventory())
-  }, [])
+    setWishlist(getItemsByCategory(loadHomeInventory(), 'wishlist'))
+    reload()
+  }, [reload])
 
-  const lowCount = useMemo(() => countLowItems(items), [items])
-  const totalItems = items.length
+  const lowCount = useMemo(() => catalog.filter(isLowStock).length, [catalog])
+  const totalItems = catalog.length + equipment.length + wishlist.length
 
-  const persist = useCallback((next: HomeInventoryItem[]) => {
-    setItems(next)
-    saveHomeInventory(next)
-  }, [])
-
-  const toggleSection = (key: InventoryCategory) => {
+  const toggleSection = (key: SectionKey) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
@@ -133,45 +234,49 @@ export default function InventorySection() {
     setOpenSections({ chemicals: true, equipment: true, supplies: true, wishlist: true })
   }
 
-  const openEdit = (item: HomeInventoryItem) => {
-    setAddingCategory(null)
-    setEditingItem(item)
+  const openSupplyEdit = (supply: Supply, kind: SupplyKind) => {
+    setAddingSupplyKind(null)
+    setEditingSupply(supply)
+    setSupplyKind(kind)
+    setSupplyMode('edit')
   }
 
-  const handleSave = (data: {
+  const openSupplyAdd = (kind: SupplyKind) => {
+    setEditingSupply(null)
+    setAddingSupplyKind(kind)
+    setSupplyKind(kind)
+    setSupplyMode('add')
+  }
+
+  const handleWishlistSave = (data: {
     name: string
-    status?: InventoryStatus
     notes: string
     priceEstimate?: number
   }) => {
-    const category = addingCategory ?? editingItem?.category
-    if (!category) return
-
-    const previousStatus = editingItem?.status
+    const items = loadHomeInventory()
     const next = upsertHomeInventoryItem(items, {
-      id: editingItem?.id,
+      id: editingWishlist?.id,
       name: data.name,
-      category,
-      status: data.status,
+      category: 'wishlist',
       notes: data.notes,
       priceEstimate: data.priceEstimate,
     })
-    persist(next)
-
-    if (data.status === 'low' && previousStatus !== 'low') {
-      notifyLowStock(data.name)
-    }
-
-    setEditingItem(null)
-    setAddingCategory(null)
+    saveHomeInventory(next)
+    setWishlist(getItemsByCategory(next, 'wishlist'))
+    setEditingWishlist(null)
+    setAddingWishlist(false)
   }
 
-  const handleDelete = (id: string) => {
-    persist(deleteHomeInventoryItem(items, id))
-    setEditingItem(null)
+  const handleWishlistDelete = (id: string) => {
+    const next = deleteHomeInventoryItem(loadHomeInventory(), id)
+    saveHomeInventory(next)
+    setWishlist(getItemsByCategory(next, 'wishlist'))
+    setEditingWishlist(null)
   }
 
-  const sheetOpen = Boolean(editingItem || addingCategory)
+  const supplySheetOpen = Boolean(editingSupply || addingSupplyKind)
+  const equipmentSheetOpen = Boolean(editingEquipment || addingEquipment)
+  const wishlistSheetOpen = Boolean(editingWishlist || addingWishlist)
 
   return (
     <section className="inv-section">
@@ -190,7 +295,7 @@ export default function InventorySection() {
             <div>
               <div className="inv-dropdown-title">Inventory</div>
               <div className="inv-dropdown-subtitle">
-                {totalItems} item{totalItems === 1 ? '' : 's'}
+                {loading ? 'Loading…' : `${totalItems} item${totalItems === 1 ? '' : 's'}`}
                 {lowCount > 0 ? ` · ${lowCount} low` : ''}
               </div>
             </div>
@@ -212,9 +317,24 @@ export default function InventorySection() {
             )}
 
             {SECTIONS.map((section) => {
-              const sectionItems = getItemsByCategory(items, section.key)
               const isOpen = openSections[section.key]
               const { Icon } = section
+
+              const sectionItems = section.isWishlist
+                ? wishlist
+                : section.isEquipment
+                  ? equipment
+                  : filterSuppliesByKind(catalog, section.supplyKind!)
+
+              const low = section.supplyKind
+                ? sectionItems.filter((s) => isLowStock(s as Supply)).length
+                : 0
+
+              const subtitle = section.isWishlist
+                ? `$${wishlist.reduce((sum, i) => sum + (i.priceEstimate ?? 0), 0)} total`
+                : section.supplyKind
+                  ? `${sectionItems.length} item${sectionItems.length === 1 ? '' : 's'} · ${low} low`
+                  : `${sectionItems.length} item${sectionItems.length === 1 ? '' : 's'}`
 
               return (
                 <div key={section.key} className="inv-sub-dropdown">
@@ -229,7 +349,7 @@ export default function InventorySection() {
                       </span>
                       <div>
                         <div className="inv-sub-title">{section.title}</div>
-                        <div className="inv-dropdown-subtitle">{sectionSubtitle(section, sectionItems)}</div>
+                        <div className="inv-dropdown-subtitle">{subtitle}</div>
                       </div>
                     </div>
                     <span className={`inv-chevron${isOpen ? ' inv-chevron--open' : ''}`}>
@@ -239,22 +359,57 @@ export default function InventorySection() {
 
                   {isOpen && (
                     <div className="inv-sub-body">
-                      {sectionItems.map((item, index) => (
-                        <ItemRow
-                          key={item.id}
-                          item={item}
-                          section={section}
-                          onEdit={() => openEdit(item)}
-                          showDivider={index < sectionItems.length - 1}
-                        />
-                      ))}
+                      {section.isWishlist &&
+                        wishlist.map((item, index) => (
+                          <WishlistRow
+                            key={item.id}
+                            item={item}
+                            onEdit={() => {
+                              setAddingWishlist(false)
+                              setEditingWishlist(item)
+                            }}
+                            showDivider={index < wishlist.length - 1}
+                          />
+                        ))}
+
+                      {section.isEquipment &&
+                        equipment.map((item, index) => (
+                          <EquipmentRow
+                            key={item.id}
+                            item={item}
+                            onEdit={() => {
+                              setAddingEquipment(false)
+                              setEditingEquipment(item)
+                              setEquipmentMode('edit')
+                            }}
+                            showDivider={index < equipment.length - 1}
+                          />
+                        ))}
+
+                      {section.supplyKind &&
+                        (sectionItems as Supply[]).map((item, index) => (
+                          <SupplyRow
+                            key={item.id}
+                            supply={item}
+                            onEdit={() => openSupplyEdit(item, section.supplyKind!)}
+                            showDivider={index < sectionItems.length - 1}
+                          />
+                        ))}
 
                       <button
                         type="button"
                         className="inv-add-row"
                         onClick={() => {
-                          setEditingItem(null)
-                          setAddingCategory(section.key)
+                          if (section.isWishlist) {
+                            setEditingWishlist(null)
+                            setAddingWishlist(true)
+                          } else if (section.isEquipment) {
+                            setEditingEquipment(null)
+                            setAddingEquipment(true)
+                            setEquipmentMode('add')
+                          } else if (section.supplyKind) {
+                            openSupplyAdd(section.supplyKind)
+                          }
                         }}
                       >
                         <span className="inv-add-btn">+</span>
@@ -269,16 +424,81 @@ export default function InventorySection() {
         )}
       </div>
 
-      {sheetOpen && (
-        <InventoryEditSheet
-          item={editingItem}
-          category={addingCategory ?? editingItem!.category}
-          isNew={!editingItem}
-          onSave={handleSave}
-          onDelete={() => editingItem && handleDelete(editingItem.id)}
+      {supplySheetOpen && (
+        <SupplyEditSheet
+          supply={editingSupply}
+          kind={supplyKind}
+          mode={supplyMode}
+          onModeChange={setSupplyMode}
+          onSaveAdd={async (input) => {
+            await createSupply(input)
+            await reload()
+          }}
+          onSaveEdit={async (id, input) => {
+            const prev = catalog.find((s) => s.id === id)
+            const wasLow = prev ? isLowStock(prev) : false
+            await updateSupply(id, input)
+            const updated = await getSupplies()
+            const next = updated.find((s) => s.id === id)
+            if (next && isLowStock(next) && !wasLow) notifyLowStock(next.name)
+            await reload()
+          }}
+          onRestock={async (id, quantity, totalCost) => {
+            await restockSupply(id, { quantity, total_cost: totalCost || undefined })
+            await reload()
+          }}
+          onDelete={async (id) => {
+            await deleteSupply(id)
+            await reload()
+            setEditingSupply(null)
+          }}
           onClose={() => {
-            setEditingItem(null)
-            setAddingCategory(null)
+            setEditingSupply(null)
+            setAddingSupplyKind(null)
+          }}
+        />
+      )}
+
+      {equipmentSheetOpen && (
+        <EquipmentEditSheet
+          item={editingEquipment}
+          mode={equipmentMode}
+          onSaveAdd={async (input) => {
+            await createEquipment(input)
+            await reload()
+          }}
+          onSaveEdit={async (id, input) => {
+            await updateEquipment(id, input)
+            await reload()
+          }}
+          onDelete={async (id) => {
+            await deleteEquipment(id)
+            await reload()
+            setEditingEquipment(null)
+          }}
+          onClose={() => {
+            setEditingEquipment(null)
+            setAddingEquipment(false)
+          }}
+        />
+      )}
+
+      {wishlistSheetOpen && (
+        <InventoryEditSheet
+          item={editingWishlist}
+          category="wishlist"
+          isNew={!editingWishlist}
+          onSave={(data) =>
+            handleWishlistSave({
+              name: data.name,
+              notes: data.notes,
+              priceEstimate: data.priceEstimate,
+            })
+          }
+          onDelete={() => editingWishlist && handleWishlistDelete(editingWishlist.id)}
+          onClose={() => {
+            setEditingWishlist(null)
+            setAddingWishlist(false)
           }}
         />
       )}

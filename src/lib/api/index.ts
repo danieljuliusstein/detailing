@@ -25,6 +25,8 @@ import {
   type MigrationStatus,
   type SyncStatus,
 } from './sync'
+import * as equipmentLocal from './equipment-local'
+import * as equipmentPb from './equipment-pocketbase'
 import * as suppliesLocal from './supplies-local'
 import * as suppliesPb from './supplies-pocketbase'
 import { clearWriteDegraded, executeWrite } from './write-router'
@@ -51,8 +53,11 @@ import type {
   PackageInput,
   Payment,
   PhotoType,
+  Equipment,
+  EquipmentInput,
   QuickJobData,
   RecentJobRow,
+  RestockInput,
   Supply,
   SupplyInput,
   WeekDay,
@@ -353,14 +358,55 @@ export async function deleteSupply(id: string): Promise<boolean> {
   return suppliesLocal.deleteSupply(id)
 }
 
-export async function restockSupply(id: string, quantity: number): Promise<Supply | null> {
+export async function restockSupply(id: string, input: RestockInput): Promise<Supply | null> {
   const resolved = await resolveBackend()
   return executeWrite({
     resolvedBackend: resolved,
-    local: () => suppliesLocal.updateSupplyQty(id, quantity),
-    pocketbase: () => suppliesPb.updateSupplyQty(id, quantity),
-    buildQueue: (supply) => (supply ? { type: 'restockSupply', params: { id, quantity } } : null),
+    local: () => suppliesLocal.restockSupply(id, input),
+    pocketbase: () => suppliesPb.restockSupply(id, input),
+    buildQueue: (supply) => (supply ? { type: 'restockSupply', params: { id, input } } : null),
   })
+}
+
+export async function getEquipment(): Promise<Equipment[]> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? equipmentPb.getEquipment()
+    : equipmentLocal.getEquipment()
+}
+
+export async function createEquipment(input: EquipmentInput): Promise<Equipment> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => equipmentLocal.createEquipment(input),
+    pocketbase: () => equipmentPb.createEquipment(input),
+    buildQueue: (item) => ({ type: 'createEquipment', params: input, localEquipmentId: item.id }),
+  })
+}
+
+export async function updateEquipment(
+  id: string,
+  input: Partial<EquipmentInput>
+): Promise<Equipment | null> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => equipmentLocal.updateEquipment(id, input),
+    pocketbase: () => equipmentPb.updateEquipment(id, input),
+    buildQueue: (item) => (item ? { type: 'updateEquipment', params: { id, input } } : null),
+  })
+}
+
+export async function deleteEquipment(id: string): Promise<boolean> {
+  const resolved = await resolveBackend()
+  if (resolved === 'pocketbase') {
+    try {
+      return await equipmentPb.deleteEquipment(id)
+    } catch {
+      return equipmentLocal.deleteEquipment(id)
+    }
+  }
+  return equipmentLocal.deleteEquipment(id)
 }
 
 export async function getOverheadExpenses(): Promise<OverheadExpense[]> {

@@ -1,6 +1,6 @@
 import { isDemoAppData } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
-import type { Client, Invoice, Job, OverheadExpense, Package, Supply } from './types'
+import type { Client, Equipment, Invoice, Job, OverheadExpense, Package, Supply } from './types'
 
 function useDevDemoSeed(): boolean {
   return process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
@@ -20,6 +20,7 @@ export interface AppData {
   jobs: Job[]
   invoices: Invoice[]
   supplies: Supply[]
+  equipment?: Equipment[]
   overhead_expenses: OverheadExpense[]
   job_photos: Record<string, JobPhotoLocal[]>
 }
@@ -37,11 +38,17 @@ export function createSeedData(): AppData {
   ]
 
   const supplies: Supply[] = [
-    { id: 'sup_soap', name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys' },
-    { id: 'sup_towel', name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon' },
-    { id: 'sup_interior', name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars' },
-    { id: 'sup_wax', name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys' },
-    { id: 'sup_ceramic', name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq' },
+    { id: 'sup_soap', name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys', kind: 'chemical' },
+    { id: 'sup_towel', name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon', kind: 'consumable' },
+    { id: 'sup_interior', name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars', kind: 'chemical' },
+    { id: 'sup_wax', name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys', kind: 'chemical' },
+    { id: 'sup_ceramic', name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq', kind: 'chemical' },
+  ]
+
+  const equipment: Equipment[] = [
+    { id: 'eq_polisher', name: 'DA polisher', purchase_price: 350, status: 'active' },
+    { id: 'eq_vacuum', name: 'Vacuum', purchase_price: 180, status: 'active' },
+    { id: 'eq_pressure', name: 'Pressure washer', purchase_price: 420, status: 'active' },
   ]
 
   const overhead_expenses: OverheadExpense[] = [
@@ -172,7 +179,7 @@ export function createSeedData(): AppData {
     },
   ]
 
-  return { packages, clients, jobs, invoices, supplies, overhead_expenses, job_photos: {} }
+  return { packages, clients, jobs, invoices, supplies, equipment, overhead_expenses, job_photos: {} }
 }
 
 /** Empty store — used when PocketBase is configured so we never show demo seed data on fallback. */
@@ -183,6 +190,7 @@ export function createEmptyData(): AppData {
     jobs: [],
     invoices: [],
     supplies: [],
+    equipment: [],
     overhead_expenses: [],
     job_photos: {},
   }

@@ -1,6 +1,6 @@
-import { isLowStock } from '../supplies-logic'
+import { isLowStock, weightedAverageCostPerUnit } from '../supplies-logic'
 import { loadData, newId, saveData } from '../storage'
-import type { Supply, SupplyInput } from '../types'
+import type { RestockInput, Supply, SupplyInput } from '../types'
 
 export function getSupplies(): Supply[] {
   return loadData().supplies
@@ -50,6 +50,31 @@ export function updateSupplyQty(id: string, delta: number): Supply | null {
   }
   saveData(data)
   return data.supplies[idx]
+}
+
+export function restockSupply(id: string, input: RestockInput): Supply | null {
+  const data = loadData()
+  const idx = data.supplies.findIndex((s) => s.id === id)
+  if (idx === -1 || input.quantity <= 0) return null
+
+  const current = data.supplies[idx]
+  const updated: Supply = {
+    ...current,
+    quantity_on_hand: current.quantity_on_hand + input.quantity,
+  }
+
+  if (input.total_cost != null && input.total_cost > 0) {
+    updated.cost_per_unit = weightedAverageCostPerUnit(
+      current.quantity_on_hand,
+      current.cost_per_unit,
+      input.quantity,
+      input.total_cost
+    )
+  }
+
+  data.supplies[idx] = updated
+  saveData(data)
+  return updated
 }
 
 export function saveSuppliesCatalog(catalog: Supply[]): void {

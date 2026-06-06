@@ -27,18 +27,6 @@ function nowIso(): string {
 export function createSeedInventory(): HomeInventoryItem[] {
   const t = nowIso()
   return [
-    { id: 'hi_1', name: 'Car wash soap', category: 'chemicals', status: 'ok', notes: '', updatedAt: t },
-    { id: 'hi_2', name: 'Iron remover', category: 'chemicals', status: 'low', notes: 'Need 1 gallon jug', updatedAt: t },
-    { id: 'hi_3', name: 'All-purpose cleaner', category: 'chemicals', status: 'ok', updatedAt: t },
-    { id: 'hi_4', name: 'Tire shine', category: 'chemicals', status: 'ok', updatedAt: t },
-    { id: 'hi_5', name: 'Ceramic coating', category: 'chemicals', status: 'low', updatedAt: t },
-    { id: 'hi_6', name: 'Glass cleaner', category: 'chemicals', status: 'ok', updatedAt: t },
-    { id: 'hi_7', name: 'DA polisher', category: 'equipment', notes: '', updatedAt: t },
-    { id: 'hi_8', name: 'Vacuum', category: 'equipment', updatedAt: t },
-    { id: 'hi_9', name: 'Pressure washer', category: 'equipment', updatedAt: t },
-    { id: 'hi_10', name: 'Microfiber towels', category: 'supplies', status: 'ok', updatedAt: t },
-    { id: 'hi_11', name: 'Applicator pads', category: 'supplies', status: 'low', updatedAt: t },
-    { id: 'hi_12', name: 'Wheel brushes', category: 'supplies', status: 'ok', updatedAt: t },
     { id: 'hi_13', name: 'Foam cannon', category: 'wishlist', priceEstimate: 120, updatedAt: t },
     { id: 'hi_14', name: 'Extractors', category: 'wishlist', priceEstimate: 290, updatedAt: t },
   ]

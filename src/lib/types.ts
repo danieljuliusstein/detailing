@@ -33,6 +33,9 @@ export interface Package {
   active: boolean
 }
 
+export type SupplyKind = 'chemical' | 'consumable' | 'other'
+export type EquipmentStatus = 'active' | 'retired'
+
 export interface Supply {
   id: string
   name: string
@@ -41,6 +44,18 @@ export interface Supply {
   reorder_threshold?: number
   cost_per_unit?: number
   supplier?: string
+  kind?: SupplyKind
+  notes?: string
+}
+
+export interface Equipment {
+  id: string
+  name: string
+  purchase_price?: number
+  purchase_date?: string
+  supplier?: string
+  notes?: string
+  status?: EquipmentStatus
 }
 
 export interface OverheadExpense {
@@ -134,6 +149,7 @@ export interface QuickJobData {
   revenue: number
   tip: number
   date: string
+  supplies_used?: SupplyUsage[]
 }
 
 export interface DashboardKpis {
@@ -178,6 +194,22 @@ export interface SupplyInput {
   reorder_threshold?: number
   cost_per_unit?: number
   supplier?: string
+  kind?: SupplyKind
+  notes?: string
+}
+
+export interface RestockInput {
+  quantity: number
+  total_cost?: number
+}
+
+export interface EquipmentInput {
+  name: string
+  purchase_price?: number
+  purchase_date?: string
+  supplier?: string
+  notes?: string
+  status?: EquipmentStatus
 }
 
 export interface OverheadInput {

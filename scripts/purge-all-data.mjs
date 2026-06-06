@@ -66,6 +66,7 @@ async function main() {
     'notifications_log',
     'clients',
     'overhead_expenses',
+    'equipment',
     'supplies',
     'packages',
     'app_settings',

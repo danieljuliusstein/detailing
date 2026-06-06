@@ -2,7 +2,8 @@ import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
 import { isLowStock } from '../supplies-logic'
 import { appSupplyToPb, pbSupplyToApp, type PbRecord } from './mappers'
-import type { Supply, SupplyInput } from '../types'
+import { weightedAverageCostPerUnit } from '../supplies-logic'
+import type { RestockInput, Supply, SupplyInput } from '../types'
 
 function pb() {
   const client = getPocketBase()
@@ -63,6 +64,26 @@ export async function updateSupplyQty(id: string, delta: number): Promise<Supply
   })
 }
 
+export async function restockSupply(id: string, input: RestockInput): Promise<Supply | null> {
+  const current = await getSupply(id)
+  if (!current || input.quantity <= 0) return null
+
+  const updates: Partial<SupplyInput> = {
+    quantity_on_hand: current.quantity_on_hand + input.quantity,
+  }
+
+  if (input.total_cost != null && input.total_cost > 0) {
+    updates.cost_per_unit = weightedAverageCostPerUnit(
+      current.quantity_on_hand,
+      current.cost_per_unit,
+      input.quantity,
+      input.total_cost
+    )
+  }
+
+  return updateSupply(id, updates)
+}
+
 export async function deductSupplies(suppliesUsed: { supply_id: string; quantity_used: number }[]): Promise<void> {
   for (const usage of suppliesUsed) {
     const supply = await getSupply(usage.supply_id)
@@ -73,12 +94,12 @@ export async function deductSupplies(suppliesUsed: { supply_id: string; quantity
   }
 }
 
-const DEFAULT_SUPPLIES = [
-  { name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys' },
-  { name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon' },
-  { name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars' },
-  { name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys' },
-  { name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq' },
+const DEFAULT_SUPPLIES: SupplyInput[] = [
+  { name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys', kind: 'chemical' },
+  { name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon', kind: 'consumable' },
+  { name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars', kind: 'chemical' },
+  { name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys', kind: 'chemical' },
+  { name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq', kind: 'chemical' },
 ]
 
 export async function seedSuppliesIfEmpty(): Promise<number> {

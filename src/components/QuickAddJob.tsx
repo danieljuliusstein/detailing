@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Car,
@@ -16,10 +16,13 @@ import {
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
-import type { Client, Package, QuickJobData, VehicleType } from '@/lib/types'
+import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
+import { defaultSuppliesFromPackage } from '@/lib/supplies-logic'
+import type { Client, Package, QuickJobData, Supply, SupplyUsage, VehicleType } from '@/lib/types'
 
 interface QuickAddJobProps {
   packages: Package[]
+  supplies: Supply[]
   recentClients: Client[]
   onSave: (data: QuickJobData) => Promise<{ id: string }>
 }
@@ -33,7 +36,7 @@ const VEHICLE_TYPES: { id: VehicleType; label: string; Icon: PhosphorIcon }[] = 
   { id: 'other', label: 'Other', Icon: DotsThree },
 ]
 
-export default function QuickAddJob({ packages, recentClients, onSave }: QuickAddJobProps) {
+export default function QuickAddJob({ packages, supplies, recentClients, onSave }: QuickAddJobProps) {
   const router = useRouter()
 
   const [clientSearch, setClientSearch] = useState('')
@@ -44,10 +47,17 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
   const [locationType, setLocationType] = useState<'mobile' | 'fixed'>('mobile')
   const [revenue, setRevenue] = useState(selectedPackage?.base_price ?? 0)
   const [tip, setTip] = useState(0)
+  const [suppliesUsed, setSuppliesUsed] = useState<SupplyUsage[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    if (selectedPackage) {
+      setSuppliesUsed(defaultSuppliesFromPackage(selectedPackage))
+    }
+  }, [selectedPackage])
 
   const filteredClients = recentClients.filter((c) =>
     c.name.toLowerCase().includes(clientSearch.toLowerCase())
@@ -56,6 +66,7 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
   const handlePackageSelect = useCallback((pkg: Package) => {
     setSelectedPackage(pkg)
     setRevenue(pkg.base_price)
+    setSuppliesUsed(defaultSuppliesFromPackage(pkg))
   }, [])
 
   const buildPayload = (): QuickJobData => ({
@@ -67,6 +78,7 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
     revenue,
     tip,
     date: today,
+    supplies_used: suppliesUsed,
   })
 
   const handleSave = async () => {
@@ -262,6 +274,11 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
         </div>
       </div>
 
+      <div className="section-title">Supplies used</div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <JobSuppliesPicker supplies={supplies} value={suppliesUsed} onChange={setSuppliesUsed} />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
         <div>
           <div className="section-title">Revenue</div>
@@ -270,8 +287,8 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
             <input
               type="number"
               className="input money"
-              value={revenue}
-              onChange={(e) => setRevenue(Number(e.target.value))}
+              value={revenue || ''}
+              onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))}
               style={{ paddingLeft: 26, fontSize: 20, fontWeight: 700, color: 'var(--green)' }}
             />
           </div>
@@ -283,8 +300,8 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
             <input
               type="number"
               className="input money"
-              value={tip}
-              onChange={(e) => setTip(Number(e.target.value))}
+              value={tip || ''}
+              onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))}
               style={{ paddingLeft: 26, fontSize: 20, fontWeight: 700, color: 'var(--text-secondary)' }}
             />
           </div>
