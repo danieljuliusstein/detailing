@@ -328,10 +328,19 @@ export default function Settings() {
         <button
           className="btn-ghost"
           onClick={handleMigrate}
-          disabled={migrating || migration?.migrated}
+          disabled={
+            migrating ||
+            (migration?.migrated === true &&
+              migration.pocketBaseJobCount != null &&
+              migration.localJobCount <= migration.pocketBaseJobCount)
+          }
           style={{ width: '100%', marginBottom: 8 }}
         >
-          {migrating ? 'Migrating…' : migration?.migrated ? 'Migration complete' : 'Migrate local data to PocketBase'}
+          {migrating
+            ? 'Migrating…'
+            : migration?.migrated && migration.pocketBaseJobCount != null && migration.localJobCount <= migration.pocketBaseJobCount
+              ? 'Migration complete'
+              : 'Migrate local data to PocketBase'}
         </button>
         <button
           className="btn-ghost"

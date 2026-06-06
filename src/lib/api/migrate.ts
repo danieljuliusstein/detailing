@@ -1,5 +1,6 @@
 import { getPocketBase } from '../pocketbase'
 import { loadData } from '../storage'
+import { saveIdMapEntry } from './id-resolve'
 import * as pb from './pocketbase'
 import { appOverheadToPb, appSupplyToPb, escapeFilterValue } from './mappers'
 
@@ -58,14 +59,17 @@ export async function getMigrationStatus(): Promise<MigrationStatus> {
 }
 
 export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
-  if (isMigrated()) {
-    return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
-  }
+  const local = loadData()
 
-  const counts = await pb.getCollectionCounts()
-  if (counts.jobs > 0) {
-    markMigrated()
-    return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
+  if (isMigrated()) {
+    try {
+      const counts = await pb.getCollectionCounts()
+      if (local.jobs.length <= counts.jobs) {
+        return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
+      }
+    } catch {
+      return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
+    }
   }
 
   const pocketBase = getPocketBase()
@@ -73,7 +77,6 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
   }
 
-  const local = loadData()
   const packageIdMap = new Map<string, string>()
   const clientIdMap = new Map<string, string>()
   const jobIdMap = new Map<string, string>()
@@ -93,7 +96,10 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
   const pbPackages = await pb.getPackages()
   for (const pkg of local.packages) {
     const match = pbPackages.find((p) => p.name.toLowerCase() === pkg.name.toLowerCase())
-    if (match) packageIdMap.set(pkg.id, match.id)
+    if (match) {
+      packageIdMap.set(pkg.id, match.id)
+      saveIdMapEntry(pkg.id, match.id, 'package')
+    }
   }
 
   const pbSupplies = await pocketBase.collection('supplies').getFullList({ sort: 'name' })
@@ -130,6 +136,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
 
     if (existing.length > 0) {
       clientIdMap.set(client.id, existing[0].id)
+      saveIdMapEntry(client.id, existing[0].id, 'client')
       continue
     }
 
@@ -143,6 +150,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       notes: client.notes ?? '',
     })
     clientIdMap.set(client.id, created.id)
+    saveIdMapEntry(client.id, created.id, 'client')
     clientsCreated++
   }
 
@@ -150,6 +158,18 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     const packageId = packageIdMap.get(job.package_id)
     const clientId = clientIdMap.get(job.client_id)
     if (!packageId || !clientId) continue
+
+    const escapedClient = escapeFilterValue(clientId)
+    const escapedDate = escapeFilterValue(job.date)
+    const existingJob = await pocketBase.collection('jobs').getFullList({
+      filter: `client_id = "${escapedClient}" && date = "${escapedDate}"`,
+      limit: 1,
+    })
+    if (existingJob.length > 0) {
+      jobIdMap.set(job.id, existingJob[0].id)
+      saveIdMapEntry(job.id, existingJob[0].id, 'job')
+      continue
+    }
 
     const remappedSupplies = job.supplies_used.map((u) => ({
       supply_id: supplyIdMap.get(u.supply_id) ?? u.supply_id,
@@ -176,6 +196,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       photo_meta: job.photo_meta ?? [],
     })
     jobIdMap.set(job.id, created.id)
+    saveIdMapEntry(job.id, created.id, 'job')
     jobsCreated++
   }
 
@@ -202,6 +223,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     })
 
     await pocketBase.collection('jobs').update(jobId, { invoice_id: created.id })
+    saveIdMapEntry(inv.id, created.id, 'invoice')
     invoicesCreated++
   }
 

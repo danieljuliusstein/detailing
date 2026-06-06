@@ -82,10 +82,26 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
     }
   }
 
-  await pb.seedPackagesIfEmpty()
-  await suppliesPb.seedSuppliesIfEmpty()
-  await migrateLocalToPocketBase()
-  await flushOfflineQueue()
+  try {
+    await pb.seedPackagesIfEmpty()
+  } catch (err) {
+    console.warn('[api] Package seed failed:', err)
+  }
+  try {
+    await suppliesPb.seedSuppliesIfEmpty()
+  } catch (err) {
+    console.warn('[api] Supply seed failed:', err)
+  }
+  try {
+    await migrateLocalToPocketBase()
+  } catch (err) {
+    console.warn('[api] Local data migration failed:', err)
+  }
+  try {
+    await flushOfflineQueue()
+  } catch (err) {
+    console.warn('[api] Offline queue flush failed:', err)
+  }
   clearWriteDegraded()
   const { loadSettingsAsync } = await import('../settings')
   await loadSettingsAsync()

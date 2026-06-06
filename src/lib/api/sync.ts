@@ -13,6 +13,13 @@ import * as photosPb from './photos-pocketbase'
 import * as pb from './pocketbase'
 import * as suppliesPb from './supplies-pocketbase'
 import {
+  preloadIdMaps,
+  resolveClientId,
+  resolveInvoiceId,
+  resolveJobId,
+  resolvePackageId,
+} from './id-resolve'
+import {
   clearMigratedFlag,
   getMigrationStatus,
   isMigrated,
@@ -76,34 +83,56 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
 
   switch (op.type) {
     case 'createJob': {
-      const job = await pb.createJob(op.params)
+      const params = {
+        ...op.params,
+        packageId: await resolvePackageId(op.params.packageId),
+        clientId: op.params.clientId ? await resolveClientId(op.params.clientId) : op.params.clientId,
+      }
+      const job = await pb.createJob(params)
       maps.jobs.set(op.localJobId, job.id)
       break
     }
     case 'updateJob': {
       const jobId = maps.resolveJob(op.params.id)
-      await pb.updateJob(jobId, op.params.data)
+      const resolvedId = maps.jobs.has(op.params.id) ? jobId : await resolveJobId(op.params.id)
+      maps.jobs.set(op.params.id, resolvedId)
+      const data = { ...op.params.data }
+      if (data.packageId) {
+        data.packageId = await resolvePackageId(data.packageId)
+      }
+      await pb.updateJob(resolvedId, data)
       break
     }
     case 'createInvoiceForJob': {
       const jobId = maps.resolveJob(op.params.jobId)
-      const invoice = await invPb.createInvoiceForJob(jobId)
+      const resolvedId = maps.jobs.has(op.params.jobId) ? jobId : await resolveJobId(op.params.jobId)
+      maps.jobs.set(op.params.jobId, resolvedId)
+      const invoice = await invPb.createInvoiceForJob(resolvedId)
       maps.invoices.set(op.params.jobId, invoice.id)
       break
     }
     case 'markInvoiceSent': {
       const invoiceId = maps.resolveInvoice(op.params.invoiceId)
-      await invPb.markInvoiceSent(invoiceId)
+      const resolvedId = maps.invoices.has(op.params.invoiceId)
+        ? invoiceId
+        : await resolveInvoiceId(op.params.invoiceId)
+      await invPb.markInvoiceSent(resolvedId)
       break
     }
     case 'addPayment': {
       const invoiceId = maps.resolveInvoice(op.params.invoiceId)
-      await invPb.addPayment(invoiceId, op.params.payment)
+      const resolvedId = maps.invoices.has(op.params.invoiceId)
+        ? invoiceId
+        : await resolveInvoiceId(op.params.invoiceId)
+      await invPb.addPayment(resolvedId, op.params.payment)
       break
     }
     case 'markInvoicePaid': {
       const invoiceId = maps.resolveInvoice(op.params.invoiceId)
-      await invPb.markInvoicePaid(invoiceId, op.params.method)
+      const resolvedId = maps.invoices.has(op.params.invoiceId)
+        ? invoiceId
+        : await resolveInvoiceId(op.params.invoiceId)
+      await invPb.markInvoicePaid(resolvedId, op.params.method)
       break
     }
     case 'createSupply': {
@@ -138,13 +167,17 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
     }
     case 'uploadJobPhoto': {
       const jobId = maps.resolveJob(op.params.jobId)
+      const resolvedId = maps.jobs.has(op.params.jobId) ? jobId : await resolveJobId(op.params.jobId)
+      maps.jobs.set(op.params.jobId, resolvedId)
       const file = dataUrlToFile(op.params.dataUrl, op.params.filename)
-      await photosPb.uploadJobPhoto(jobId, file, op.params.photoType)
+      await photosPb.uploadJobPhoto(resolvedId, file, op.params.photoType)
       break
     }
     case 'deleteJobPhoto': {
       const jobId = maps.resolveJob(op.params.jobId)
-      await photosPb.deleteJobPhoto(jobId, op.params.filename)
+      const resolvedId = maps.jobs.has(op.params.jobId) ? jobId : await resolveJobId(op.params.jobId)
+      maps.jobs.set(op.params.jobId, resolvedId)
+      await photosPb.deleteJobPhoto(resolvedId, op.params.filename)
       break
     }
   }
@@ -169,6 +202,7 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
 
   const items = await getQueueItems()
   const maps = new IdMaps()
+  preloadIdMaps(maps)
 
   for (const item of items) {
     try {
