@@ -15,7 +15,28 @@ export function markCatalogReady(): void {
   }
 }
 
-/** Seed defaults only when authenticated and collections are actually empty. */
+/** On connect: mark catalog ready if PocketBase already has data — never seed. */
+export async function syncCatalogReadyFlag(): Promise<void> {
+  if (isCatalogMarkedReady()) return
+  if (!(await ensurePocketBaseAuth())) return
+
+  const client = getPocketBase()
+  if (!client) return
+
+  try {
+    const [packages, supplies] = await Promise.all([
+      client.collection('packages').getList(1, 1),
+      client.collection('supplies').getList(1, 1),
+    ])
+    if (packages.totalItems > 0 && supplies.totalItems > 0) {
+      markCatalogReady()
+    }
+  } catch {
+    // best-effort on connect
+  }
+}
+
+/** Seed defaults only when authenticated and collections are actually empty (migration). */
 export async function ensureDefaultCatalog(): Promise<void> {
   if (isCatalogMarkedReady()) return
   if (!(await ensurePocketBaseAuth())) return

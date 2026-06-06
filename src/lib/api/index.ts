@@ -1,7 +1,7 @@
 import { clearLocalDeviceDataSync, purgeDemoCacheIfPresent } from '../clear-local-data'
 import { purgeStaleQueueItems } from './queue-utils'
 import { ensurePocketBaseAuth } from '../pb-auth'
-import { ensureDefaultCatalog } from './catalog-ready'
+import { syncCatalogReadyFlag } from './catalog-ready'
 import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
 import { withTimeout } from '../timeout'
 import { migrateLocalToPocketBase } from './migrate'
@@ -100,8 +100,7 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
   // Non-blocking — keeps mobile connect fast on slow networks
   void (async () => {
     try {
-      await ensurePocketBaseAuth()
-      await ensureDefaultCatalog()
+      await syncCatalogReadyFlag()
     } catch {
       // catalog check is best-effort on connect
     }

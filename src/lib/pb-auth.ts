@@ -9,37 +9,7 @@ export function isPocketBaseAuthenticated(): boolean {
   return pb.authStore.isValid
 }
 
-/** Validate or refresh auth — stale tokens return empty lists and 400 on create. */
-export async function ensurePocketBaseAuth(): Promise<boolean> {
-  if (!isPocketBaseConfigured()) return false
-
-  const pb = getPocketBase()
-  if (!pb) return false
-
-  if (pb.authStore.isValid) {
-    try {
-      await withTimeout(
-        pb.collection('packages').getList(1, 1),
-        5000,
-        'PocketBase auth check',
-      )
-      return true
-    } catch {
-      pb.authStore.clear()
-    }
-  }
-
-  return authenticatePocketBase()
-}
-
-export async function authenticatePocketBase(): Promise<boolean> {
-  if (!isPocketBaseConfigured()) return false
-
-  const pb = getPocketBase()
-  if (!pb) return false
-
-  if (pb.authStore.isValid) return true
-
+async function authWithCredentials(pb: NonNullable<ReturnType<typeof getPocketBase>>): Promise<boolean> {
   const email = process.env.NEXT_PUBLIC_PB_EMAIL
   const password = process.env.NEXT_PUBLIC_PB_PASSWORD
 
@@ -52,7 +22,7 @@ export async function authenticatePocketBase(): Promise<boolean> {
     await withTimeout(
       pb.collection('users').authWithPassword(email, password),
       8000,
-      'PocketBase auth'
+      'PocketBase auth',
     )
     if (typeof window !== 'undefined') {
       sessionStorage.setItem(AUTH_FLAG_KEY, '1')
@@ -62,6 +32,29 @@ export async function authenticatePocketBase(): Promise<boolean> {
     console.warn('[pb-auth] Authentication failed:', err)
     return false
   }
+}
+
+/** Validate or refresh auth — unauthenticated list calls return empty 200, not errors. */
+export async function ensurePocketBaseAuth(): Promise<boolean> {
+  if (!isPocketBaseConfigured()) return false
+
+  const pb = getPocketBase()
+  if (!pb) return false
+
+  if (pb.authStore.isValid) {
+    try {
+      await withTimeout(pb.collection('users').authRefresh(), 8000, 'PocketBase auth refresh')
+      return true
+    } catch {
+      pb.authStore.clear()
+    }
+  }
+
+  return authWithCredentials(pb)
+}
+
+export async function authenticatePocketBase(): Promise<boolean> {
+  return ensurePocketBaseAuth()
 }
 
 export function clearPocketBaseAuth(): void {
