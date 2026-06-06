@@ -10,6 +10,7 @@ import {
   Plus,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
+import { useQuickAction } from '@/providers/QuickActionContext'
 
 interface NavItem {
   href: string
@@ -51,6 +52,7 @@ function NavTab({ tab, active }: { tab: NavItem; active: boolean }) {
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { menuOpen, openMenu, closeMenu } = useQuickAction()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href)
@@ -64,9 +66,16 @@ export default function BottomNav() {
       ))}
 
       <div className="bottom-nav-fab">
-        <Link href="/jobs/new" className="bottom-nav-fab-link" aria-label="Add new job">
+        <button
+          type="button"
+          className={`bottom-nav-fab-link${menuOpen ? ' bottom-nav-fab-link--open' : ''}`}
+          aria-label={menuOpen ? 'Close quick actions' : 'Quick actions'}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          onClick={() => (menuOpen ? closeMenu() : openMenu())}
+        >
           <Plus size={24} weight="bold" color="#071407" aria-hidden="true" />
-        </Link>
+        </button>
       </div>
 
       {RIGHT_TABS.map((tab) => (

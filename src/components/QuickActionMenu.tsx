@@ -1,0 +1,107 @@
+'use client'
+
+import { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { Briefcase, Receipt, UserPlus } from '@phosphor-icons/react'
+import { useQuickAction } from '@/providers/QuickActionContext'
+
+interface ActionItem {
+  id: string
+  label: string
+  subtitle: string
+  Icon: typeof Briefcase
+  onSelect: () => void
+}
+
+export default function QuickActionMenu() {
+  const router = useRouter()
+  const { menuOpen, closeMenu, openExpenseSheet } = useQuickAction()
+  const firstActionRef = useRef<HTMLButtonElement>(null)
+
+  const actions: ActionItem[] = [
+    {
+      id: 'new-job',
+      label: 'New job',
+      subtitle: 'Schedule a detail and log revenue',
+      Icon: Briefcase,
+      onSelect: () => {
+        closeMenu()
+        router.push('/jobs/new')
+      },
+    },
+    {
+      id: 'log-expense',
+      label: 'Log business expense',
+      subtitle: 'One-time payment like LLC renewal',
+      Icon: Receipt,
+      onSelect: openExpenseSheet,
+    },
+    {
+      id: 'add-client',
+      label: 'Add client',
+      subtitle: 'New customer contact',
+      Icon: UserPlus,
+      onSelect: () => {
+        closeMenu()
+        router.push('/clients/new')
+      },
+    },
+  ]
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    firstActionRef.current?.focus()
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenu()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen, closeMenu])
+
+  if (!menuOpen) return null
+
+  return (
+    <div className="quick-action-root" role="presentation">
+      <button
+        type="button"
+        className="quick-action-backdrop"
+        onClick={closeMenu}
+        aria-label="Close quick actions"
+      />
+      <div className="quick-action-sheet" role="menu" aria-label="Quick actions">
+        <div className="quick-action-sheet-handle" />
+        <div className="quick-action-sheet-title">Quick actions</div>
+        {actions.map((action, index) => {
+          const { Icon } = action
+          return (
+            <button
+              key={action.id}
+              ref={index === 0 ? firstActionRef : undefined}
+              type="button"
+              role="menuitem"
+              className="quick-action-row"
+              onClick={action.onSelect}
+            >
+              <span className="quick-action-row-icon">
+                <Icon size={22} weight="duotone" color="var(--green)" aria-hidden="true" />
+              </span>
+              <span className="quick-action-row-text">
+                <span className="quick-action-row-label">{action.label}</span>
+                <span className="quick-action-row-subtitle">{action.subtitle}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

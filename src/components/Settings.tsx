@@ -322,6 +322,15 @@ export default function Settings() {
         <div className="divider" />
         <div
           className="card-pressable"
+          onClick={() => router.push('/settings/business-expenses')}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0, padding: '10px 0', border: 'none', background: 'transparent' }}
+        >
+          <span style={{ fontSize: 14 }}>Business expenses</span>
+          <CaretRight size={16} color="var(--text-dim)" />
+        </div>
+        <div className="divider" />
+        <div
+          className="card-pressable"
           onClick={() => router.push('/settings/packages')}
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0, padding: '10px 0', border: 'none', background: 'transparent' }}
         >

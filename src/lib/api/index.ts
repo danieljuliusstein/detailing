@@ -10,6 +10,8 @@ import * as invPb from './invoices-pocketbase'
 import * as local from './local'
 import * as overheadLocal from './overhead-local'
 import * as overheadPb from './overhead-pocketbase'
+import * as businessExpensesLocal from './business-expenses-local'
+import * as businessExpensesPb from './business-expenses-pocketbase'
 import * as photosLocal from './photos-local'
 import * as photosPb from './photos-pocketbase'
 import * as pb from './pocketbase'
@@ -47,6 +49,8 @@ import type {
   JobEditData,
   JobPhoto,
   JobWithRelations,
+  BusinessExpense,
+  BusinessExpenseInput,
   OverheadExpense,
   OverheadInput,
   Package,
@@ -452,6 +456,50 @@ export async function getMonthlyOverheadTotal(): Promise<number> {
   return (await resolveBackend()) === 'pocketbase'
     ? overheadPb.getMonthlyOverheadTotal()
     : overheadLocal.getMonthlyOverheadTotal()
+}
+
+export async function getBusinessExpenses(): Promise<BusinessExpense[]> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? businessExpensesPb.getBusinessExpenses()
+    : businessExpensesLocal.getBusinessExpenses()
+}
+
+export async function createBusinessExpense(input: BusinessExpenseInput): Promise<BusinessExpense> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => businessExpensesLocal.createBusinessExpense(input),
+    pocketbase: () => businessExpensesPb.createBusinessExpense(input),
+    buildQueue: (expense) => ({
+      type: 'createBusinessExpense',
+      params: input,
+      localBusinessExpenseId: expense.id,
+    }),
+  })
+}
+
+export async function updateBusinessExpense(
+  id: string,
+  input: Partial<BusinessExpenseInput>
+): Promise<BusinessExpense | null> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => businessExpensesLocal.updateBusinessExpense(id, input),
+    pocketbase: () => businessExpensesPb.updateBusinessExpense(id, input),
+    buildQueue: (expense) =>
+      expense ? { type: 'updateBusinessExpense', params: { id, input } } : null,
+  })
+}
+
+export async function deleteBusinessExpense(id: string): Promise<boolean> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => businessExpensesLocal.deleteBusinessExpense(id),
+    pocketbase: () => businessExpensesPb.deleteBusinessExpense(id),
+    buildQueue: () => ({ type: 'deleteBusinessExpense', params: { id } }),
+  })
 }
 
 export async function getJobPhotos(jobId: string): Promise<JobPhoto[]> {

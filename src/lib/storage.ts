@@ -1,6 +1,6 @@
 import { isDemoAppData } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
-import type { Client, Equipment, Invoice, Job, OverheadExpense, Package, Supply } from './types'
+import type { BusinessExpense, Client, Equipment, Invoice, Job, OverheadExpense, Package, Supply } from './types'
 
 function useDevDemoSeed(): boolean {
   return process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
@@ -22,6 +22,7 @@ export interface AppData {
   supplies: Supply[]
   equipment?: Equipment[]
   overhead_expenses: OverheadExpense[]
+  business_expenses?: BusinessExpense[]
   job_photos: Record<string, JobPhotoLocal[]>
 }
 
@@ -179,7 +180,7 @@ export function createSeedData(): AppData {
     },
   ]
 
-  return { packages, clients, jobs, invoices, supplies, equipment, overhead_expenses, job_photos: {} }
+  return { packages, clients, jobs, invoices, supplies, equipment, overhead_expenses, business_expenses: [], job_photos: {} }
 }
 
 /** Empty store — used when PocketBase is configured so we never show demo seed data on fallback. */
@@ -192,6 +193,7 @@ export function createEmptyData(): AppData {
     supplies: [],
     equipment: [],
     overhead_expenses: [],
+    business_expenses: [],
     job_photos: {},
   }
 }

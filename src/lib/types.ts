@@ -68,6 +68,36 @@ export interface OverheadExpense {
   notes?: string
 }
 
+export type BusinessExpenseCategory =
+  | 'legal'
+  | 'licensing'
+  | 'taxes'
+  | 'insurance'
+  | 'vehicle'
+  | 'marketing'
+  | 'software'
+  | 'equipment'
+  | 'other'
+
+export interface BusinessExpense {
+  id: string
+  date: string
+  name: string
+  amount: number
+  category?: BusinessExpenseCategory
+  vendor?: string
+  notes?: string
+}
+
+export interface BusinessExpenseInput {
+  date: string
+  name: string
+  amount: number
+  category?: BusinessExpenseCategory
+  vendor?: string
+  notes?: string
+}
+
 export interface PhotoMeta {
   filename: string
   type: PhotoType

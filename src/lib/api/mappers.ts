@@ -1,4 +1,6 @@
 import type {
+  BusinessExpense,
+  BusinessExpenseCategory,
   Client,
   Equipment,
   ExpenseLine,
@@ -264,6 +266,40 @@ export function appEquipmentToPb(input: {
     supplier: input.supplier ?? '',
     notes: input.notes ?? '',
     status: input.status ?? 'active',
+  }
+}
+
+export function pbBusinessExpenseToApp(r: PbRecord): BusinessExpense {
+  const category = str(r.category) as BusinessExpenseCategory | undefined
+  const valid: BusinessExpenseCategory[] = [
+    'legal', 'licensing', 'taxes', 'insurance', 'vehicle', 'marketing', 'software', 'equipment', 'other',
+  ]
+  return {
+    id: r.id,
+    date: String(r.date ?? '').slice(0, 10),
+    name: String(r.name ?? ''),
+    amount: num(r.amount),
+    category: category && valid.includes(category) ? category : 'other',
+    vendor: str(r.vendor),
+    notes: str(r.notes),
+  }
+}
+
+export function appBusinessExpenseToPb(input: {
+  date: string
+  name: string
+  amount: number
+  category?: BusinessExpenseCategory
+  vendor?: string
+  notes?: string
+}) {
+  return {
+    date: input.date,
+    name: input.name,
+    amount: input.amount,
+    category: input.category ?? 'other',
+    vendor: input.vendor ?? '',
+    notes: input.notes ?? '',
   }
 }
 

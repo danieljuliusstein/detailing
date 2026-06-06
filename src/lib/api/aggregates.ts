@@ -23,6 +23,7 @@ export interface PLReport {
     marketing: number
     labor: number
     overhead: number
+    business: number
     other: number
   }
   totalExpenses: number
@@ -94,10 +95,25 @@ export function priorRangeFor(key: DateRangeKey, now = new Date()): { start: Dat
   }
 }
 
-export function computePLReportForDates(jobs: Job[], start: Date, end: Date, overhead = 0): PLReport {
+export function computePLReportForDates(
+  jobs: Job[],
+  start: Date,
+  end: Date,
+  overhead = 0,
+  businessExpenses = 0
+): PLReport {
   const filtered = jobs.filter((j) => jobInRange(j, start, end))
 
-  const expenses = { supplies: 0, travel: 0, equipment: 0, marketing: 0, labor: 0, overhead: 0, other: 0 }
+  const expenses = {
+    supplies: 0,
+    travel: 0,
+    equipment: 0,
+    marketing: 0,
+    labor: 0,
+    overhead: 0,
+    business: 0,
+    other: 0,
+  }
   let revenue = 0
   let profit = 0
 
@@ -113,7 +129,8 @@ export function computePLReportForDates(jobs: Job[], start: Date, end: Date, ove
   }
 
   expenses.overhead = overhead
-  profit -= overhead
+  expenses.business = businessExpenses
+  profit -= overhead + businessExpenses
 
   const totalExp = Object.values(expenses).reduce((s, v) => s + v, 0)
   const marginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0
@@ -128,9 +145,14 @@ export function computePLReportForDates(jobs: Job[], start: Date, end: Date, ove
   }
 }
 
-export function computePLReport(jobs: Job[], range: DateRangeKey, overhead = 0): PLReport {
+export function computePLReport(
+  jobs: Job[],
+  range: DateRangeKey,
+  overhead = 0,
+  businessExpenses = 0
+): PLReport {
   const { start, end } = rangeFor(range)
-  return computePLReportForDates(jobs, start, end, overhead)
+  return computePLReportForDates(jobs, start, end, overhead, businessExpenses)
 }
 
 export function computeJobsCSV(jobs: Job[], range: DateRangeKey, labelResolver: (job: Job) => { client: string; pkg: string }): string {

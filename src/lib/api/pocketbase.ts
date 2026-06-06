@@ -45,6 +45,8 @@ import type {
 } from '../types'
 import type { DateRangeKey } from './reports'
 import * as overheadPb from './overhead-pocketbase'
+import * as businessExpensesPb from './business-expenses-pocketbase'
+import { businessExpensesTotalForDates } from '../business-expenses-logic'
 
 const JOB_EXPAND = 'client_id,package_id,invoice_id'
 
@@ -314,19 +316,31 @@ export async function getJobsForDate(date: string): Promise<RecentJobRow[]> {
 }
 
 export async function getPLReport(range: DateRangeKey) {
-  const [jobs, overhead] = await Promise.all([fetchJobsRaw(), overheadPb.getOverheadForRange(range)])
-  return computePLReport(jobs, range, overhead)
+  const { start, end } = rangeFor(range)
+  const [jobs, overhead, businessItems] = await Promise.all([
+    fetchJobsRaw(),
+    overheadPb.getOverheadForRange(range),
+    businessExpensesPb.getBusinessExpenses(),
+  ])
+  const business = businessExpensesTotalForDates(businessItems, start, end)
+  return computePLReport(jobs, range, overhead, business)
 }
 
 export async function getPLReportBundle(range: DateRangeKey) {
-  const [jobs, expenses] = await Promise.all([fetchJobsRaw(), overheadPb.getOverheadExpenses()])
+  const [jobs, overheadItems, businessItems] = await Promise.all([
+    fetchJobsRaw(),
+    overheadPb.getOverheadExpenses(),
+    businessExpensesPb.getBusinessExpenses(),
+  ])
   const { start, end } = rangeFor(range)
   const prior = priorRangeFor(range)
-  const currentOverhead = overheadAmountForDates(expenses, start, end)
-  const priorOverhead = overheadAmountForDates(expenses, prior.start, prior.end)
+  const currentOverhead = overheadAmountForDates(overheadItems, start, end)
+  const priorOverhead = overheadAmountForDates(overheadItems, prior.start, prior.end)
+  const currentBusiness = businessExpensesTotalForDates(businessItems, start, end)
+  const priorBusiness = businessExpensesTotalForDates(businessItems, prior.start, prior.end)
   return {
-    current: computePLReportForDates(jobs, start, end, currentOverhead),
-    prior: computePLReportForDates(jobs, prior.start, prior.end, priorOverhead),
+    current: computePLReportForDates(jobs, start, end, currentOverhead, currentBusiness),
+    prior: computePLReportForDates(jobs, prior.start, prior.end, priorOverhead, priorBusiness),
   }
 }
 

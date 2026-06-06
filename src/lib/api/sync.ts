@@ -14,6 +14,7 @@ import {
 } from '../offline-queue'
 import * as invPb from './invoices-pocketbase'
 import * as overheadPb from './overhead-pocketbase'
+import * as businessExpensesPb from './business-expenses-pocketbase'
 import * as photosPb from './photos-pocketbase'
 import * as pb from './pocketbase'
 import * as equipmentPb from './equipment-pocketbase'
@@ -57,6 +58,7 @@ export class IdMaps {
   supplies = new Map<string, string>()
   equipment = new Map<string, string>()
   overhead = new Map<string, string>()
+  businessExpenses = new Map<string, string>()
   invoices = new Map<string, string>()
 
   resolveJob(id: string): string {
@@ -73,6 +75,10 @@ export class IdMaps {
 
   resolveOverhead(id: string): string {
     return this.overhead.get(id) ?? id
+  }
+
+  resolveBusinessExpense(id: string): string {
+    return this.businessExpenses.get(id) ?? id
   }
 
   resolveInvoice(id: string): string {
@@ -189,6 +195,21 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
     case 'deleteOverheadExpense': {
       const expenseId = maps.resolveOverhead(op.params.id)
       await overheadPb.deleteOverheadExpense(expenseId)
+      break
+    }
+    case 'createBusinessExpense': {
+      const expense = await businessExpensesPb.createBusinessExpense(op.params)
+      maps.businessExpenses.set(op.localBusinessExpenseId, expense.id)
+      break
+    }
+    case 'updateBusinessExpense': {
+      const expenseId = maps.resolveBusinessExpense(op.params.id)
+      await businessExpensesPb.updateBusinessExpense(expenseId, op.params.input)
+      break
+    }
+    case 'deleteBusinessExpense': {
+      const expenseId = maps.resolveBusinessExpense(op.params.id)
+      await businessExpensesPb.deleteBusinessExpense(expenseId)
       break
     }
     case 'uploadJobPhoto': {

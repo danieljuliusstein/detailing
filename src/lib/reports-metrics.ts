@@ -10,6 +10,7 @@ export const EXPENSE_ORDER: (keyof PLReport['expenses'])[] = [
   'marketing',
   'labor',
   'overhead',
+  'business',
   'other',
 ]
 
@@ -20,6 +21,7 @@ export const EXPENSE_LABELS: Record<keyof PLReport['expenses'], string> = {
   marketing: 'Marketing',
   labor: 'Labor',
   overhead: 'Overhead',
+  business: 'Business expenses',
   other: 'Other',
 }
 
@@ -166,6 +168,7 @@ export function buildWaterfallData(report: PLReport): WaterfallData {
 
   const otherExpenses = WATERFALL_OTHER_KEYS.reduce((sum, key) => sum + expenses[key], 0)
   const overhead = expenses.overhead
+  const business = expenses.business
 
   let running = revenue
 
@@ -187,6 +190,16 @@ export function buildWaterfallData(report: PLReport): WaterfallData {
     colors.push('#e06060')
     labels.push('Overhead')
     running = afterOver
+  }
+
+  if (business > 0) {
+    const afterBusiness = running - business
+    starts.push(afterBusiness)
+    vals.push(business)
+    ranges.push([afterBusiness, running])
+    colors.push('#e06060')
+    labels.push('Business exp.')
+    running = afterBusiness
   }
 
   const profit = running
