@@ -9,6 +9,7 @@ const APP_DATA_KEY = 'detailing_app_data_v1'
 const HOME_INVENTORY_KEY = 'detailing_home_inventory_v1'
 const ID_MAP_KEY = 'detailing_pb_id_map_v1'
 const MIGRATED_KEY = 'migrated_to_pb_v1'
+const CATALOG_OK_KEY = 'pb_catalog_ready_v1'
 
 /** Wipe per-device caches (jobs, clients, inventory). Keeps PIN and settings. */
 export async function clearLocalDeviceData(): Promise<void> {
@@ -18,6 +19,7 @@ export async function clearLocalDeviceData(): Promise<void> {
   localStorage.removeItem(HOME_INVENTORY_KEY)
   localStorage.removeItem(ID_MAP_KEY)
   localStorage.removeItem(MIGRATED_KEY)
+  localStorage.removeItem(CATALOG_OK_KEY)
   saveData(createEmptyData())
   await clearQueue()
 }

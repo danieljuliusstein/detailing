@@ -1,6 +1,7 @@
 import { clearLocalDeviceDataSync, purgeDemoCacheIfPresent } from '../clear-local-data'
 import { purgeStaleQueueItems } from './queue-utils'
-import { authenticatePocketBase, isPocketBaseAuthenticated } from '../pb-auth'
+import { authenticatePocketBase, ensurePocketBaseAuth, isPocketBaseAuthenticated } from '../pb-auth'
+import { ensureDefaultCatalog } from './catalog-ready'
 import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
 import { withTimeout } from '../timeout'
 import { migrateLocalToPocketBase } from './migrate'
@@ -88,7 +89,12 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
   }
 
   if (!isPocketBaseAuthenticated()) {
-    const authed = await authenticatePocketBase()
+    const authed = await ensurePocketBaseAuth()
+    if (!authed) {
+      return 'local'
+    }
+  } else {
+    const authed = await ensurePocketBaseAuth()
     if (!authed) {
       return 'local'
     }
@@ -102,14 +108,10 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
   // Non-blocking — keeps mobile connect fast on slow networks
   void (async () => {
     try {
-      await pb.seedPackagesIfEmpty()
-    } catch (err) {
-      console.warn('[api] Package seed failed:', err)
-    }
-    try {
-      await suppliesPb.seedSuppliesIfEmpty()
-    } catch (err) {
-      console.warn('[api] Supply seed failed:', err)
+      await ensurePocketBaseAuth()
+      await ensureDefaultCatalog()
+    } catch {
+      // catalog check is best-effort on connect
     }
     try {
       await migrateLocalToPocketBase()

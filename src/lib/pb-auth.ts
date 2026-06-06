@@ -9,6 +9,29 @@ export function isPocketBaseAuthenticated(): boolean {
   return pb.authStore.isValid
 }
 
+/** Validate or refresh auth — stale tokens return empty lists and 400 on create. */
+export async function ensurePocketBaseAuth(): Promise<boolean> {
+  if (!isPocketBaseConfigured()) return false
+
+  const pb = getPocketBase()
+  if (!pb) return false
+
+  if (pb.authStore.isValid) {
+    try {
+      await withTimeout(
+        pb.collection('packages').getList(1, 1),
+        5000,
+        'PocketBase auth check',
+      )
+      return true
+    } catch {
+      pb.authStore.clear()
+    }
+  }
+
+  return authenticatePocketBase()
+}
+
 export async function authenticatePocketBase(): Promise<boolean> {
   if (!isPocketBaseConfigured()) return false
 

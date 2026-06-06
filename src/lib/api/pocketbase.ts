@@ -6,6 +6,7 @@ import {
   overheadAmountForDates,
   resolveSuppliesUsed,
 } from '../supplies-logic'
+import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
 import {
   computeDashboard,
@@ -323,21 +324,22 @@ const DEFAULT_PACKAGES = [
   { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application' },
 ]
 
-/** Ensure default service packages exist — skips names already on the server. */
+/** Ensure default service packages exist — only when collection is empty and auth works. */
 export async function seedPackagesIfEmpty(): Promise<number> {
-  const client = pb()
-  const existing = await client.collection('packages').getFullList<PbRecord>({ sort: 'name' })
-  const names = new Set(existing.map((r) => String(r.name).toLowerCase()))
-  let created = 0
+  if (!(await ensurePocketBaseAuth())) return 0
 
+  const client = pb()
+  const { totalItems } = await client.collection('packages').getList(1, 1)
+  if (totalItems > 0) return 0
+
+  let created = 0
   for (const pkg of DEFAULT_PACKAGES) {
-    if (names.has(pkg.name.toLowerCase())) continue
     try {
       await client.collection('packages').create(pkg)
-      names.add(pkg.name.toLowerCase())
       created++
-    } catch (err) {
-      console.warn(`[api] Skip package seed "${pkg.name}":`, err)
+    } catch {
+      // Unauthenticated or validation failure — stop rather than spam the console
+      break
     }
   }
   return created

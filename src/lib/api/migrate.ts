@@ -1,3 +1,5 @@
+import { ensurePocketBaseAuth } from '../pb-auth'
+import { ensureDefaultCatalog } from './catalog-ready'
 import { getPocketBase } from '../pocketbase'
 import { loadData } from '../storage'
 import { saveIdMapEntry } from './id-resolve'
@@ -72,8 +74,12 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     }
   }
 
+  if (!(await ensurePocketBaseAuth())) {
+    return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
+  }
+
   const pocketBase = getPocketBase()
-  if (!pocketBase?.authStore.isValid) {
+  if (!pocketBase) {
     return { packages: 0, clients: 0, jobs: 0, invoices: 0, supplies: 0, overhead: 0, photos: 0, skipped: true }
   }
 
@@ -89,9 +95,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
   let overheadCreated = 0
   let photosCreated = 0
 
-  await pb.seedPackagesIfEmpty()
-  const { seedSuppliesIfEmpty } = await import('./supplies-pocketbase')
-  await seedSuppliesIfEmpty()
+  await ensureDefaultCatalog()
 
   const pbPackages = await pb.getPackages()
   for (const pkg of local.packages) {

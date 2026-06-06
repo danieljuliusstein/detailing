@@ -1,3 +1,4 @@
+import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
 import { isLowStock } from '../supplies-logic'
 import { appSupplyToPb, pbSupplyToApp, type PbRecord } from './mappers'
@@ -81,19 +82,19 @@ const DEFAULT_SUPPLIES = [
 ]
 
 export async function seedSuppliesIfEmpty(): Promise<number> {
-  const client = pb()
-  const existing = await client.collection('supplies').getFullList<PbRecord>({ sort: 'name' })
-  const names = new Set(existing.map((r) => String(r.name).toLowerCase()))
-  let created = 0
+  if (!(await ensurePocketBaseAuth())) return 0
 
+  const client = pb()
+  const { totalItems } = await client.collection('supplies').getList(1, 1)
+  if (totalItems > 0) return 0
+
+  let created = 0
   for (const item of DEFAULT_SUPPLIES) {
-    if (names.has(item.name.toLowerCase())) continue
     try {
       await client.collection('supplies').create(appSupplyToPb(item))
-      names.add(item.name.toLowerCase())
       created++
-    } catch (err) {
-      console.warn(`[api] Skip supply seed "${item.name}":`, err)
+    } catch {
+      break
     }
   }
   return created

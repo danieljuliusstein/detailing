@@ -1,4 +1,4 @@
-import { authenticatePocketBase } from '../pb-auth'
+import { ensurePocketBaseAuth } from '../pb-auth'
 import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
 import {
   describeQueueItem,
@@ -199,7 +199,7 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
     return result
   }
 
-  if (!(await authenticatePocketBase())) {
+  if (!(await ensurePocketBaseAuth())) {
     result.remaining = await getQueueCount()
     result.errors.push('PocketBase authentication failed')
     return result
@@ -271,7 +271,7 @@ export async function runDataMigration(options?: { force?: boolean }): Promise<M
   const healthy = await checkPocketBaseHealth()
   if (!healthy) throw new Error('PocketBase is unreachable')
 
-  if (!(await authenticatePocketBase())) {
+  if (!(await ensurePocketBaseAuth())) {
     throw new Error('PocketBase authentication failed')
   }
 
