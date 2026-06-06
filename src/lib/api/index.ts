@@ -1,6 +1,6 @@
 import { clearLocalDeviceDataSync, purgeDemoCacheIfPresent } from '../clear-local-data'
 import { purgeStaleQueueItems } from './queue-utils'
-import { authenticatePocketBase, ensurePocketBaseAuth, isPocketBaseAuthenticated } from '../pb-auth'
+import { ensurePocketBaseAuth } from '../pb-auth'
 import { ensureDefaultCatalog } from './catalog-ready'
 import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
 import { withTimeout } from '../timeout'
