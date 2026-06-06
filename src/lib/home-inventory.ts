@@ -1,3 +1,6 @@
+import { isDemoHomeInventory } from './demo-data'
+import { isPocketBaseConfigured } from './pocketbase'
+
 export type InventoryCategory = 'chemicals' | 'equipment' | 'supplies' | 'wishlist'
 export type InventoryStatus = 'ok' | 'low'
 
@@ -42,17 +45,30 @@ export function createSeedInventory(): HomeInventoryItem[] {
 }
 
 export function loadHomeInventory(): HomeInventoryItem[] {
-  if (typeof window === 'undefined') return createSeedInventory()
+  if (typeof window === 'undefined') return []
+
+  const useDevSeed = process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
   const raw = localStorage.getItem(STORAGE_KEY)
+
   if (!raw) {
-    const seed = createSeedInventory()
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
-    return seed
+    if (useDevSeed) {
+      const seed = createSeedInventory()
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+      return seed
+    }
+    return []
   }
+
   try {
-    return JSON.parse(raw) as HomeInventoryItem[]
+    const items = JSON.parse(raw) as HomeInventoryItem[]
+    if (isPocketBaseConfigured() && isDemoHomeInventory(items)) {
+      localStorage.removeItem(STORAGE_KEY)
+      return []
+    }
+    return items
   } catch {
-    return createSeedInventory()
+    localStorage.removeItem(STORAGE_KEY)
+    return useDevSeed ? createSeedInventory() : []
   }
 }
 

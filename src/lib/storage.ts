@@ -1,5 +1,10 @@
+import { isDemoAppData } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
 import type { Client, Invoice, Job, OverheadExpense, Package, Supply } from './types'
+
+function useDevDemoSeed(): boolean {
+  return process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
+}
 
 const STORAGE_KEY = 'detailing_app_data_v1'
 
@@ -184,7 +189,7 @@ export function createEmptyData(): AppData {
 }
 
 function defaultLocalData(): AppData {
-  return isPocketBaseConfigured() ? createEmptyData() : createSeedData()
+  return useDevDemoSeed() ? createSeedData() : createEmptyData()
 }
 
 export function loadData(): AppData {
@@ -193,8 +198,7 @@ export function loadData(): AppData {
   const raw = localStorage.getItem(STORAGE_KEY)
   if (!raw) {
     const initial = defaultLocalData()
-    // Only persist demo seed for offline-only dev; production phones should not get Marcus/Sarah demo jobs.
-    if (!isPocketBaseConfigured()) {
+    if (useDevDemoSeed()) {
       saveData(initial)
     }
     return initial
@@ -202,7 +206,7 @@ export function loadData(): AppData {
 
   const parsed = JSON.parse(raw) as Partial<AppData>
   const fallback = defaultLocalData()
-  return {
+  const merged: AppData = {
     packages: parsed.packages ?? fallback.packages,
     clients: parsed.clients ?? fallback.clients,
     jobs: parsed.jobs ?? fallback.jobs,
@@ -211,6 +215,14 @@ export function loadData(): AppData {
     overhead_expenses: parsed.overhead_expenses ?? fallback.overhead_expenses,
     job_photos: parsed.job_photos ?? {},
   }
+
+  // Phone may still have demo saved from an earlier visit — drop it when cloud is configured.
+  if (isPocketBaseConfigured() && isDemoAppData(merged)) {
+    localStorage.removeItem(STORAGE_KEY)
+    return createEmptyData()
+  }
+
+  return merged
 }
 
 export function saveData(data: AppData): void {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CaretRight, FloppyDisk } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import {
+  clearLocalDeviceData,
   clearOfflineQueue,
   flushOfflineQueue,
   getActiveBackend,
@@ -207,14 +208,28 @@ export default function Settings() {
             <button
               type="button"
               className="btn-ghost"
-              style={{ width: '100%' }}
+              style={{ width: '100%', marginBottom: 8 }}
               onClick={async () => {
+                clearLocalDeviceData()
                 resetBackend()
                 await refreshSync()
                 window.location.reload()
               }}
             >
               Reconnect to cloud
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
+              onClick={() => {
+                if (!confirm('Clear all data stored on this device? Your cloud data on PocketBase is not deleted.')) return
+                clearLocalDeviceData()
+                resetBackend()
+                window.location.reload()
+              }}
+            >
+              Clear local device data
             </button>
           </div>
         )}
@@ -397,6 +412,18 @@ export default function Settings() {
         </button>
         <button className="btn-ghost" onClick={handleExport} style={{ width: '100%', marginBottom: 8 }}>
           Export all data (local)
+        </button>
+        <button
+          className="btn-ghost"
+          style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
+          onClick={() => {
+            if (!confirm('Clear demo and cached data on this device? Cloud data on PocketBase is not deleted.')) return
+            clearLocalDeviceData()
+            resetBackend()
+            window.location.reload()
+          }}
+        >
+          Clear local device data
         </button>
         {backupMsg && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{backupMsg}</div>}
       </div>
