@@ -1,5 +1,5 @@
 import { ensurePocketBaseAuth } from '../pb-auth'
-import { ensureDefaultCatalog } from './catalog-ready'
+import { ensureDefaultCatalog, isCatalogMarkedReady, syncCatalogReadyFlag } from './catalog-ready'
 import { getPocketBase } from '../pocketbase'
 import { loadData } from '../storage'
 import { saveIdMapEntry } from './id-resolve'
@@ -95,7 +95,10 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
   let overheadCreated = 0
   let photosCreated = 0
 
-  await ensureDefaultCatalog()
+  await syncCatalogReadyFlag()
+  if (!isCatalogMarkedReady()) {
+    await ensureDefaultCatalog()
+  }
 
   const pbPackages = await pb.getPackages()
   for (const pkg of local.packages) {
