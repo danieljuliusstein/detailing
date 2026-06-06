@@ -140,15 +140,17 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       continue
     }
 
-    const created = await pocketBase.collection('clients').create({
+    const clientPayload: Record<string, unknown> = {
       name: client.name,
       phone: client.phone ?? '',
       email: client.email ?? '',
       address: client.address ?? '',
-      lead_source: client.lead_source ?? '',
       tags: client.tags ?? [],
       notes: client.notes ?? '',
-    })
+    }
+    if (client.lead_source) clientPayload.lead_source = client.lead_source
+
+    const created = await pocketBase.collection('clients').create(clientPayload)
     clientIdMap.set(client.id, created.id)
     saveIdMapEntry(client.id, created.id, 'client')
     clientsCreated++

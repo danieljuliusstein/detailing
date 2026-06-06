@@ -116,15 +116,17 @@ export async function createClient(input: import('../types').ClientInput): Promi
   const trimmed = input.name.trim()
   if (!trimmed) throw new Error('Client name is required')
 
-  const created = await pb().collection('clients').create<PbRecord>({
+  const payload: Record<string, unknown> = {
     name: trimmed,
     phone: input.phone ?? '',
     email: input.email ?? '',
     address: input.address ?? '',
-    lead_source: input.lead_source ?? '',
     tags: input.tags ?? [],
     notes: input.notes ?? '',
-  })
+  }
+  if (input.lead_source) payload.lead_source = input.lead_source
+
+  const created = await pb().collection('clients').create<PbRecord>(payload)
   return pbClientToApp(created)
 }
 
@@ -135,7 +137,7 @@ export async function updateClient(id: string, input: Partial<import('../types')
     if (input.phone !== undefined) payload.phone = input.phone
     if (input.email !== undefined) payload.email = input.email
     if (input.address !== undefined) payload.address = input.address
-    if (input.lead_source !== undefined) payload.lead_source = input.lead_source
+    if (input.lead_source) payload.lead_source = input.lead_source
     if (input.tags !== undefined) payload.tags = input.tags
     if (input.notes !== undefined) payload.notes = input.notes
 
@@ -314,22 +316,31 @@ export async function exportJobsCSV(range: DateRangeKey): Promise<string> {
   }))
 }
 
-/** Seed default packages if collection is empty */
+const DEFAULT_PACKAGES = [
+  { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry' },
+  { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail' },
+  { name: 'Paint Correct', base_price: 450, active: true, description: 'Single-stage paint correction' },
+  { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application' },
+]
+
+/** Ensure default service packages exist — skips names already on the server. */
 export async function seedPackagesIfEmpty(): Promise<number> {
-  const existing = await pb().collection('packages').getFullList<PbRecord>({ limit: 1 })
-  if (existing.length > 0) return 0
+  const client = pb()
+  const existing = await client.collection('packages').getFullList<PbRecord>({ sort: 'name' })
+  const names = new Set(existing.map((r) => String(r.name).toLowerCase()))
+  let created = 0
 
-  const defaults = [
-    { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry' },
-    { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail' },
-    { name: 'Paint Correct', base_price: 450, active: true, description: 'Single-stage paint correction' },
-    { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application' },
-  ]
-
-  for (const pkg of defaults) {
-    await pb().collection('packages').create(pkg)
+  for (const pkg of DEFAULT_PACKAGES) {
+    if (names.has(pkg.name.toLowerCase())) continue
+    try {
+      await client.collection('packages').create(pkg)
+      names.add(pkg.name.toLowerCase())
+      created++
+    } catch (err) {
+      console.warn(`[api] Skip package seed "${pkg.name}":`, err)
+    }
   }
-  return defaults.length
+  return created
 }
 
 export async function getCollectionCounts(): Promise<Record<string, number>> {

@@ -72,20 +72,29 @@ export async function deductSupplies(suppliesUsed: { supply_id: string; quantity
   }
 }
 
+const DEFAULT_SUPPLIES = [
+  { name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys' },
+  { name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon' },
+  { name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars' },
+  { name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys' },
+  { name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq' },
+]
+
 export async function seedSuppliesIfEmpty(): Promise<number> {
-  const existing = await pb().collection('supplies').getFullList<PbRecord>({ limit: 1 })
-  if (existing.length > 0) return 0
+  const client = pb()
+  const existing = await client.collection('supplies').getFullList<PbRecord>({ sort: 'name' })
+  const names = new Set(existing.map((r) => String(r.name).toLowerCase()))
+  let created = 0
 
-  const defaults = [
-    { name: 'Car wash soap', unit: 'oz', quantity_on_hand: 128, reorder_threshold: 32, cost_per_unit: 0.15, supplier: 'Chemical Guys' },
-    { name: 'Microfiber towels', unit: 'each', quantity_on_hand: 24, reorder_threshold: 8, cost_per_unit: 2.5, supplier: 'Amazon' },
-    { name: 'Interior cleaner', unit: 'oz', quantity_on_hand: 64, reorder_threshold: 16, cost_per_unit: 0.22, supplier: 'Meguiars' },
-    { name: 'Wax / sealant', unit: 'oz', quantity_on_hand: 32, reorder_threshold: 8, cost_per_unit: 1.2, supplier: 'Chemical Guys' },
-    { name: 'Ceramic coating', unit: 'oz', quantity_on_hand: 16, reorder_threshold: 4, cost_per_unit: 8.5, supplier: 'Gtechniq' },
-  ]
-
-  for (const item of defaults) {
-    await pb().collection('supplies').create(appSupplyToPb(item))
+  for (const item of DEFAULT_SUPPLIES) {
+    if (names.has(item.name.toLowerCase())) continue
+    try {
+      await client.collection('supplies').create(appSupplyToPb(item))
+      names.add(item.name.toLowerCase())
+      created++
+    } catch (err) {
+      console.warn(`[api] Skip supply seed "${item.name}":`, err)
+    }
   }
-  return defaults.length
+  return created
 }

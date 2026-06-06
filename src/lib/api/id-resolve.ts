@@ -1,3 +1,4 @@
+import { isDemoJobId } from '../demo-data'
 import { getPocketBase } from '../pocketbase'
 import { loadData } from '../storage'
 import { escapeFilterValue } from './mappers'
@@ -74,6 +75,8 @@ export async function resolveClientId(id: string): Promise<string> {
 }
 
 export async function resolveJobId(id: string): Promise<string> {
+  if (isDemoJobId(id)) throw new Error(`Unknown job: ${id}`)
+
   const mapped = lookupIdMap(id, 'job')
   if (mapped) return mapped
   if (await pbRecordExists('jobs', id)) return id

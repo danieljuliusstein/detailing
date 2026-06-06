@@ -1,6 +1,11 @@
 import { authenticatePocketBase } from '../pb-auth'
 import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
 import {
+  describeQueueItem,
+  isDiscardableQueueError,
+  purgeStaleQueueItems,
+} from './queue-utils'
+import {
   getQueueCount,
   getQueueItems,
   incrementRetries,
@@ -200,6 +205,8 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
     return result
   }
 
+  await purgeStaleQueueItems()
+
   const items = await getQueueItems()
   const maps = new IdMaps()
   preloadIdMaps(maps)
@@ -210,11 +217,21 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
       await removeQueueItem(item.id)
       result.processed++
     } catch (err) {
-      await incrementRetries(item.id)
+      const message = err instanceof Error ? err.message : String(err)
       result.failed++
-      result.errors.push(err instanceof Error ? err.message : String(err))
-      if (item.retries >= 3) {
-        result.errors.push(`Giving up on ${item.id} after 3 retries`)
+
+      if (isDiscardableQueueError(err)) {
+        await removeQueueItem(item.id)
+        result.errors.push(`Discarded stale sync (${describeQueueItem(item)}): ${message}`)
+        continue
+      }
+
+      await incrementRetries(item.id)
+      if (item.retries + 1 >= 3) {
+        await removeQueueItem(item.id)
+        result.errors.push(`Discarded after 3 retries (${describeQueueItem(item)}): ${message}`)
+      } else {
+        result.errors.push(message)
       }
     }
   }
@@ -260,6 +277,8 @@ export async function runDataMigration(options?: { force?: boolean }): Promise<M
 
   return migrateLocalToPocketBase()
 }
+
+export { purgeStaleQueueItems } from './queue-utils'
 
 export async function syncOnReconnect(): Promise<FlushResult> {
   const flush = await flushOfflineQueue()

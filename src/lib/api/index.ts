@@ -1,4 +1,5 @@
-import { clearLocalDeviceData, purgeDemoCacheIfPresent } from '../clear-local-data'
+import { clearLocalDeviceDataSync, purgeDemoCacheIfPresent } from '../clear-local-data'
+import { purgeStaleQueueItems } from './queue-utils'
 import { authenticatePocketBase, isPocketBaseAuthenticated } from '../pb-auth'
 import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
 import { withTimeout } from '../timeout'
@@ -59,7 +60,7 @@ import type {
 export type { DateRangeKey, PLReport } from './reports'
 export type { FlushResult, MigrationResult, MigrationStatus, SyncStatus }
 export { getMigrationStatus, getSyncStatus, runDataMigration, flushOfflineQueue, syncOnReconnect }
-export { clearLocalDeviceData, purgeDemoCacheIfPresent }
+export { clearLocalDeviceDataSync as clearLocalDeviceData, purgeDemoCacheIfPresent }
 
 let backend: 'local' | 'pocketbase' | null = null
 let initPromise: Promise<'local' | 'pocketbase'> | null = null
@@ -75,6 +76,7 @@ async function resolveBackend(): Promise<'local' | 'pocketbase'> {
 
 async function initBackendInner(): Promise<'local' | 'pocketbase'> {
   purgeDemoCacheIfPresent()
+  await purgeStaleQueueItems()
 
   if (!isPocketBaseConfigured()) {
     return 'local'

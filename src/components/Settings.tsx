@@ -210,7 +210,7 @@ export default function Settings() {
               className="btn-ghost"
               style={{ width: '100%', marginBottom: 8 }}
               onClick={async () => {
-                clearLocalDeviceData()
+                await clearLocalDeviceData()
                 resetBackend()
                 await refreshSync()
                 window.location.reload()
@@ -222,9 +222,9 @@ export default function Settings() {
               type="button"
               className="btn-ghost"
               style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
-              onClick={() => {
+              onClick={async () => {
                 if (!confirm('Clear all data stored on this device? Your cloud data on PocketBase is not deleted.')) return
-                clearLocalDeviceData()
+                await clearLocalDeviceData()
                 resetBackend()
                 window.location.reload()
               }}
@@ -388,7 +388,7 @@ export default function Settings() {
         </button>
         {syncStatus && syncStatus.pendingWrites > 0 && (
           <button className="btn-ghost" onClick={handleClearQueue} style={{ width: '100%', fontSize: 12, color: 'var(--red)' }}>
-            Clear failed queue
+            Clear sync queue
           </button>
         )}
       </div>
@@ -416,9 +416,9 @@ export default function Settings() {
         <button
           className="btn-ghost"
           style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
-          onClick={() => {
+          onClick={async () => {
             if (!confirm('Clear demo and cached data on this device? Cloud data on PocketBase is not deleted.')) return
-            clearLocalDeviceData()
+            await clearLocalDeviceData()
             resetBackend()
             window.location.reload()
           }}
