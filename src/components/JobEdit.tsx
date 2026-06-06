@@ -36,6 +36,7 @@ interface JobEditProps {
 
 export default function JobEdit({ job, packages, supplies, onSave }: JobEditProps) {
   const router = useRouter()
+  const [date, setDate] = useState(job.date)
   const [packageId, setPackageId] = useState(job.package_id)
   const [vehicleType, setVehicleType] = useState(job.vehicle_type)
   const [locationType, setLocationType] = useState(job.location_type)
@@ -66,6 +67,7 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
     setSaving(true)
     try {
       await onSave({
+        date,
         packageId,
         vehicleType,
         locationType,
@@ -91,15 +93,21 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
       <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20 }}>
         <BackButton onClick={() => router.back()} />
         <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Edit job</div>
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
-          {new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </div>
       </div>
 
       <div className="section-title">Client</div>
       <div className="card" style={{ marginBottom: 20, fontSize: 14, fontWeight: 500 }}>
         {job.client?.name ?? 'Unknown'}
       </div>
+
+      <div className="section-title">Job date</div>
+      <input
+        type="date"
+        className="input"
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        style={{ marginBottom: 20 }}
+      />
 
       <div className="section-title">Package</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>

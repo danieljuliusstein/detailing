@@ -162,6 +162,7 @@ export function appJobCreateToPb(input: {
 }
 
 export function appJobEditToPb(updates: {
+  date?: string
   packageId: string
   vehicleType: string
   locationType: string
@@ -178,6 +179,7 @@ export function appJobEditToPb(updates: {
   expenses?: ExpenseLine[]
 }) {
   const payload: Record<string, unknown> = {
+    ...(updates.date !== undefined ? { date: updates.date } : {}),
     package_id: updates.packageId,
     vehicle_type: updates.vehicleType,
     location_type: updates.locationType,

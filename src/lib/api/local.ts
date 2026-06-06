@@ -249,6 +249,7 @@ export function updateJob(id: string, updates: JobEditData): Job | null {
 
   data.jobs[idx] = {
     ...current,
+    date: updates.date ?? current.date,
     package_id: updates.packageId,
     vehicle_type: updates.vehicleType,
     location_type: updates.locationType,

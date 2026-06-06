@@ -172,6 +172,7 @@ export interface RecentJobRow {
 }
 
 export interface JobEditData {
+  date: string
   packageId: string
   vehicleType: VehicleType
   locationType: LocationType
