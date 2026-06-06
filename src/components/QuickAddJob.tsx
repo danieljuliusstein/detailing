@@ -45,6 +45,7 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
   const [revenue, setRevenue] = useState(selectedPackage?.base_price ?? 0)
   const [tip, setTip] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -69,24 +70,42 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
   })
 
   const handleSave = async () => {
-    if (!selectedPackage) return
-    if (!selectedClient && !clientSearch.trim()) return
+    setSaveError(null)
+    if (!selectedPackage) {
+      setSaveError('Add a service package first (Settings → Packages).')
+      return
+    }
+    if (!selectedClient && !clientSearch.trim()) {
+      setSaveError('Enter a client name.')
+      return
+    }
     setSaving(true)
     try {
       await onSave(buildPayload())
       router.push('/')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save job.')
     } finally {
       setSaving(false)
     }
   }
 
   const handleSaveAndExpenses = async () => {
-    if (!selectedPackage) return
-    if (!selectedClient && !clientSearch.trim()) return
+    setSaveError(null)
+    if (!selectedPackage) {
+      setSaveError('Add a service package first (Settings → Packages).')
+      return
+    }
+    if (!selectedClient && !clientSearch.trim()) {
+      setSaveError('Enter a client name.')
+      return
+    }
     setSaving(true)
     try {
       const job = await onSave(buildPayload())
       router.push(`/jobs/${job.id}`)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save job.')
     } finally {
       setSaving(false)
     }
@@ -143,6 +162,21 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
       </div>
 
       <div className="section-title">Package</div>
+      {packages.length === 0 ? (
+        <div style={{
+          background: 'var(--bg-surface)',
+          border: '0.5px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
+          padding: 16,
+          marginBottom: 20,
+          fontSize: 14,
+          color: 'var(--text-muted)',
+        }}>
+          No service packages yet. Add at least one under{' '}
+          <a href="/settings/packages" style={{ color: 'var(--green)' }}>Settings → Packages</a>{' '}
+          before creating jobs.
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
         {packages.map((pkg) => {
           const active = selectedPackage?.id === pkg.id
@@ -170,6 +204,7 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
           )
         })}
       </div>
+      )}
 
       <div className="section-title">Vehicle type</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
@@ -256,14 +291,18 @@ export default function QuickAddJob({ packages, recentClients, onSave }: QuickAd
         </div>
       </div>
 
+      {saveError && (
+        <div style={{ fontSize: 13, color: 'var(--red, #e55)', marginBottom: 12 }}>{saveError}</div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
-        <button className="btn-primary" onClick={handleSave} disabled={saving}>
+        <button className="btn-primary" onClick={handleSave} disabled={saving || packages.length === 0}>
           {saving ? 'Saving...' : 'Save job'}
         </button>
         <button
           className="btn-ghost"
           onClick={handleSaveAndExpenses}
-          disabled={saving}
+          disabled={saving || packages.length === 0}
           style={{ whiteSpace: 'nowrap', padding: '16px 20px' }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

@@ -81,7 +81,7 @@ export default function PinAuth() {
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 32, textAlign: 'center' }}>
         {needsSetup
           ? 'Choose a 4-digit PIN to secure your business data'
-          : 'Your app locks after 5 minutes of inactivity'}
+          : 'Enter your PIN to open the app'}
       </p>
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>

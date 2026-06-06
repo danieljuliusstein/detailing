@@ -1,6 +1,5 @@
 const PIN_HASH_KEY = 'detailing_pin_hash'
 const UNLOCKED_KEY = 'detailing_unlocked_at'
-const LOCK_TIMEOUT_MS = 5 * 60 * 1000
 
 async function sha256(text: string): Promise<string> {
   const data = new TextEncoder().encode(text)
@@ -44,15 +43,7 @@ export function isUnlocked(): boolean {
   if (typeof window === 'undefined') return false
   if (!hasPinSet()) return true
 
-  const unlockedAt = localStorage.getItem(UNLOCKED_KEY)
-  if (!unlockedAt) return false
-
-  const elapsed = Date.now() - Number(unlockedAt)
-  if (elapsed > LOCK_TIMEOUT_MS) {
-    lock()
-    return false
-  }
-  return true
+  return !!localStorage.getItem(UNLOCKED_KEY)
 }
 
 export function touchActivity(): void {

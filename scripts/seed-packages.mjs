@@ -35,14 +35,18 @@ async function main() {
   const { token } = await authRes.json()
   const headers = { Authorization: token, 'Content-Type': 'application/json' }
 
-  const listRes = await fetch(`${PB_URL}/api/collections/packages/records?perPage=1`, { headers })
+  const listRes = await fetch(`${PB_URL}/api/collections/packages/records?perPage=200`, { headers })
   const list = await listRes.json()
-  if (list.totalItems > 0) {
-    console.log(`Packages already exist (${list.totalItems} total). Skipping.`)
-    return
-  }
+  const existing = new Set(
+    (list.items ?? []).map((p) => String(p.name).toLowerCase()),
+  )
 
+  let created = 0
   for (const pkg of PACKAGES) {
+    if (existing.has(pkg.name.toLowerCase())) {
+      console.log('Exists:', pkg.name)
+      continue
+    }
     const res = await fetch(`${PB_URL}/api/collections/packages/records`, {
       method: 'POST',
       headers,
@@ -53,9 +57,10 @@ async function main() {
       process.exit(1)
     }
     console.log('Created:', pkg.name)
+    created++
   }
 
-  console.log('Done — 4 packages seeded.')
+  console.log(`Done — ${created} package(s) added.`)
 }
 
 main().catch((err) => {

@@ -33,7 +33,9 @@ export async function executeWrite<T>(target: WriteTarget<T>): Promise<T> {
   try {
     return await target.pocketbase()
   } catch (err) {
-    console.warn('[api] PocketBase write failed, queuing for sync:', err)
+    const online = typeof navigator === 'undefined' || navigator.onLine
+    if (online) throw err
+    console.warn('[api] PocketBase write failed offline, queuing for sync:', err)
     const result = await target.local()
     if (shouldQueue) {
       const op = await target.buildQueue(result)

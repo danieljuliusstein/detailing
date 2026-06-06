@@ -36,14 +36,18 @@ async function main() {
   const { token } = await authRes.json()
   const headers = { Authorization: token, 'Content-Type': 'application/json' }
 
-  const listRes = await fetch(`${PB_URL}/api/collections/supplies/records?perPage=1`, { headers })
+  const listRes = await fetch(`${PB_URL}/api/collections/supplies/records?perPage=200`, { headers })
   const list = await listRes.json()
-  if (list.totalItems > 0) {
-    console.log(`Supplies already exist (${list.totalItems} total). Skipping.`)
-    return
-  }
+  const existing = new Set(
+    (list.items ?? []).map((s) => String(s.name).toLowerCase()),
+  )
 
+  let created = 0
   for (const item of SUPPLIES) {
+    if (existing.has(item.name.toLowerCase())) {
+      console.log('Exists:', item.name)
+      continue
+    }
     const res = await fetch(`${PB_URL}/api/collections/supplies/records`, {
       method: 'POST',
       headers,
@@ -54,9 +58,10 @@ async function main() {
       process.exit(1)
     }
     console.log('Created:', item.name)
+    created++
   }
 
-  console.log('Done — 5 supplies seeded.')
+  console.log(`Done — ${created} supply item(s) added.`)
 }
 
 main().catch((err) => {
