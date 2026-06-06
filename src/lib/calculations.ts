@@ -87,3 +87,17 @@ export const fmtDetailed = (n: number, forceSign = false) => {
   if (forceSign && n < 0) return `−${formatted}`
   return formatted
 }
+
+export function fmtSigned(n: number, decimals = 2): string {
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(Math.abs(n))
+  return n < 0 ? `−${formatted}` : formatted
+}
+
+export function isLoss(n: number): boolean {
+  return n < 0
+}

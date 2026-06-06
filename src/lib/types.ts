@@ -2,6 +2,7 @@ export type LocationType = 'mobile' | 'fixed'
 export type VehicleType = 'sedan' | 'suv' | 'truck' | 'van' | 'boat' | 'other'
 export type JobStatus = 'scheduled' | 'in_progress' | 'completed' | 'invoiced' | 'paid'
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired'
 export type PhotoType = 'before' | 'after'
 export type OverheadCategory = 'vehicle' | 'insurance' | 'equipment' | 'software' | 'marketing' | 'other'
 export type BillingCycle = 'monthly' | 'annual' | 'one_time'
@@ -166,6 +167,39 @@ export interface Job {
   invoice_id?: string
   created?: string
   updated?: string
+}
+
+export interface Quote {
+  id: string
+  quote_number: string
+  client_id: string
+  package_id: string
+  vehicle_type: VehicleType
+  location_type: LocationType
+  date: string
+  subtotal: number
+  notes?: string
+  status: QuoteStatus
+  valid_until?: string
+  job_id?: string
+  sent_at?: string
+  created?: string
+}
+
+export interface QuoteWithRelations extends Quote {
+  client?: Client
+  package?: Package
+}
+
+export interface QuoteInput {
+  client_id: string
+  package_id: string
+  vehicle_type: VehicleType
+  location_type: LocationType
+  date: string
+  subtotal: number
+  notes?: string
+  valid_until?: string
 }
 
 export interface Invoice {

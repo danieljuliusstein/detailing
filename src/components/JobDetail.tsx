@@ -1,8 +1,11 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { FileText, Camera, PencilSimple } from '@phosphor-icons/react'
+import { CalendarPlus, FileText, Camera, PencilSimple, Link } from '@phosphor-icons/react'
+import { suggestNextServiceDate } from '@/lib/next-service'
+import { normalizeReturnDays } from '@/lib/package-cadence'
 import BackButton from '@/components/BackButton'
+import ShareLinkActions from '@/components/portal/ShareLinkActions'
 import {
   effectiveRate,
   fmtDetailed,
@@ -52,6 +55,13 @@ export default function JobDetail({ job }: JobDetailProps) {
   const balanceDue = (job.revenue + job.tip) - totalPaid
 
   const invoiceNumber = job.invoice?.invoice_number ?? '—'
+
+  const showNextService =
+    (job.status === 'completed' || job.status === 'paid' || job.status === 'invoiced') &&
+    job.package &&
+    job.client
+  const returnDays = normalizeReturnDays(job.package?.expected_return_days)
+  const nextServiceDate = showNextService ? suggestNextServiceDate(job.date, returnDays) : null
 
   return (
     <div className="screen page-content">
@@ -152,6 +162,33 @@ export default function JobDetail({ job }: JobDetailProps) {
         </div>
       )}
 
+      {nextServiceDate && job.client && job.package && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="section-title">Next service</div>
+          <div style={{ fontSize: 14, marginBottom: 10 }}>
+            Suggested:{' '}
+            {new Date(nextServiceDate + 'T12:00:00').toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}> ({returnDays}-day cadence)</span>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            onClick={() =>
+              router.push(
+                `/jobs/new?clientId=${job.client_id}&packageId=${job.package_id}&date=${nextServiceDate}`
+              )
+            }
+          >
+            <CalendarPlus size={18} /> Book next
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <button
           className="btn-ghost"
@@ -175,6 +212,22 @@ export default function JobDetail({ job }: JobDetailProps) {
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="section-title">Notes</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{job.notes}</div>
+        </div>
+      )}
+
+      {job.client && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Link size={18} /> Client portal link
+          </div>
+          <ShareLinkActions
+            clientId={job.client_id}
+            clientEmail={job.client.email}
+            clientName={job.client.name}
+            jobId={job.id}
+            scope="full"
+            emailMessage="View your service details, invoice, and photos using the secure link below."
+          />
         </div>
       )}
 

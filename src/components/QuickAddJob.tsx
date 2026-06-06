@@ -21,15 +21,19 @@ import {
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import JobExpensesSheet, { type JobExpenseDraft } from '@/components/jobs/JobExpensesSheet'
+import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
+import { getSupplies } from '@/lib/api'
 import './QuickAddJob.css'
 import { fmt } from '@/lib/calculations'
 import { deriveInitials } from '@/lib/client-relationship-logic'
-import type { ClientWithStats, Package, QuickJobData, VehicleType } from '@/lib/types'
+import type { ClientWithStats, Package, QuickJobData, Supply, SupplyUsage, VehicleType } from '@/lib/types'
 
 interface QuickAddJobProps {
   packages: Package[]
   clients: ClientWithStats[]
   initialClient?: ClientWithStats | null
+  initialPackageId?: string
+  initialDate?: string
   onSave: (data: QuickJobData) => Promise<{ id: string }>
 }
 
@@ -66,6 +70,8 @@ export default function QuickAddJob({
   packages,
   clients,
   initialClient,
+  initialPackageId,
+  initialDate,
   onSave,
 }: QuickAddJobProps) {
   const router = useRouter()
@@ -73,12 +79,15 @@ export default function QuickAddJob({
   const [clientSearch, setClientSearch] = useState('')
   const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null)
   const [showClientList, setShowClientList] = useState(false)
-  const [jobDate, setJobDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [jobDate, setJobDate] = useState(() => initialDate ?? new Date().toISOString().slice(0, 10))
   const [startTime, setStartTime] = useState('')
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(packages[0] ?? null)
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(
+    () => packages.find((p) => p.id === initialPackageId) ?? packages[0] ?? null
+  )
   const [vehicleType, setVehicleType] = useState<VehicleType>('sedan')
   const [locationType, setLocationType] = useState<'mobile' | 'fixed'>('mobile')
-  const [revenue, setRevenue] = useState(packages[0]?.base_price ?? 0)
+  const initialPkg = packages.find((p) => p.id === initialPackageId) ?? packages[0]
+  const [revenue, setRevenue] = useState(initialPkg?.base_price ?? 0)
   const [tip, setTip] = useState(0)
   const [notes, setNotes] = useState('')
   const [expenses, setExpenses] = useState<JobExpenseDraft>({
@@ -87,6 +96,9 @@ export default function QuickAddJob({
     equipment_depreciation: 0,
   })
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false)
+  const [suppliesSheetOpen, setSuppliesSheetOpen] = useState(false)
+  const [catalogSupplies, setCatalogSupplies] = useState<Supply[]>([])
+  const [pendingSupplies, setPendingSupplies] = useState<SupplyUsage[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -118,7 +130,7 @@ export default function QuickAddJob({
     setRevenue(pkg.base_price)
   }, [])
 
-  const buildPayload = (): QuickJobData => ({
+  const buildPayload = (supplies_used?: SupplyUsage[]): QuickJobData => ({
     clientId: selectedClient!.id,
     clientName: selectedClient!.name,
     packageId: selectedPackage!.id,
@@ -132,7 +144,20 @@ export default function QuickAddJob({
     travel_cost: expenses.travel_cost,
     marketing_cost: expenses.marketing_cost,
     equipment_depreciation: expenses.equipment_depreciation,
+    supplies_used,
   })
+
+  const performSave = async (supplies_used?: SupplyUsage[]) => {
+    setSaving(true)
+    try {
+      const job = await onSave(buildPayload(supplies_used))
+      router.push(`/jobs/${job.id}`)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save job.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaveError(null)
@@ -148,15 +173,10 @@ export default function QuickAddJob({
       setSaveError('Enter revenue greater than zero.')
       return
     }
-    setSaving(true)
-    try {
-      const job = await onSave(buildPayload())
-      router.push(`/jobs/${job.id}`)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save job.')
-    } finally {
-      setSaving(false)
-    }
+    const supplies = await getSupplies()
+    setCatalogSupplies(supplies)
+    setPendingSupplies(null)
+    setSuppliesSheetOpen(true)
   }
 
   const headerDate = formatHeaderDate(new Date())
@@ -439,6 +459,19 @@ export default function QuickAddJob({
           value={expenses}
           onSave={setExpenses}
           onClose={() => setExpenseSheetOpen(false)}
+        />
+      )}
+
+      {suppliesSheetOpen && (
+        <JobSuppliesConfirmSheet
+          supplies={catalogSupplies}
+          pkg={selectedPackage ?? undefined}
+          initialUsed={pendingSupplies ?? undefined}
+          onConfirm={(used) => {
+            setSuppliesSheetOpen(false)
+            void performSave(used)
+          }}
+          onClose={() => setSuppliesSheetOpen(false)}
         />
       )}
     </div>

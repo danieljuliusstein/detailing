@@ -62,7 +62,10 @@ await check('PocketBase auth + packages', async () => {
   })
   if (!pkgRes.ok) throw new Error(`Packages API failed: ${pkgRes.status}`)
 
-  for (const collection of ['supplies', 'overhead_expenses']) {
+  for (const collection of [
+    'clients', 'jobs', 'invoices', 'supplies', 'equipment',
+    'overhead_expenses', 'business_expenses', 'app_settings',
+  ]) {
     const res = await fetch(`${PB_URL}/api/collections/${collection}/records?perPage=1`, {
       headers: { Authorization: token },
       signal: AbortSignal.timeout(5000),

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Briefcase, Flask, Receipt, UserPlus } from '@phosphor-icons/react'
+import { Briefcase, FileText, Flask, Receipt, UserPlus } from '@phosphor-icons/react'
 import { useQuickAction } from '@/providers/QuickActionContext'
 
 interface ActionItem {
@@ -27,6 +27,16 @@ export default function QuickActionMenu() {
       onSelect: () => {
         closeMenu()
         router.push('/jobs/new')
+      },
+    },
+    {
+      id: 'new-quote',
+      label: 'New quote',
+      subtitle: 'Send an estimate to a client',
+      Icon: FileText,
+      onSelect: () => {
+        closeMenu()
+        router.push('/quotes/new')
       },
     },
     {

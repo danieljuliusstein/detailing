@@ -1,4 +1,5 @@
 import PocketBase from 'pocketbase'
+import { withTimeout } from './timeout'
 
 let pb: PocketBase | null = null
 
@@ -29,5 +30,19 @@ export async function checkPocketBaseHealth(timeoutMs = 8000): Promise<boolean> 
     return res.ok
   } catch {
     return false
+  }
+}
+
+/** Verify app collections exist (health alone only checks the server is up). */
+export async function checkPocketBaseSchema(timeoutMs = 8000): Promise<{ ok: boolean; error?: string }> {
+  const pb = getPocketBase()
+  if (!pb?.authStore.isValid) return { ok: false, error: 'not_authenticated' }
+
+  try {
+    await withTimeout(pb.collection('jobs').getList(1, 1), timeoutMs, 'PocketBase schema probe')
+    return { ok: true }
+  } catch (err) {
+    const e = err as { status?: number; message?: string }
+    return { ok: false, error: `${e.status ?? '?'}: ${e.message ?? String(err)}` }
   }
 }

@@ -97,6 +97,24 @@ export const FILTER_CHIPS: { key: DateRangeKey; label: string }[] = [
   { key: 'this_year', label: 'This year' },
 ]
 
+/** Full donut ring — SVG cannot draw a 360° arc in one command (start === end). */
+function fullDonutPath(cx: number, cy: number, outerR: number, innerR: number): string {
+  const topOuter = { x: cx, y: cy - outerR }
+  const bottomOuter = { x: cx, y: cy + outerR }
+  const topInner = { x: cx, y: cy - innerR }
+  const bottomInner = { x: cx, y: cy + innerR }
+
+  return [
+    `M ${topOuter.x} ${topOuter.y}`,
+    `A ${outerR} ${outerR} 0 1 1 ${bottomOuter.x} ${bottomOuter.y}`,
+    `A ${outerR} ${outerR} 0 1 1 ${topOuter.x} ${topOuter.y}`,
+    `L ${topInner.x} ${topInner.y}`,
+    `A ${innerR} ${innerR} 0 1 0 ${bottomInner.x} ${bottomInner.y}`,
+    `A ${innerR} ${innerR} 0 1 0 ${topInner.x} ${topInner.y}`,
+    'Z',
+  ].join(' ')
+}
+
 /** SVG donut arc path from startAngle to endAngle (radians). */
 export function donutArcPath(
   cx: number,
@@ -106,7 +124,12 @@ export function donutArcPath(
   startAngle: number,
   endAngle: number
 ): string {
-  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0
+  const sweep = endAngle - startAngle
+  if (sweep >= Math.PI * 2 - 1e-6) {
+    return fullDonutPath(cx, cy, outerR, innerR)
+  }
+
+  const largeArc = sweep > Math.PI ? 1 : 0
   const ox1 = cx + outerR * Math.cos(startAngle)
   const oy1 = cy + outerR * Math.sin(startAngle)
   const ox2 = cx + outerR * Math.cos(endAngle)

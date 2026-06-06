@@ -1,6 +1,6 @@
 import { isDemoAppData } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
-import type { BusinessExpense, Client, Equipment, Invoice, Job, OverheadExpense, Package, Supply } from './types'
+import type { BusinessExpense, Client, Equipment, Invoice, Job, OverheadExpense, Package, Quote, Supply } from './types'
 
 function useDevDemoSeed(): boolean {
   return process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
@@ -19,6 +19,7 @@ export interface AppData {
   clients: Client[]
   jobs: Job[]
   invoices: Invoice[]
+  quotes?: Quote[]
   supplies: Supply[]
   equipment?: Equipment[]
   overhead_expenses: OverheadExpense[]

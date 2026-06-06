@@ -3,11 +3,14 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Car, Jeep, Truck, Van, Boat, DotsThree, MapPin, House, FloppyDisk,
+  CalendarBlank, Car, Jeep, Truck, Van, Boat, DotsThree, MapPin, House, FloppyDisk,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
 import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
+import { buildJobIcs, downloadIcs } from '@/lib/calendar-ics'
+import { isCompletingJob } from '@/lib/supplies-logic'
 import type { JobEditData, JobStatus, JobWithRelations, Package, Supply, SupplyUsage, VehicleType } from '@/lib/types'
 
 const VEHICLE_TYPES: { id: VehicleType; label: string; Icon: PhosphorIcon }[] = [
@@ -50,6 +53,7 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
   const [marketingCost, setMarketingCost] = useState(job.marketing_cost)
   const [equipmentCost, setEquipmentCost] = useState(job.equipment_depreciation)
   const [suppliesUsed, setSuppliesUsed] = useState<SupplyUsage[]>(job.supplies_used)
+  const [suppliesSheetOpen, setSuppliesSheetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const handlePackageSelect = useCallback((pkg: Package) => {
@@ -63,7 +67,7 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
     }
   }, [])
 
-  const handleSave = async () => {
+  const saveJob = async (used: SupplyUsage[]) => {
     setSaving(true)
     try {
       await onSave({
@@ -77,7 +81,7 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         start_time: startTime || undefined,
         status,
         notes: notes || undefined,
-        supplies_used: suppliesUsed,
+        supplies_used: used,
         travel_cost: travelCost,
         marketing_cost: marketingCost,
         equipment_depreciation: equipmentCost,
@@ -86,6 +90,26 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSave = async () => {
+    if (isCompletingJob(job.status, status)) {
+      setSuppliesSheetOpen(true)
+      return
+    }
+    await saveJob(suppliesUsed)
+  }
+
+  const handleAddToCalendar = () => {
+    const pkg = packages.find((p) => p.id === packageId)
+    const ics = buildJobIcs({
+      uid: job.id,
+      title: `${job.client?.name ?? 'Client'} — ${pkg?.name ?? 'Detail'}`,
+      description: notes || undefined,
+      date,
+      startTime: startTime || undefined,
+    })
+    downloadIcs(`job-${job.id}`, ics)
   }
 
   return (
@@ -106,8 +130,19 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         className="input"
         value={date}
         onChange={(e) => setDate(e.target.value)}
-        style={{ marginBottom: 20 }}
+        style={{ marginBottom: 12 }}
       />
+
+      {status === 'scheduled' && (
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{ width: '100%', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          onClick={handleAddToCalendar}
+        >
+          <CalendarBlank size={18} /> Add to calendar
+        </button>
+      )}
 
       <div className="section-title">Package</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
@@ -218,6 +253,20 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         <FloppyDisk size={18} weight="bold" />
         {saving ? 'Saving…' : 'Save changes'}
       </button>
+
+      {suppliesSheetOpen && (
+        <JobSuppliesConfirmSheet
+          supplies={supplies}
+          pkg={packages.find((p) => p.id === packageId)}
+          initialUsed={suppliesUsed}
+          onConfirm={(used) => {
+            setSuppliesUsed(used)
+            setSuppliesSheetOpen(false)
+            void saveJob(used)
+          }}
+          onClose={() => setSuppliesSheetOpen(false)}
+        />
+      )}
     </div>
   )
 }

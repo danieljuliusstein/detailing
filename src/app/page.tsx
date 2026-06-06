@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Dashboard from '@/components/Dashboard'
-import { getDashboardData, getJobsForDate } from '@/lib/api'
-import type { DashboardKpis, RecentJobRow, WeekDay } from '@/lib/types'
+import { getClientsWithStats, getDashboardData, getJobsForDate } from '@/lib/api'
+import { buildDerivedMap, overdueClients } from '@/lib/client-relationship-logic'
+import type { ClientWithStats, DashboardKpis, RecentJobRow, WeekDay } from '@/lib/types'
 
 export default function HomePage() {
   const [kpis, setKpis] = useState<DashboardKpis | null>(null)
@@ -12,18 +13,21 @@ export default function HomePage() {
   const [weekDays, setWeekDays] = useState<WeekDay[]>([])
   const [selectedDate, setSelectedDate] = useState('')
   const [dayJobs, setDayJobs] = useState<RecentJobRow[]>([])
+  const [dueClients, setDueClients] = useState<ClientWithStats[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
-    getDashboardData()
-      .then((data) => {
+    Promise.all([getDashboardData(), getClientsWithStats()])
+      .then(([data, clients]) => {
         if (cancelled) return
         setKpis(data.kpis)
         setRecentJobs(data.recentJobs)
         setJobsToday(data.jobsToday)
         setWeekDays(data.weekDays)
+        const derived = buildDerivedMap(clients)
+        setDueClients(overdueClients(clients, derived))
         const today = data.weekDays.find((d) => d.isToday)?.date ?? data.weekDays[0]?.date ?? ''
         setSelectedDate(today)
       })
@@ -66,6 +70,7 @@ export default function HomePage() {
       jobsToday={jobsToday}
       weekDays={weekDays}
       dayJobs={dayJobs}
+      dueClients={dueClients}
       selectedDate={selectedDate}
       onDaySelect={setSelectedDate}
     />

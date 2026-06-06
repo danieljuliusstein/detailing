@@ -64,9 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [ready, authenticated, router, bumpAuth])
 
+  const isPublicRoute = pathname === '/auth' || pathname.startsWith('/portal')
+
   useEffect(() => {
     if (!ready) return
-    if (pathname === '/auth') return
+    if (isPublicRoute) return
 
     if (needsSetup) {
       router.replace('/auth')
@@ -76,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!authenticated) {
       router.replace('/auth')
     }
-  }, [ready, authenticated, needsSetup, pathname, router])
+  }, [ready, authenticated, needsSetup, pathname, router, isPublicRoute])
 
   const syncPocketBaseInBackground = useCallback(() => {
     void (async () => {
@@ -90,6 +92,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })()
   }, [])
+
+  // Re-auth PocketBase on refresh when PIN session is already unlocked
+  useEffect(() => {
+    if (!ready || !authenticated) return
+    syncPocketBaseInBackground()
+  }, [ready, authenticated, syncPocketBaseInBackground])
+
+  useEffect(() => {
+    if (!ready || !authenticated || pathname !== '/auth') return
+    router.replace('/')
+  }, [ready, authenticated, pathname, router])
 
   const setupPinFn = useCallback(async (pin: string) => {
     await setPin(pin)
@@ -126,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (pathname === '/auth') {
+  if (isPublicRoute) {
     return (
       <AuthContext.Provider value={{ isAuthenticated: authenticated, needsSetup, setupPin: setupPinFn, login, logout }}>
         {children}

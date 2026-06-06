@@ -57,7 +57,12 @@ export default function BottomNav() {
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
-  if (pathname === '/auth' || pathname.startsWith('/jobs/new') || pathname.startsWith('/settings')) return null
+  if (
+    pathname === '/auth' ||
+    pathname.startsWith('/portal') ||
+    pathname.startsWith('/jobs/new') ||
+    pathname.startsWith('/settings')
+  ) return null
 
   return (
     <nav className="bottom-nav" aria-label="Main navigation">

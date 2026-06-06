@@ -1,5 +1,6 @@
 import type { PLReport } from './api/aggregates'
 import type { DateRangeKey } from './api/reports'
+import { fmtSigned } from './calculations'
 
 export const MARGIN_TARGET_PCT = 55
 
@@ -52,19 +53,67 @@ export interface PLProgressBar {
   highlight: boolean
   isExpense: boolean
   isProfit?: boolean
+  isLoss?: boolean
 }
 
-export function revenuePct(value: number, revenue: number): number {
-  if (revenue <= 0) return 0
-  return Math.round((value / revenue) * 100)
+export function formatKpiNetProfit(n: number): string {
+  return fmtSigned(n, 0)
+}
+
+export function formatBreakdownNetProfit(n: number): string {
+  return fmtSigned(n, 2)
+}
+
+export function marginPillClass(marginPct: number): string {
+  return marginPct < 0 ? 'reports-margin-pill reports-margin-pill--loss' : 'reports-margin-pill reports-margin-pill--pos'
+}
+
+export function barWidthPct(value: number, revenue: number): { width: number; overflow: number } {
+  if (revenue <= 0) return { width: 0, overflow: 0 }
+  const width = Math.min((Math.abs(value) / revenue) * 100, 100)
+  const overflow = Math.max(0, value - revenue)
+  return { width, overflow }
+}
+
+export function formatPct(value: number, revenue: number): string {
+  if (revenue === 0) return '—'
+  return `${Math.round((value / revenue) * 100)}%`
+}
+
+export function formatPctSigned(value: number, revenue: number): string {
+  if (revenue === 0) return '—'
+  const pct = Math.round((value / revenue) * 100)
+  if (pct < 0) return `−${Math.abs(pct)}%`
+  return `${pct}%`
+}
+
+export function formatOverflowAmount(expense: number, revenue: number): string {
+  const over = expense - revenue
+  return over.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  })
+}
+
+export function formatMarginPill(marginPct: number): string {
+  const rounded = Math.round(marginPct)
+  if (rounded < 0) return `−${Math.abs(rounded)}%`
+  return `${rounded}%`
+}
+
+export function formatTotalExpensesAmount(total: number): string {
+  if (total === 0) return fmtSigned(0, 2)
+  return `−${fmtSigned(total, 2)}`
 }
 
 export function buildPLProgressBars(report: PLReport): {
   revenue: number
   expenseBars: PLProgressBar[]
+  totalExpenseBar: PLProgressBar
   profitBar: PLProgressBar
 } {
-  const { revenue, expenses, netProfit } = report
+  const { revenue, expenses, netProfit, totalExpenses } = report
 
   const expenseBars: PLProgressBar[] = EXPENSE_ORDER.map((key) => ({
     name: EXPENSE_LABELS[key],
@@ -74,16 +123,26 @@ export function buildPLProgressBars(report: PLReport): {
     isExpense: true,
   })).filter((bar) => bar.value > 0)
 
+  const loss = netProfit < 0
+
   return {
     revenue,
     expenseBars,
+    totalExpenseBar: {
+      name: 'Total expenses',
+      value: totalExpenses,
+      color: totalExpenses > 0 ? '#e06060' : '#555',
+      highlight: true,
+      isExpense: true,
+    },
     profitBar: {
       name: 'Net profit',
       value: netProfit,
-      color: '#3dc97a',
+      color: loss ? '#e06060' : '#3dc97a',
       highlight: true,
       isExpense: false,
       isProfit: true,
+      isLoss: loss,
     },
   }
 }
@@ -129,6 +188,30 @@ function priorPeriodLabel(range: DateRangeKey): string {
   return 'last mo.'
 }
 
+export function formatPercentDelta(
+  current: number,
+  prior: number,
+  range: DateRangeKey
+): string {
+  if (prior === 0) return current === 0 ? '—' : 'New'
+  const val = Math.round(((current - prior) / prior) * 100)
+  const arrow = val >= 0 ? '↑' : '↓'
+  const period = priorPeriodLabel(range)
+  return `${arrow} ${Math.abs(val)}% vs ${period}`
+}
+
+export function formatDollarDelta(
+  current: number,
+  prior: number,
+  range: DateRangeKey
+): string {
+  if (prior === 0) return current === 0 ? '—' : 'New'
+  const val = Math.round(current - prior)
+  const arrow = val >= 0 ? '↑' : '↓'
+  const period = priorPeriodLabel(range)
+  return `${arrow} $${Math.abs(val).toLocaleString()} vs ${period}`
+}
+
 export function formatDelta(val: number, type: 'percent' | 'dollar', range: DateRangeKey): string {
   const arrow = val >= 0 ? '↑' : '↓'
   const period = priorPeriodLabel(range)
@@ -142,6 +225,23 @@ export function deltaClass(
 ): 'reports-delta--pos' | 'reports-delta--neg' | 'reports-delta--neutral' {
   if (kind === 'expense') return val > 0 ? 'reports-delta--neg' : val < 0 ? 'reports-delta--pos' : 'reports-delta--neutral'
   return val >= 0 ? 'reports-delta--pos' : 'reports-delta--neg'
+}
+
+export function percentDeltaClass(
+  current: number,
+  prior: number,
+  kind: 'revenue' | 'profit'
+): 'reports-delta--pos' | 'reports-delta--neg' | 'reports-delta--neutral' {
+  if (prior === 0) return 'reports-delta--neutral'
+  return deltaClass(percentChange(current, prior), kind)
+}
+
+export function dollarDeltaClass(
+  current: number,
+  prior: number
+): 'reports-delta--pos' | 'reports-delta--neg' | 'reports-delta--neutral' {
+  if (prior === 0) return 'reports-delta--neutral'
+  return deltaClass(Math.round(current - prior), 'expense')
 }
 
 /** Job-level expenses grouped for waterfall (everything except overhead). */

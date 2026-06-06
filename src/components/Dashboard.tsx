@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { Car, Gear } from '@phosphor-icons/react'
-import type { DashboardKpis, RecentJobRow, WeekDay } from '@/lib/types'
+import { timeAgo } from '@/lib/client-relationship-logic'
+import type { ClientWithStats, DashboardKpis, RecentJobRow, WeekDay } from '@/lib/types'
 import InventorySection from '@/components/home/InventorySection'
 import { fmt } from '@/lib/calculations'
 
@@ -12,6 +13,7 @@ interface DashboardProps {
   jobsToday: number
   weekDays: WeekDay[]
   dayJobs: RecentJobRow[]
+  dueClients: ClientWithStats[]
   onDaySelect: (date: string) => void
   selectedDate: string
 }
@@ -79,7 +81,7 @@ function JobRow({ job, onPress }: { job: RecentJobRow; onPress: () => void }) {
   )
 }
 
-export default function Dashboard({ kpis, recentJobs, jobsToday, weekDays, dayJobs, onDaySelect, selectedDate }: DashboardProps) {
+export default function Dashboard({ kpis, recentJobs, jobsToday, weekDays, dayJobs, dueClients, onDaySelect, selectedDate }: DashboardProps) {
   const router = useRouter()
 
   return (
@@ -99,6 +101,29 @@ export default function Dashboard({ kpis, recentJobs, jobsToday, weekDays, dayJo
       </div>
 
       <KpiGrid kpis={kpis} />
+
+      {dueClients.length > 0 && (
+        <>
+          <div className="section-title">Due for service</div>
+          {dueClients.slice(0, 5).map((client) => (
+            <div
+              key={client.id}
+              className="card-pressable"
+              style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}
+              onClick={() => router.push(`/clients/${client.id}`)}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{client.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Last visit {client.lastJobDate ? timeAgo(client.lastJobDate) : '—'} · {fmt(client.totalRevenue)} lifetime
+                </div>
+              </div>
+              <span className="badge badge-overdue">Follow up</span>
+            </div>
+          ))}
+          <div style={{ marginBottom: 16 }} />
+        </>
+      )}
 
       <div className="section-title">This week</div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 12, paddingBottom: 4 }}>

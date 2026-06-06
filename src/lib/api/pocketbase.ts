@@ -45,7 +45,7 @@ import type {
 } from '../types'
 import type { DateRangeKey } from './reports'
 import * as overheadPb from './overhead-pocketbase'
-import * as businessExpensesPb from './business-expenses-pocketbase'
+import { getBusinessExpensesMerged } from './business-expenses-merge'
 import { businessExpensesTotalForDates } from '../business-expenses-logic'
 import { enrichClientWithStats } from '../client-stats'
 
@@ -329,7 +329,7 @@ export async function getPLReport(range: DateRangeKey) {
   const [jobs, overhead, businessItems] = await Promise.all([
     fetchJobsRaw(),
     overheadPb.getOverheadForRange(range),
-    businessExpensesPb.getBusinessExpenses(),
+    getBusinessExpensesMerged(),
   ])
   const business = businessExpensesTotalForDates(businessItems, start, end)
   return computePLReport(jobs, range, overhead, business)
@@ -339,7 +339,7 @@ export async function getPLReportBundle(range: DateRangeKey) {
   const [jobs, overheadItems, businessItems] = await Promise.all([
     fetchJobsRaw(),
     overheadPb.getOverheadExpenses(),
-    businessExpensesPb.getBusinessExpenses(),
+    getBusinessExpensesMerged(),
   ])
   const { start, end } = rangeFor(range)
   const prior = priorRangeFor(range)

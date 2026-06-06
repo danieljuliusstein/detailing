@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CameraPlus, Trash, Image as ImageIcon } from '@phosphor-icons/react'
+import { CameraPlus, ShareNetwork, Trash, Image as ImageIcon } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import ShareLinkActions from '@/components/portal/ShareLinkActions'
 import { deleteJobPhoto, getJobPhotos, uploadJobPhoto } from '@/lib/api'
 import type { JobPhoto, JobWithRelations, PhotoType } from '@/lib/types'
 
@@ -122,10 +123,27 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
         className="btn-ghost"
         onClick={() => handleAddClick('after')}
         disabled={uploading}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        style={{ width: '100%', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
       >
         <CameraPlus size={18} /> {uploading ? 'Uploading…' : 'Add after photo'}
       </button>
+
+      {photos.length > 0 && job.client && (
+        <div className="card">
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShareNetwork size={18} /> Share before &amp; after
+          </div>
+          <ShareLinkActions
+            clientId={job.client_id}
+            clientEmail={job.client.email}
+            clientName={job.client.name}
+            jobId={job.id}
+            scope="photos"
+            emailSubject={`Your photos from ${job.client.name}`}
+            emailMessage="View your before and after photos using the secure link below."
+          />
+        </div>
+      )}
     </div>
   )
 }

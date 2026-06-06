@@ -14,6 +14,7 @@ import {
 import { fmtDetailed } from '@/lib/calculations'
 import { PAYMENT_METHODS } from '@/lib/invoices'
 import { downloadInvoicePdf } from '@/lib/pdf/downloadInvoicePdf'
+import { createShareLink } from '@/lib/portal-client'
 import { loadSettings } from '@/lib/settings'
 import type { JobWithRelations } from '@/lib/types'
 
@@ -67,6 +68,17 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
         inv = await markInvoiceSent(inv.id)
       }
       if (settings.business_email && job.client?.email) {
+        let portalUrl: string | undefined
+        try {
+          const link = await createShareLink({
+            clientId: job.client_id,
+            jobId: job.id,
+            scope: 'invoice',
+          })
+          portalUrl = link.url
+        } catch {
+          // email still sends without portal link
+        }
         const res = await fetch('/api/invoices/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -77,6 +89,7 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
             total: inv.total,
             businessName: settings.business_name,
             fromEmail: settings.business_email,
+            portalUrl,
           }),
         })
         const data = await res.json()

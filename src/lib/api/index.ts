@@ -2,11 +2,13 @@ import { clearLocalDeviceDataSync, purgeDemoCacheIfPresent } from '../clear-loca
 import { purgeStaleQueueItems } from './queue-utils'
 import { ensurePocketBaseAuth } from '../pb-auth'
 import { syncCatalogReadyFlag } from './catalog-ready'
-import { checkPocketBaseHealth, isPocketBaseConfigured } from '../pocketbase'
+import { checkPocketBaseHealth, checkPocketBaseSchema, isPocketBaseConfigured } from '../pocketbase'
 import { withTimeout } from '../timeout'
 import { migrateLocalToPocketBase } from './migrate'
 import * as invLocal from './invoices-local'
 import * as invPb from './invoices-pocketbase'
+import * as quotesLocal from './quotes-local'
+import * as quotesPb from './quotes-pocketbase'
 import * as local from './local'
 import * as overheadLocal from './overhead-local'
 import * as overheadPb from './overhead-pocketbase'
@@ -33,6 +35,8 @@ import * as equipmentLocal from './equipment-local'
 import * as equipmentPb from './equipment-pocketbase'
 import * as suppliesLocal from './supplies-local'
 import * as suppliesPb from './supplies-pocketbase'
+import { notifyFinancialDataChanged } from '../financial-data-events'
+import { getBusinessExpensesMerged } from './business-expenses-merge'
 import { clearWriteDegraded, executeWrite } from './write-router'
 import {
   getPLReportFromJobs,
@@ -59,6 +63,9 @@ import type {
   PackageInput,
   Payment,
   PhotoType,
+  Quote,
+  QuoteInput,
+  QuoteWithRelations,
   Equipment,
   EquipmentInput,
   QuickJobData,
@@ -101,6 +108,12 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
   }
 
   if (!(await ensurePocketBaseAuth())) {
+    return 'local'
+  }
+
+  const schema = await checkPocketBaseSchema()
+  if (!schema.ok) {
+    console.warn('[api] PocketBase collections missing — run: cd pocketbase && ./pocketbase migrate up', schema.error)
     return 'local'
   }
 
@@ -201,22 +214,26 @@ export async function getJob(id: string): Promise<JobWithRelations | null> {
 
 export async function createJob(data: QuickJobData): Promise<Job> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const job = await executeWrite({
     resolvedBackend: resolved,
     local: () => local.createJob(data),
     pocketbase: () => pb.createJob(data),
     buildQueue: (job) => ({ type: 'createJob', params: data, localJobId: job.id }),
   })
+  notifyFinancialDataChanged()
+  return job
 }
 
 export async function updateJob(id: string, data: JobEditData): Promise<Job | null> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const job = await executeWrite({
     resolvedBackend: resolved,
     local: () => local.updateJob(id, data),
     pocketbase: () => pb.updateJob(id, data),
     buildQueue: (job) => (job ? { type: 'updateJob', params: { id, data } } : null),
   })
+  notifyFinancialDataChanged()
+  return job
 }
 
 export async function getDashboardData(): Promise<{
@@ -317,6 +334,41 @@ export async function markInvoicePaid(invoiceId: string, method: string): Promis
     pocketbase: () => invPb.markInvoicePaid(invoiceId, method),
     buildQueue: () => ({ type: 'markInvoicePaid', params: { invoiceId, method } }),
   })
+}
+
+export async function getQuotes(): Promise<QuoteWithRelations[]> {
+  return (await resolveBackend()) === 'pocketbase' ? quotesPb.getQuotes() : quotesLocal.getQuotes()
+}
+
+export async function getQuote(id: string): Promise<QuoteWithRelations | null> {
+  return (await resolveBackend()) === 'pocketbase' ? quotesPb.getQuote(id) : quotesLocal.getQuote(id)
+}
+
+export async function createQuote(input: QuoteInput): Promise<Quote> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? quotesPb.createQuote(input)
+    : quotesLocal.createQuote(input)
+}
+
+export async function markQuoteSent(quoteId: string): Promise<Quote | null> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? quotesPb.updateQuoteStatus(quoteId, 'sent')
+    : quotesLocal.updateQuoteStatus(quoteId, 'sent')
+}
+
+export async function acceptQuote(quoteId: string): Promise<{ quote: Quote; jobId: string } | null> {
+  const result =
+    (await resolveBackend()) === 'pocketbase'
+      ? await quotesPb.acceptQuote(quoteId)
+      : quotesLocal.acceptQuote(quoteId)
+  if (result) notifyFinancialDataChanged()
+  return result
+}
+
+export async function declineQuote(quoteId: string): Promise<Quote | null> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? quotesPb.updateQuoteStatus(quoteId, 'declined')
+    : quotesLocal.updateQuoteStatus(quoteId, 'declined')
 }
 
 export async function getSupplies(): Promise<Supply[]> {
@@ -424,12 +476,14 @@ export async function getOverheadExpenses(): Promise<OverheadExpense[]> {
 
 export async function createOverheadExpense(input: OverheadInput): Promise<OverheadExpense> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const expense = await executeWrite({
     resolvedBackend: resolved,
     local: () => overheadLocal.createOverheadExpense(input),
     pocketbase: () => overheadPb.createOverheadExpense(input),
     buildQueue: (expense) => ({ type: 'createOverheadExpense', params: input, localOverheadId: expense.id }),
   })
+  notifyFinancialDataChanged()
+  return expense
 }
 
 export async function updateOverheadExpense(
@@ -437,22 +491,26 @@ export async function updateOverheadExpense(
   input: Partial<OverheadInput>
 ): Promise<OverheadExpense | null> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const expense = await executeWrite({
     resolvedBackend: resolved,
     local: () => overheadLocal.updateOverheadExpense(id, input),
     pocketbase: () => overheadPb.updateOverheadExpense(id, input),
     buildQueue: (expense) => (expense ? { type: 'updateOverheadExpense', params: { id, input } } : null),
   })
+  notifyFinancialDataChanged()
+  return expense
 }
 
 export async function deleteOverheadExpense(id: string): Promise<boolean> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const ok = await executeWrite({
     resolvedBackend: resolved,
     local: () => overheadLocal.deleteOverheadExpense(id),
     pocketbase: () => overheadPb.deleteOverheadExpense(id),
     buildQueue: () => ({ type: 'deleteOverheadExpense', params: { id } }),
   })
+  notifyFinancialDataChanged()
+  return ok
 }
 
 export async function getMonthlyOverheadTotal(): Promise<number> {
@@ -463,13 +521,13 @@ export async function getMonthlyOverheadTotal(): Promise<number> {
 
 export async function getBusinessExpenses(): Promise<BusinessExpense[]> {
   return (await resolveBackend()) === 'pocketbase'
-    ? businessExpensesPb.getBusinessExpenses()
+    ? getBusinessExpensesMerged()
     : businessExpensesLocal.getBusinessExpenses()
 }
 
 export async function createBusinessExpense(input: BusinessExpenseInput): Promise<BusinessExpense> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const expense = await executeWrite({
     resolvedBackend: resolved,
     local: () => businessExpensesLocal.createBusinessExpense(input),
     pocketbase: () => businessExpensesPb.createBusinessExpense(input),
@@ -479,6 +537,8 @@ export async function createBusinessExpense(input: BusinessExpenseInput): Promis
       localBusinessExpenseId: expense.id,
     }),
   })
+  notifyFinancialDataChanged()
+  return expense
 }
 
 export async function updateBusinessExpense(
@@ -486,28 +546,32 @@ export async function updateBusinessExpense(
   input: Partial<BusinessExpenseInput>
 ): Promise<BusinessExpense | null> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const expense = await executeWrite({
     resolvedBackend: resolved,
     local: () => businessExpensesLocal.updateBusinessExpense(id, input),
     pocketbase: () => businessExpensesPb.updateBusinessExpense(id, input),
     buildQueue: (expense) =>
       expense ? { type: 'updateBusinessExpense', params: { id, input } } : null,
   })
+  notifyFinancialDataChanged()
+  return expense
 }
 
 export async function deleteBusinessExpense(id: string): Promise<boolean> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const ok = await executeWrite({
     resolvedBackend: resolved,
     local: () => businessExpensesLocal.deleteBusinessExpense(id),
     pocketbase: () => businessExpensesPb.deleteBusinessExpense(id),
     buildQueue: () => ({ type: 'deleteBusinessExpense', params: { id } }),
   })
+  notifyFinancialDataChanged()
+  return ok
 }
 
 export async function createSupplyPurchase(input: SupplyPurchaseInput): Promise<BusinessExpense> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const expense = await executeWrite({
     resolvedBackend: resolved,
     local: () => supplyPurchasesLocal.createSupplyPurchase(input),
     pocketbase: () => supplyPurchasesPb.createSupplyPurchase(input),
@@ -518,6 +582,8 @@ export async function createSupplyPurchase(input: SupplyPurchaseInput): Promise<
       localSupplyId: expense.supply_id,
     }),
   })
+  notifyFinancialDataChanged()
+  return expense
 }
 
 export async function updateSupplyPurchase(
@@ -525,23 +591,27 @@ export async function updateSupplyPurchase(
   input: Partial<SupplyPurchaseInput>
 ): Promise<BusinessExpense | null> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const expense = await executeWrite({
     resolvedBackend: resolved,
     local: () => supplyPurchasesLocal.updateSupplyPurchase(id, input),
     pocketbase: () => supplyPurchasesPb.updateSupplyPurchase(id, input),
     buildQueue: (expense) =>
       expense ? { type: 'updateSupplyPurchase', params: { id, input } } : null,
   })
+  notifyFinancialDataChanged()
+  return expense
 }
 
 export async function deleteSupplyPurchase(id: string): Promise<boolean> {
   const resolved = await resolveBackend()
-  return executeWrite({
+  const ok = await executeWrite({
     resolvedBackend: resolved,
     local: () => supplyPurchasesLocal.deleteSupplyPurchase(id),
     pocketbase: () => supplyPurchasesPb.deleteSupplyPurchase(id),
     buildQueue: () => ({ type: 'deleteSupplyPurchase', params: { id } }),
   })
+  notifyFinancialDataChanged()
+  return ok
 }
 
 export async function getJobPhotos(jobId: string): Promise<JobPhoto[]> {

@@ -6,7 +6,7 @@ import BackButton from '@/components/BackButton'
 import { createClient, updateClient } from '@/lib/api'
 import type { Client, ClientInput } from '@/lib/types'
 
-const LEAD_SOURCES = ['referral', 'google', 'instagram', 'facebook', 'yelp', 'repeat', 'other']
+const LEAD_SOURCES = ['google', 'referral', 'instagram', 'facebook', 'tiktok', 'word_of_mouth', 'other']
 
 interface Props {
   client?: Client

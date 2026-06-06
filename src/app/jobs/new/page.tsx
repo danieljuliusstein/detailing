@@ -10,6 +10,8 @@ import type { ClientWithStats, Package } from '@/lib/types'
 export default function NewJobPage() {
   const searchParams = useSearchParams()
   const clientId = searchParams.get('clientId')
+  const packageId = searchParams.get('packageId')
+  const prefillDate = searchParams.get('date')
 
   const [packages, setPackages] = useState<Package[]>([])
   const [clients, setClients] = useState<ClientWithStats[]>([])
@@ -53,6 +55,8 @@ export default function NewJobPage() {
       packages={packages}
       clients={clients}
       initialClient={initialClient}
+      initialPackageId={packageId ?? undefined}
+      initialDate={prefillDate ?? undefined}
       onSave={async (data) => {
         const job = await createJob(data)
         return { id: job.id }

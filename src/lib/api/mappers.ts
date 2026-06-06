@@ -11,6 +11,8 @@ import type {
   OverheadExpense,
   Package,
   PhotoMeta,
+  Quote,
+  QuoteWithRelations,
   Supply,
   SupplyKind,
   SupplyUsage,
@@ -73,6 +75,35 @@ export function pbClientToApp(r: PbRecord): Client {
     tags: jsonArray<string>(r.tags),
     notes: str(r.notes),
     created: r.created,
+  }
+}
+
+export function pbQuoteToApp(r: PbRecord): Quote {
+  return {
+    id: r.id,
+    quote_number: String(r.quote_number ?? ''),
+    client_id: relationId(r.client_id),
+    package_id: relationId(r.package_id),
+    vehicle_type: (r.vehicle_type as Quote['vehicle_type']) ?? 'sedan',
+    location_type: (r.location_type as Quote['location_type']) ?? 'mobile',
+    date: String(r.date ?? ''),
+    subtotal: num(r.subtotal),
+    notes: str(r.notes),
+    status: (r.status as Quote['status']) ?? 'draft',
+    valid_until: str(r.valid_until),
+    job_id: str(relationId(r.job_id)) || undefined,
+    sent_at: str(r.sent_at),
+    created: r.created,
+  }
+}
+
+export function pbQuoteToAppWithRelations(r: PbRecord): QuoteWithRelations {
+  const expand = r.expand ?? {}
+  const quote = pbQuoteToApp(r)
+  return {
+    ...quote,
+    client: expand.client_id ? pbClientToApp(expand.client_id) : undefined,
+    package: expand.package_id ? pbPackageToApp(expand.package_id) : undefined,
   }
 }
 

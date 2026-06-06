@@ -10,8 +10,10 @@
     "seed:packages": "node scripts/seed-packages.mjs",
     "seed:supplies": "node scripts/seed-supplies.mjs",
     "verify:backend": "node scripts/verify-backend.mjs",
+    "qa:walkthrough": "node scripts/qa-walkthrough.mjs",
     "generate:vapid": "node scripts/generate-vapid-keys.mjs",
-    "generate:icons": "node scripts/generate-icons.mjs"
+    "generate:icons": "node scripts/generate-icons.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -34,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }

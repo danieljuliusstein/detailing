@@ -9,7 +9,7 @@ function pb() {
 }
 
 function photoUrl(record: PbRecord, filename: string): string {
-  return pb().files.getUrl(record, filename)
+  return pb().files.getURL(record, filename)
 }
 
 export async function getJobPhotos(jobId: string): Promise<JobPhoto[]> {
