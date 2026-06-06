@@ -1,29 +1,35 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Car,
-  Jeep,
-  Truck,
-  Van,
   Boat,
+  Bus,
+  CalendarBlank,
+  Car,
+  CaretLeft,
+  CheckCircle,
+  Circle,
+  Clock,
   DotsThree,
+  House,
+  Jeep,
   MagnifyingGlass,
   MapPin,
-  House,
   Plus,
+  Truck,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
-import BackButton from '@/components/BackButton'
-import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
-import { defaultSuppliesFromPackage } from '@/lib/supplies-logic'
-import type { Client, Package, QuickJobData, Supply, SupplyUsage, VehicleType } from '@/lib/types'
+import JobExpensesSheet, { type JobExpenseDraft } from '@/components/jobs/JobExpensesSheet'
+import './QuickAddJob.css'
+import { fmt } from '@/lib/calculations'
+import { deriveInitials } from '@/lib/client-relationship-logic'
+import type { ClientWithStats, Package, QuickJobData, VehicleType } from '@/lib/types'
 
 interface QuickAddJobProps {
   packages: Package[]
-  supplies: Supply[]
-  recentClients: Client[]
+  clients: ClientWithStats[]
+  initialClient?: ClientWithStats | null
   onSave: (data: QuickJobData) => Promise<{ id: string }>
 }
 
@@ -31,85 +37,115 @@ const VEHICLE_TYPES: { id: VehicleType; label: string; Icon: PhosphorIcon }[] = 
   { id: 'sedan', label: 'Sedan', Icon: Car },
   { id: 'suv', label: 'SUV', Icon: Jeep },
   { id: 'truck', label: 'Truck', Icon: Truck },
-  { id: 'van', label: 'Van', Icon: Van },
+  { id: 'van', label: 'Van', Icon: Bus },
   { id: 'boat', label: 'Boat', Icon: Boat },
   { id: 'other', label: 'Other', Icon: DotsThree },
 ]
 
-export default function QuickAddJob({ packages, supplies, recentClients, onSave }: QuickAddJobProps) {
+function formatHeaderDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function formatDateBox(iso: string): string {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function formatTimeDisplay(time: string): string {
+  if (!time) return ''
+  const [h, m] = time.split(':').map(Number)
+  const dt = new Date()
+  dt.setHours(h, m)
+  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+export default function QuickAddJob({
+  packages,
+  clients,
+  initialClient,
+  onSave,
+}: QuickAddJobProps) {
   const router = useRouter()
 
   const [clientSearch, setClientSearch] = useState('')
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null)
   const [showClientList, setShowClientList] = useState(false)
+  const [jobDate, setJobDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [startTime, setStartTime] = useState('')
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(packages[0] ?? null)
   const [vehicleType, setVehicleType] = useState<VehicleType>('sedan')
   const [locationType, setLocationType] = useState<'mobile' | 'fixed'>('mobile')
-  const [revenue, setRevenue] = useState(selectedPackage?.base_price ?? 0)
+  const [revenue, setRevenue] = useState(packages[0]?.base_price ?? 0)
   const [tip, setTip] = useState(0)
-  const [suppliesUsed, setSuppliesUsed] = useState<SupplyUsage[]>([])
+  const [notes, setNotes] = useState('')
+  const [expenses, setExpenses] = useState<JobExpenseDraft>({
+    travel_cost: 0,
+    marketing_cost: 0,
+    equipment_depreciation: 0,
+  })
+  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
-
   useEffect(() => {
-    if (selectedPackage) {
-      setSuppliesUsed(defaultSuppliesFromPackage(selectedPackage))
+    if (initialClient) {
+      setSelectedClient(initialClient)
+      setClientSearch('')
     }
-  }, [selectedPackage])
+  }, [initialClient])
 
-  const filteredClients = recentClients.filter((c) =>
-    c.name.toLowerCase().includes(clientSearch.toLowerCase())
-  )
+  const filteredClients = clients.filter((c) => {
+    const q = clientSearch.toLowerCase()
+    if (!q) return true
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.phone?.includes(clientSearch) ?? false) ||
+      (c.email?.toLowerCase().includes(q) ?? false)
+    )
+  })
+
+  const isValid =
+    Boolean(selectedClient?.id) &&
+    Boolean(selectedPackage?.id) &&
+    Boolean(vehicleType) &&
+    revenue > 0
 
   const handlePackageSelect = useCallback((pkg: Package) => {
     setSelectedPackage(pkg)
     setRevenue(pkg.base_price)
-    setSuppliesUsed(defaultSuppliesFromPackage(pkg))
   }, [])
 
   const buildPayload = (): QuickJobData => ({
-    clientId: selectedClient?.id ?? null,
-    clientName: selectedClient?.name ?? clientSearch,
+    clientId: selectedClient!.id,
+    clientName: selectedClient!.name,
     packageId: selectedPackage!.id,
     vehicleType,
     locationType,
     revenue,
     tip,
-    date: today,
-    supplies_used: suppliesUsed,
+    date: jobDate,
+    start_time: startTime || undefined,
+    notes: notes.trim() || undefined,
+    travel_cost: expenses.travel_cost,
+    marketing_cost: expenses.marketing_cost,
+    equipment_depreciation: expenses.equipment_depreciation,
   })
 
   const handleSave = async () => {
     setSaveError(null)
+    if (!selectedClient) {
+      setSaveError('Select a client.')
+      return
+    }
     if (!selectedPackage) {
-      setSaveError('Add a service package first (Settings → Packages).')
+      setSaveError('Select a service package.')
       return
     }
-    if (!selectedClient && !clientSearch.trim()) {
-      setSaveError('Enter a client name.')
-      return
-    }
-    setSaving(true)
-    try {
-      await onSave(buildPayload())
-      router.push('/')
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save job.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleSaveAndExpenses = async () => {
-    setSaveError(null)
-    if (!selectedPackage) {
-      setSaveError('Add a service package first (Settings → Packages).')
-      return
-    }
-    if (!selectedClient && !clientSearch.trim()) {
-      setSaveError('Enter a client name.')
+    if (revenue <= 0) {
+      setSaveError('Enter revenue greater than zero.')
       return
     }
     setSaving(true)
@@ -123,211 +159,288 @@ export default function QuickAddJob({ packages, supplies, recentClients, onSave 
     }
   }
 
+  const headerDate = formatHeaderDate(new Date())
+
   return (
-    <div className="screen page-content">
-      <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20 }}>
-        <BackButton onClick={() => router.back()} />
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>New job</div>
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+    <div className="new-job">
+      <header className="new-job-header">
+        <div className="new-job-header-left">
+          <button type="button" className="new-job-back" onClick={() => router.back()} aria-label="Back">
+            <CaretLeft size={18} weight="bold" aria-hidden="true" />
+          </button>
+          <h1 className="new-job-title">New job</h1>
         </div>
-      </div>
+        <span className="new-job-header-date">{headerDate}</span>
+      </header>
 
-      <div className="section-title">Client</div>
-      <div style={{ position: 'relative', marginBottom: 20 }}>
-        <input
-          className="input"
-          placeholder="Search or type new client name..."
-          value={selectedClient ? selectedClient.name : clientSearch}
-          onFocus={() => { setShowClientList(true); setSelectedClient(null) }}
-          onBlur={() => setTimeout(() => setShowClientList(false), 150)}
-          onChange={(e) => setClientSearch(e.target.value)}
-          style={{ paddingLeft: 40 }}
-        />
-        <MagnifyingGlass
-          size={18}
-          weight="regular"
-          color="var(--text-muted)"
-          aria-hidden="true"
-          style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }}
-        />
-
-        {showClientList && filteredClients.length > 0 && (
-          <div style={{
-            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-            background: 'var(--bg-surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--radius-md)', marginTop: 4, overflow: 'hidden',
-          }}>
-            {filteredClients.slice(0, 5).map((c) => (
-              <div
-                key={c.id}
-                style={{ padding: '11px 14px', fontSize: 14, color: 'var(--text-primary)', cursor: 'pointer', borderBottom: '0.5px solid var(--border)' }}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { setSelectedClient(c); setClientSearch(''); setShowClientList(false) }}
-              >
-                <div style={{ fontWeight: 500 }}>{c.name}</div>
-                {c.phone && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.phone}</div>}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="section-title">Package</div>
-      {packages.length === 0 ? (
-        <div style={{
-          background: 'var(--bg-surface)',
-          border: '0.5px solid var(--border)',
-          borderRadius: 'var(--radius-md)',
-          padding: 16,
-          marginBottom: 20,
-          fontSize: 14,
-          color: 'var(--text-muted)',
-        }}>
-          No service packages yet. Add at least one under{' '}
-          <a href="/settings/packages" style={{ color: 'var(--green)' }}>Settings → Packages</a>{' '}
-          before creating jobs.
-        </div>
-      ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-        {packages.map((pkg) => {
-          const active = selectedPackage?.id === pkg.id
-          return (
-            <div
-              key={pkg.id}
-              onClick={() => handlePackageSelect(pkg)}
-              style={{
-                background: active ? 'var(--green)' : 'var(--bg-surface)',
-                border: `0.5px solid ${active ? 'var(--green)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-md)',
-                padding: '12px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'all 150ms ease',
+      <div className="new-job-body">
+        {/* 1. Client */}
+        <section id="nj-client" className="new-job-section">
+          <div className="new-job-label">Client</div>
+          {selectedClient ? (
+            <button
+              type="button"
+              className="new-job-client-selected"
+              onClick={() => {
+                setSelectedClient(null)
+                setClientSearch('')
+                setShowClientList(true)
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#071407' : 'var(--text-primary)' }}>
-                {pkg.name}
-              </div>
-              <div style={{ fontSize: 11, color: active ? '#1a3a1a' : 'var(--text-muted)', marginTop: 3 }}>
-                from ${pkg.base_price}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      )}
-
-      <div className="section-title">Vehicle type</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
-        {VEHICLE_TYPES.map((v) => {
-          const active = vehicleType === v.id
-          const { Icon } = v
-          return (
-            <div
-              key={v.id}
-              onClick={() => setVehicleType(v.id)}
-              style={{
-                background: active ? 'var(--green)' : 'var(--bg-surface)',
-                border: `0.5px solid ${active ? 'var(--green)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-md)',
-                padding: '10px 6px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'all 150ms ease',
-              }}
-            >
-              <Icon
-                size={24}
-                weight={active ? 'fill' : 'regular'}
-                color={active ? '#071407' : 'var(--text-muted)'}
-                aria-hidden="true"
-                style={{ margin: '0 auto' }}
+              <span className="new-job-client-avatar new-job-client-avatar--selected">
+                {deriveInitials(selectedClient.name)}
+              </span>
+              <span className="new-job-client-selected-text">
+                <span className="new-job-client-selected-name">{selectedClient.name}</span>
+                <span className="new-job-client-selected-meta">
+                  {selectedClient.jobCount} job{selectedClient.jobCount !== 1 ? 's' : ''} ·{' '}
+                  {fmt(selectedClient.totalRevenue)} lifetime
+                </span>
+              </span>
+              <CheckCircle size={18} weight="fill" color="#3dc97a" className="new-job-client-check" />
+            </button>
+          ) : (
+            <div className="new-job-client-search-wrap">
+              <MagnifyingGlass size={16} className="new-job-search-icon" aria-hidden="true" />
+              <input
+                className="new-job-input new-job-input--search"
+                placeholder="Search clients..."
+                value={clientSearch}
+                onFocus={() => setShowClientList(true)}
+                onBlur={() => setTimeout(() => setShowClientList(false), 150)}
+                onChange={(e) => setClientSearch(e.target.value)}
               />
-              <div style={{ fontSize: 11, fontWeight: active ? 600 : 400, color: active ? '#071407' : 'var(--text-muted)', marginTop: 4 }}>
-                {v.label}
+              {showClientList && filteredClients.length > 0 && (
+                <div className="new-job-client-dropdown">
+                  {filteredClients.slice(0, 8).map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="new-job-client-option"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSelectedClient(c)
+                        setClientSearch('')
+                        setShowClientList(false)
+                      }}
+                    >
+                      <span className="new-job-client-avatar">{deriveInitials(c.name)}</span>
+                      <span className="new-job-client-option-text">
+                        <span className="new-job-client-option-name">{c.name}</span>
+                        <span className="new-job-client-option-meta">
+                          {c.jobCount} job{c.jobCount !== 1 ? 's' : ''} · {fmt(c.totalRevenue)}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* 2. Date & Time */}
+        <section id="nj-datetime" className="new-job-section">
+          <div className="new-job-label">Date &amp; Time</div>
+          <div className="new-job-datetime-grid">
+            <label className="new-job-datetime-box">
+              <CalendarBlank size={16} color="#555" aria-hidden="true" />
+              <span className="new-job-datetime-value">{formatDateBox(jobDate)}</span>
+              <input
+                type="date"
+                className="new-job-datetime-native"
+                value={jobDate}
+                onChange={(e) => setJobDate(e.target.value)}
+              />
+            </label>
+            <label className="new-job-datetime-box">
+              <Clock size={16} color="#555" aria-hidden="true" />
+              <span
+                className={`new-job-datetime-value${startTime ? '' : ' new-job-datetime-value--empty'}`}
+              >
+                {startTime ? formatTimeDisplay(startTime) : 'Set time'}
+              </span>
+              <input
+                type="time"
+                className="new-job-datetime-native"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+
+        {/* 3. Service & Vehicle */}
+        <section id="nj-service" className="new-job-section">
+          <div className="new-job-label">Package</div>
+          {packages.length === 0 ? (
+            <p className="new-job-empty-hint">
+              No packages yet.{' '}
+              <a href="/settings/packages" className="new-job-link">
+                Add one in Settings
+              </a>
+            </p>
+          ) : (
+            <div className="new-job-package-list">
+              {packages.map((pkg) => {
+                const selected = selectedPackage?.id === pkg.id
+                return (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    className={`new-job-package-card${selected ? ' new-job-package-card--selected' : ''}`}
+                    onClick={() => handlePackageSelect(pkg)}
+                  >
+                    <span className="new-job-package-left">
+                      <span className="new-job-package-name">{pkg.name}</span>
+                      {pkg.description && (
+                        <span className="new-job-package-desc">{pkg.description}</span>
+                      )}
+                    </span>
+                    <span className="new-job-package-right">
+                      <span className="new-job-package-price">{fmt(pkg.base_price)}</span>
+                      {selected ? (
+                        <CheckCircle size={18} weight="fill" color="#3dc97a" />
+                      ) : (
+                        <Circle size={18} color="#2a2a2a" />
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                className="new-job-add-package"
+                onClick={() => router.push('/settings/packages')}
+              >
+                <Plus size={14} color="#555" aria-hidden="true" />
+                Add new package
+              </button>
+            </div>
+          )}
+
+          <div className="new-job-label" style={{ marginTop: 4 }}>
+            Vehicle type
+          </div>
+          <div className="new-job-vehicle-grid">
+            {VEHICLE_TYPES.map((v) => {
+              const active = vehicleType === v.id
+              const { Icon } = v
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  className={`new-job-vehicle-btn${active ? ' new-job-vehicle-btn--selected' : ''}`}
+                  onClick={() => setVehicleType(v.id)}
+                >
+                  <Icon size={22} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
+                  <span>{v.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="new-job-label">Location</div>
+          <div className="new-job-location-toggle">
+            <button
+              type="button"
+              className={`new-job-location-opt${locationType === 'mobile' ? ' new-job-location-opt--selected' : ''}`}
+              onClick={() => setLocationType('mobile')}
+            >
+              <MapPin size={15} aria-hidden="true" />
+              Mobile
+            </button>
+            <button
+              type="button"
+              className={`new-job-location-opt${locationType === 'fixed' ? ' new-job-location-opt--selected' : ''}`}
+              onClick={() => setLocationType('fixed')}
+            >
+              <House size={15} aria-hidden="true" />
+              Fixed
+            </button>
+          </div>
+        </section>
+
+        {/* 4. Revenue */}
+        <section id="nj-revenue" className="new-job-section">
+          <div className="new-job-label">Revenue &amp; Tip</div>
+          <div className="new-job-money-grid">
+            <div>
+              <div className="new-job-money-sublabel">Revenue</div>
+              <div className="new-job-money-box">
+                <span className="new-job-money-sign new-job-money-sign--green">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className="new-job-money-input"
+                  placeholder="0"
+                  value={revenue || ''}
+                  onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))}
+                />
               </div>
             </div>
-          )
-        })}
-      </div>
+            <div>
+              <div className="new-job-money-sublabel">Tip</div>
+              <div className="new-job-money-box">
+                <span className="new-job-money-sign">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className="new-job-money-input"
+                  placeholder="0"
+                  value={tip || ''}
+                  onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <div className="section-title">Location</div>
-      <div className="toggle-group" style={{ marginBottom: 20 }}>
-        <div
-          className={`toggle-option ${locationType === 'mobile' ? 'active' : ''}`}
-          onClick={() => setLocationType('mobile')}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <MapPin size={14} weight={locationType === 'mobile' ? 'fill' : 'regular'} aria-hidden="true" />
-            Mobile
-          </span>
-        </div>
-        <div
-          className={`toggle-option ${locationType === 'fixed' ? 'active' : ''}`}
-          onClick={() => setLocationType('fixed')}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <House size={14} weight={locationType === 'fixed' ? 'fill' : 'regular'} aria-hidden="true" />
-            Fixed
-          </span>
-        </div>
-      </div>
-
-      <div className="section-title">Supplies used</div>
-      <div className="card" style={{ marginBottom: 20 }}>
-        <JobSuppliesPicker supplies={supplies} value={suppliesUsed} onChange={setSuppliesUsed} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
-        <div>
-          <div className="section-title">Revenue</div>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--green)', fontWeight: 700, fontSize: 16, fontFamily: 'var(--font-mono)' }}>$</span>
-            <input
-              type="number"
-              className="input money"
-              value={revenue || ''}
-              onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))}
-              style={{ paddingLeft: 26, fontSize: 20, fontWeight: 700, color: 'var(--green)' }}
+        {/* 5. Notes */}
+        <section id="nj-notes" className="new-job-section">
+          <div className="new-job-label">
+            Notes <span className="new-job-optional">OPTIONAL</span>
+          </div>
+          <div className="new-job-notes-box">
+            <textarea
+              className="new-job-notes-input"
+              placeholder="e.g. client wants interior only, paint correction on driver side..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
             />
           </div>
-        </div>
-        <div>
-          <div className="section-title">Tip</div>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 700, fontSize: 16, fontFamily: 'var(--font-mono)' }}>$</span>
-            <input
-              type="number"
-              className="input money"
-              value={tip || ''}
-              onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))}
-              style={{ paddingLeft: 26, fontSize: 20, fontWeight: 700, color: 'var(--text-secondary)' }}
-            />
-          </div>
-        </div>
+        </section>
+
+        {saveError && <p className="new-job-error">{saveError}</p>}
       </div>
 
-      {saveError && (
-        <div style={{ fontSize: 13, color: 'var(--red, #e55)', marginBottom: 12 }}>{saveError}</div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
-        <button className="btn-primary" onClick={handleSave} disabled={saving || packages.length === 0}>
-          {saving ? 'Saving...' : 'Save job'}
+      <div className="new-job-footer">
+        <button
+          type="button"
+          className={`new-job-save-btn${!isValid ? ' new-job-save-btn--muted' : ''}`}
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? 'Saving…' : 'Save job'}
         </button>
         <button
-          className="btn-ghost"
-          onClick={handleSaveAndExpenses}
-          disabled={saving || packages.length === 0}
-          style={{ whiteSpace: 'nowrap', padding: '16px 20px' }}
+          type="button"
+          className="new-job-expenses-btn"
+          onClick={() => setExpenseSheetOpen(true)}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Plus size={14} weight="bold" aria-hidden="true" />
-            Expenses
-          </span>
+          <Plus size={14} aria-hidden="true" />
+          Expenses
         </button>
       </div>
+
+      {expenseSheetOpen && (
+        <JobExpensesSheet
+          value={expenses}
+          onSave={setExpenses}
+          onClose={() => setExpenseSheetOpen(false)}
+        />
+      )}
     </div>
   )
 }

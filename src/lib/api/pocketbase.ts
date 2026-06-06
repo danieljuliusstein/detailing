@@ -47,6 +47,7 @@ import type { DateRangeKey } from './reports'
 import * as overheadPb from './overhead-pocketbase'
 import * as businessExpensesPb from './business-expenses-pocketbase'
 import { businessExpensesTotalForDates } from '../business-expenses-logic'
+import { enrichClientWithStats } from '../client-stats'
 
 const JOB_EXPAND = 'client_id,package_id,invoice_id'
 
@@ -162,6 +163,7 @@ export async function createPackage(input: import('../types').PackageInput): Pro
     name: input.name.trim(),
     base_price: input.base_price,
     description: input.description ?? '',
+    expected_return_days: input.expected_return_days ?? 90,
     default_supplies: input.default_supplies ?? [],
     active: input.active !== false,
   })
@@ -174,6 +176,7 @@ export async function updatePackage(id: string, input: Partial<import('../types'
     if (input.name !== undefined) payload.name = input.name.trim()
     if (input.base_price !== undefined) payload.base_price = input.base_price
     if (input.description !== undefined) payload.description = input.description
+    if (input.expected_return_days !== undefined) payload.expected_return_days = input.expected_return_days
     if (input.default_supplies !== undefined) payload.default_supplies = input.default_supplies
     if (input.active !== undefined) payload.active = input.active
 
@@ -215,6 +218,11 @@ export async function createJob(input: QuickJobData): Promise<Job> {
     status: 'completed',
     revenue: input.revenue,
     tip: input.tip,
+    start_time: input.start_time,
+    notes: input.notes,
+    travel_cost: input.travel_cost,
+    marketing_cost: input.marketing_cost,
+    equipment_depreciation: input.equipment_depreciation,
   }) as Record<string, unknown>
 
   const { getSupplies, deductSupplies } = await import('./supplies-pocketbase')
@@ -272,14 +280,15 @@ export async function updateJob(id: string, updates: JobEditData): Promise<Job |
 }
 
 export async function getClientsWithStats(): Promise<ClientWithStats[]> {
-  const [clients, jobs] = await Promise.all([getClients(), fetchJobsRaw()])
-  return clients
-    .map((client) => {
-      const clientJobs = jobs.filter((j) => j.client_id === client.id)
-      const totalRevenue = clientJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
-      return { ...client, totalRevenue, jobCount: clientJobs.length }
-    })
-    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+  const [clients, jobs, packages] = await Promise.all([
+    getClients(),
+    fetchJobsRaw(),
+    getPackages(),
+  ])
+  return clients.map((client) => {
+    const clientJobs = jobs.filter((j) => j.client_id === client.id)
+    return enrichClientWithStats(client, clientJobs, packages)
+  })
 }
 
 export async function getClientJobs(clientId: string): Promise<JobWithRelations[]> {

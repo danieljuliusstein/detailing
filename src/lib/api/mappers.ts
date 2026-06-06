@@ -50,11 +50,13 @@ function relationId(v: unknown): string {
 }
 
 export function pbPackageToApp(r: PbRecord): Package {
+  const returnDays = num(r.expected_return_days)
   return {
     id: r.id,
     name: String(r.name ?? ''),
     base_price: num(r.base_price),
     description: str(r.description),
+    expected_return_days: returnDays > 0 ? returnDays : 90,
     default_supplies: jsonArray(r.default_supplies),
     active: bool(r.active, true),
   }
@@ -145,6 +147,11 @@ export function appJobCreateToPb(input: {
   status: string
   revenue: number
   tip: number
+  start_time?: string
+  notes?: string
+  travel_cost?: number
+  marketing_cost?: number
+  equipment_depreciation?: number
 }) {
   return {
     date: input.date,
@@ -155,12 +162,14 @@ export function appJobCreateToPb(input: {
     status: input.status,
     revenue: input.revenue,
     tip: input.tip,
+    start_time: input.start_time ?? '',
+    notes: input.notes ?? '',
     hours_worked: 0,
     expenses: [],
     supplies_used: [],
-    travel_cost: 0,
-    marketing_cost: 0,
-    equipment_depreciation: 0,
+    travel_cost: input.travel_cost ?? 0,
+    marketing_cost: input.marketing_cost ?? 0,
+    equipment_depreciation: input.equipment_depreciation ?? 0,
   }
 }
 

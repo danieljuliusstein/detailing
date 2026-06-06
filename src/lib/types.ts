@@ -29,6 +29,8 @@ export interface Package {
   name: string
   base_price: number
   description?: string
+  /** Typical days until this service type should be booked again. */
+  expected_return_days: number
   default_supplies?: { supply_id: string; default_qty: number }[]
   active: boolean
 }
@@ -199,6 +201,11 @@ export interface QuickJobData {
   revenue: number
   tip: number
   date: string
+  start_time?: string
+  notes?: string
+  travel_cost?: number
+  marketing_cost?: number
+  equipment_depreciation?: number
   supplies_used?: SupplyUsage[]
 }
 
@@ -286,6 +293,7 @@ export interface PackageInput {
   name: string
   base_price: number
   description?: string
+  expected_return_days?: number
   default_supplies?: { supply_id: string; default_qty: number }[]
   active?: boolean
 }
@@ -293,6 +301,11 @@ export interface PackageInput {
 export interface ClientWithStats extends Client {
   totalRevenue: number
   jobCount: number
+  lastJobDate?: string | null
+  firstJobDate?: string | null
+  lastServiceName?: string | null
+  /** Cadence from the client's most recent job package. */
+  expectedReturnDays: number
 }
 
 export interface WeekDay {

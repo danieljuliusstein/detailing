@@ -2,69 +2,152 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MagnifyingGlass, Plus, Users } from '@phosphor-icons/react'
+import { MagnifyingGlass, Plus } from '@phosphor-icons/react'
+import ClientCard from '@/components/clients/ClientCard'
 import { fmt } from '@/lib/calculations'
+import {
+  buildDerivedMap,
+  filterBySegment,
+  overdueClients,
+  partitionForAll,
+  sortForSegment,
+  type ClientSegment,
+} from '@/lib/client-relationship-logic'
 import type { ClientWithStats } from '@/lib/types'
+
+const SEGMENTS: { key: ClientSegment; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'followup', label: 'Follow up' },
+  { key: 'top', label: 'Top' },
+  { key: 'new', label: 'New' },
+]
+
+function matchesSearch(client: ClientWithStats, q: string): boolean {
+  const lower = q.toLowerCase()
+  return (
+    client.name.toLowerCase().includes(lower) ||
+    (client.phone?.includes(q) ?? false) ||
+    (client.email?.toLowerCase().includes(lower) ?? false)
+  )
+}
 
 export default function ClientsList({ clients }: { clients: ClientWithStats[] }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
+  const [segment, setSegment] = useState<ClientSegment>('all')
+
+  const derivedMap = useMemo(() => buildDerivedMap(clients), [clients])
+
+  const lifetimeTotal = useMemo(
+    () => clients.reduce((s, c) => s + c.totalRevenue, 0),
+    [clients]
+  )
+
+  const overdue = useMemo(() => overdueClients(clients, derivedMap), [clients, derivedMap])
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    if (!q) return clients
-    return clients.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.phone?.includes(q) || c.email?.toLowerCase().includes(q)
-    )
-  }, [clients, search])
+    const q = search.trim()
+    let list = filterBySegment(clients, segment, derivedMap)
+    list = sortForSegment(list, segment, derivedMap)
+    if (q) list = list.filter((c) => matchesSearch(c, q))
+    return list
+  }, [clients, segment, search, derivedMap])
+
+  const { needsAttention, rest } = useMemo(() => {
+    if (segment !== 'all') return { needsAttention: [], rest: filtered }
+    const q = search.trim()
+    const base = q ? clients.filter((c) => matchesSearch(c, q)) : clients
+    return partitionForAll(base, derivedMap)
+  }, [segment, filtered, search, clients, derivedMap])
+
+  const renderCards = (list: ClientWithStats[]) =>
+    list.map((client) => {
+      const derived = derivedMap.get(client.id)!
+      return <ClientCard key={client.id} client={client} derived={derived} />
+    })
 
   return (
-    <div className="screen page-content">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 20 }}>
+    <div className="screen page-content clients-screen">
+      <div className="clients-header">
         <div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Clients</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{clients.length} total</div>
+          <h1 className="clients-title">Clients</h1>
+          <p className="clients-subtitle">
+            {clients.length} client{clients.length !== 1 ? 's' : ''} · {fmt(lifetimeTotal)} lifetime
+          </p>
         </div>
         <button
+          type="button"
+          className="clients-add-btn"
           onClick={() => router.push('/clients/new')}
           aria-label="Add client"
-          style={{ background: 'var(--green)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
-          <Plus size={20} weight="bold" color="#071407" />
+          <Plus size={20} weight="bold" color="#111" aria-hidden="true" />
         </button>
       </div>
 
-      <div style={{ position: 'relative', marginBottom: 20 }}>
-        <input className="input" placeholder="Search clients…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ paddingLeft: 40 }} />
-        <MagnifyingGlass size={18} color="var(--text-muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
+      {overdue.length > 0 && (
+        <button
+          type="button"
+          className="clients-banner"
+          onClick={() => setSegment('followup')}
+        >
+          <span className="clients-banner-dot" aria-hidden="true" />
+          <span className="clients-banner-text">
+            <strong>{overdue.length}</strong>
+            {` client${overdue.length > 1 ? 's' : ''} due for a visit — tap to follow up`}
+          </span>
+        </button>
+      )}
+
+      <div className="clients-search-wrap">
+        <MagnifyingGlass
+          size={16}
+          color="#555"
+          className="clients-search-icon"
+          aria-hidden="true"
+        />
+        <input
+          className="clients-search"
+          placeholder="Search clients..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-          <Users size={40} weight="duotone" color="var(--text-dim)" style={{ marginBottom: 12 }} />
-          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>No clients found</div>
-        </div>
-      ) : (
-        filtered.map((client) => (
-          <div key={client.id} className="card-pressable" style={{ marginBottom: 8 }} onClick={() => router.push(`/clients/${client.id}`)}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{client.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {[client.phone, client.email].filter(Boolean).join(' · ') || 'No contact info'}
-                </div>
-                {client.lead_source && (
-                  <span className="badge badge-draft" style={{ marginTop: 6, textTransform: 'capitalize' }}>{client.lead_source.replace(/_/g, ' ')}</span>
-                )}
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="money money-positive" style={{ fontSize: 14, fontWeight: 700 }}>{fmt(client.totalRevenue)}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{client.jobCount} job{client.jobCount !== 1 ? 's' : ''}</div>
-              </div>
-            </div>
-          </div>
-        ))
+      <div className="clients-segments" role="tablist" aria-label="Client filters">
+        {SEGMENTS.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            role="tab"
+            aria-selected={segment === s.key}
+            className={`clients-segment${segment === s.key ? ' clients-segment--active' : ''}`}
+            onClick={() => setSegment(s.key)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="clients-empty">No clients found</div>
       )}
+
+      {segment === 'all' && filtered.length > 0 && (
+        <>
+          {needsAttention.length > 0 && (
+            <>
+              <div className="clients-section-label">Needs attention</div>
+              {renderCards(needsAttention)}
+              <div className="clients-section-divider" />
+            </>
+          )}
+          <div className="clients-section-label">All clients</div>
+          {renderCards(rest)}
+        </>
+      )}
+
+      {segment !== 'all' && filtered.length > 0 && renderCards(filtered)}
     </div>
   )
 }

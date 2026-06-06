@@ -32,10 +32,10 @@ function generateId(): string {
 
 export function createSeedData(): AppData {
   const packages: Package[] = [
-    { id: 'pkg_basic', name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry', default_supplies: [{ supply_id: 'sup_soap', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 2 }] },
-    { id: 'pkg_full', name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail', default_supplies: [{ supply_id: 'sup_soap', default_qty: 8 }, { supply_id: 'sup_interior', default_qty: 6 }, { supply_id: 'sup_towel', default_qty: 4 }] },
-    { id: 'pkg_paint', name: 'Paint Correct', base_price: 450, active: true, description: 'Single-stage paint correction', default_supplies: [{ supply_id: 'sup_soap', default_qty: 6 }, { supply_id: 'sup_wax', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 6 }] },
-    { id: 'pkg_ceramic', name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application', default_supplies: [{ supply_id: 'sup_ceramic', default_qty: 8 }, { supply_id: 'sup_towel', default_qty: 4 }] },
+    { id: 'pkg_basic', name: 'Basic Wash', base_price: 80, expected_return_days: 30, active: true, description: 'Exterior wash and dry', default_supplies: [{ supply_id: 'sup_soap', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 2 }] },
+    { id: 'pkg_full', name: 'Full Detail', base_price: 320, expected_return_days: 90, active: true, description: 'Interior + exterior full detail', default_supplies: [{ supply_id: 'sup_soap', default_qty: 8 }, { supply_id: 'sup_interior', default_qty: 6 }, { supply_id: 'sup_towel', default_qty: 4 }] },
+    { id: 'pkg_paint', name: 'Paint Correct', base_price: 450, expected_return_days: 180, active: true, description: 'Single-stage paint correction', default_supplies: [{ supply_id: 'sup_soap', default_qty: 6 }, { supply_id: 'sup_wax', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 6 }] },
+    { id: 'pkg_ceramic', name: 'Ceramic Coat', base_price: 800, expected_return_days: 365, active: true, description: 'Ceramic coating application', default_supplies: [{ supply_id: 'sup_ceramic', default_qty: 8 }, { supply_id: 'sup_towel', default_qty: 4 }] },
   ]
 
   const supplies: Supply[] = [

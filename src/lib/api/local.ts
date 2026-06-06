@@ -12,6 +12,7 @@ import {
   isCompletingJob,
   resolveSuppliesUsed,
 } from '../supplies-logic'
+import { enrichClientWithStats } from '../client-stats'
 import { loadData, newId, saveData } from '../storage'
 import type {
   Client,
@@ -120,6 +121,7 @@ export function createPackage(input: import('../types').PackageInput): Package {
     name: input.name.trim(),
     base_price: input.base_price,
     description: input.description,
+    expected_return_days: input.expected_return_days ?? 90,
     default_supplies: input.default_supplies,
     active: input.active !== false,
   }
@@ -139,6 +141,8 @@ export function updatePackage(id: string, input: Partial<import('../types').Pack
     name: input.name !== undefined ? input.name.trim() : current.name,
     base_price: input.base_price !== undefined ? input.base_price : current.base_price,
     description: input.description !== undefined ? input.description : current.description,
+    expected_return_days:
+      input.expected_return_days !== undefined ? input.expected_return_days : current.expected_return_days,
     default_supplies: input.default_supplies !== undefined ? input.default_supplies : current.default_supplies,
     active: input.active !== undefined ? input.active : current.active,
   }
@@ -180,6 +184,7 @@ export function createJob(input: QuickJobData): Job {
   const job: Job = {
     id: newId(),
     date: input.date,
+    start_time: input.start_time,
     hours_worked: 0,
     location_type: input.locationType,
     package_id: input.packageId,
@@ -188,11 +193,12 @@ export function createJob(input: QuickJobData): Job {
     status: 'completed',
     revenue: input.revenue,
     tip: input.tip,
+    notes: input.notes,
     expenses,
     supplies_used,
-    travel_cost: 0,
-    marketing_cost: 0,
-    equipment_depreciation: 0,
+    travel_cost: input.travel_cost ?? 0,
+    marketing_cost: input.marketing_cost ?? 0,
+    equipment_depreciation: input.equipment_depreciation ?? 0,
     photo_count: 0,
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
@@ -276,13 +282,10 @@ export function getClient(id: string): Client | null {
 
 export function getClientsWithStats(): ClientWithStats[] {
   const data = loadData()
-  return data.clients
-    .map((client) => {
-      const clientJobs = data.jobs.filter((j) => j.client_id === client.id)
-      const totalRevenue = clientJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
-      return { ...client, totalRevenue, jobCount: clientJobs.length }
-    })
-    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+  return data.clients.map((client) => {
+    const clientJobs = data.jobs.filter((j) => j.client_id === client.id)
+    return enrichClientWithStats(client, clientJobs, data.packages)
+  })
 }
 
 export function getClientJobs(clientId: string): JobWithRelations[] {

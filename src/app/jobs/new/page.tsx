@@ -1,24 +1,44 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import QuickAddJob from '@/components/QuickAddJob'
-import { createJob, getPackages, getRecentClients, getSupplies } from '@/lib/api'
-import type { Client, Package, Supply } from '@/lib/types'
+import { createJob, getClient, getClientsWithStats, getPackages } from '@/lib/api'
+import { DEFAULT_RETURN_DAYS } from '@/lib/package-cadence'
+import type { ClientWithStats, Package } from '@/lib/types'
 
 export default function NewJobPage() {
+  const searchParams = useSearchParams()
+  const clientId = searchParams.get('clientId')
+
   const [packages, setPackages] = useState<Package[]>([])
-  const [supplies, setSupplies] = useState<Supply[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const [clients, setClients] = useState<ClientWithStats[]>([])
+  const [initialClient, setInitialClient] = useState<ClientWithStats | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    Promise.all([getPackages(), getSupplies(), getRecentClients()]).then(([pkgs, sups, cls]) => {
-      setPackages(pkgs)
-      setSupplies(sups)
-      setClients(cls)
-      setReady(true)
-    })
-  }, [])
+    Promise.all([getPackages(), getClientsWithStats(), clientId ? getClient(clientId) : Promise.resolve(null)]).then(
+      ([pkgs, allClients, prefilled]) => {
+        setPackages(pkgs)
+        setClients(allClients)
+        if (prefilled) {
+          const withStats = allClients.find((c) => c.id === prefilled.id)
+          setInitialClient(
+            withStats ?? {
+              ...prefilled,
+              totalRevenue: 0,
+              jobCount: 0,
+              lastJobDate: null,
+              firstJobDate: null,
+              lastServiceName: null,
+              expectedReturnDays: DEFAULT_RETURN_DAYS,
+            }
+          )
+        }
+        setReady(true)
+      }
+    )
+  }, [clientId])
 
   if (!ready) {
     return (
@@ -31,8 +51,8 @@ export default function NewJobPage() {
   return (
     <QuickAddJob
       packages={packages}
-      supplies={supplies}
-      recentClients={clients}
+      clients={clients}
+      initialClient={initialClient}
       onSave={async (data) => {
         const job = await createJob(data)
         return { id: job.id }

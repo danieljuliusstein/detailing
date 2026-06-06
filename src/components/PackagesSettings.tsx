@@ -6,6 +6,7 @@ import { PencilSimple, Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import { createPackage, getAllPackages, updatePackage } from '@/lib/api'
 import { fmt } from '@/lib/calculations'
+import { CADENCE_PRESETS, cadencePresetLabel, DEFAULT_RETURN_DAYS } from '@/lib/package-cadence'
 import type { Package } from '@/lib/types'
 
 export default function PackagesSettings() {
@@ -16,23 +17,30 @@ export default function PackagesSettings() {
   const [name, setName] = useState('')
   const [price, setPrice] = useState(0)
   const [description, setDescription] = useState('')
+  const [returnDays, setReturnDays] = useState(DEFAULT_RETURN_DAYS)
 
   const load = async () => setPackages(await getAllPackages())
   useEffect(() => { load() }, [])
+
+  const resetForm = () => {
+    setName('')
+    setPrice(0)
+    setDescription('')
+    setReturnDays(DEFAULT_RETURN_DAYS)
+  }
 
   const startEdit = (pkg: Package) => {
     setEditingId(pkg.id)
     setName(pkg.name)
     setPrice(pkg.base_price)
     setDescription(pkg.description ?? '')
+    setReturnDays(pkg.expected_return_days)
     setShowAdd(false)
   }
 
   const cancelEdit = () => {
     setEditingId(null)
-    setName('')
-    setPrice(0)
-    setDescription('')
+    resetForm()
   }
 
   const handleToggle = async (pkg: Package) => {
@@ -46,6 +54,7 @@ export default function PackagesSettings() {
       name: name.trim(),
       base_price: price,
       description: description.trim() || undefined,
+      expected_return_days: returnDays,
     })
     cancelEdit()
     await load()
@@ -57,12 +66,11 @@ export default function PackagesSettings() {
       name: name.trim(),
       base_price: price,
       description: description.trim() || undefined,
+      expected_return_days: returnDays,
       active: true,
     })
     setShowAdd(false)
-    setName('')
-    setPrice(0)
-    setDescription('')
+    resetForm()
     await load()
   }
 
@@ -81,7 +89,7 @@ export default function PackagesSettings() {
       </div>
 
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
-        Set base prices for each service. New jobs use these as defaults — you can still override per job.
+        Set base prices and revisit cadence for each service. Client follow-up timing and visit frequency scores use the cadence from their last booked service.
       </div>
 
       {(showAdd || editingId) && (
@@ -98,6 +106,16 @@ export default function PackagesSettings() {
             onChange={(e) => setPrice(Number(e.target.value))}
           />
           <input className="input" placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Expected revisit</div>
+            <select className="input" value={returnDays} onChange={(e) => setReturnDays(Number(e.target.value))}>
+              {CADENCE_PRESETS.map((preset) => (
+                <option key={preset.days} value={preset.days}>
+                  {preset.label} — {preset.hint}
+                </option>
+              ))}
+            </select>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-ghost" onClick={() => { showAdd ? setShowAdd(false) : cancelEdit() }} style={{ flex: 1 }}>
               Cancel
@@ -114,7 +132,9 @@ export default function PackagesSettings() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, opacity: pkg.active ? 1 : 0.5 }}>{pkg.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              {fmt(pkg.base_price)}{pkg.description ? ` · ${pkg.description}` : ''}
+              {fmt(pkg.base_price)}
+              {pkg.description ? ` · ${pkg.description}` : ''}
+              {` · ${cadencePresetLabel(pkg.expected_return_days)}`}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
