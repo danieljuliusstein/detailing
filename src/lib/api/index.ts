@@ -25,7 +25,13 @@ import {
 import * as suppliesLocal from './supplies-local'
 import * as suppliesPb from './supplies-pocketbase'
 import { clearWriteDegraded, executeWrite } from './write-router'
-import { getPLReportFromJobs, exportJobsCSVFromJobs, type DateRangeKey } from './reports'
+import {
+  getPLReportFromJobs,
+  getPLReportBundleFromJobs,
+  exportJobsCSVFromJobs,
+  type DateRangeKey,
+  type PLReportBundle,
+} from './reports'
 import type {
   Client,
   ClientInput,
@@ -224,6 +230,12 @@ export async function getPLReport(range: DateRangeKey) {
   const resolved = await resolveBackend()
   if (resolved === 'pocketbase') return pb.getPLReport(range)
   return getPLReportFromJobs(local.getJobsRaw(), range)
+}
+
+export async function getPLReportBundle(range: DateRangeKey): Promise<PLReportBundle> {
+  const resolved = await resolveBackend()
+  if (resolved === 'pocketbase') return pb.getPLReportBundle(range)
+  return getPLReportBundleFromJobs(local.getJobsRaw(), range)
 }
 
 export async function exportJobsCSV(range: DateRangeKey): Promise<string> {

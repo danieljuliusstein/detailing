@@ -86,12 +86,7 @@ function monthsInRange(start: Date, end: Date): number {
   return Math.max(1, endMonth - startMonth + 1)
 }
 
-export function overheadAmountForRange(
-  expenses: OverheadExpense[],
-  range: DateRangeKey,
-  now = new Date()
-): number {
-  const { start, end } = rangeFor(range, now)
+export function overheadAmountForDates(expenses: OverheadExpense[], start: Date, end: Date): number {
   let total = 0
 
   for (const exp of expenses) {
@@ -115,6 +110,15 @@ export function overheadAmountForRange(
   }
 
   return Math.round(total * 100) / 100
+}
+
+export function overheadAmountForRange(
+  expenses: OverheadExpense[],
+  range: DateRangeKey,
+  now = new Date()
+): number {
+  const { start, end } = rangeFor(range, now)
+  return overheadAmountForDates(expenses, start, end)
 }
 
 export function resolveSuppliesUsed(

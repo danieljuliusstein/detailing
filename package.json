@@ -17,6 +17,7 @@
     "@ducanh2912/next-pwa": "^10.2.9",
     "@phosphor-icons/react": "^2.1.10",
     "@react-pdf/renderer": "^4.5.1",
+    "chart.js": "^4.5.1",
     "next": "16.2.7",
     "pocketbase": "^0.27.0",
     "react": "19.2.4",

@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Hides the floating Next.js "N" badge in development (still shows on errors)
   devIndicators: false,
+  serverExternalPackages: ['@react-pdf/renderer'],
 };
 
 export default withPWA(nextConfig);

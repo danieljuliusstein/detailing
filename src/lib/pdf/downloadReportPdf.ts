@@ -1,0 +1,23 @@
+import type { PLReport } from '@/lib/api/aggregates'
+import type { DateRangeKey } from '@/lib/api/reports'
+import { triggerDownload } from '@/lib/pdf/triggerDownload'
+
+export async function downloadReportPdf(
+  report: PLReport,
+  range: DateRangeKey,
+  businessName: string
+): Promise<void> {
+  const res = await fetch('/api/pdf/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report, range, businessName }),
+  })
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error ?? 'PDF export failed')
+  }
+
+  const blob = await res.blob()
+  triggerDownload(blob, `report-${range}.pdf`)
+}

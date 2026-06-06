@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { ClipboardText } from '@phosphor-icons/react'
+import JobsRevenueChart from '@/components/jobs/JobsRevenueChart'
 import { fmt, mapJobStatusForDisplay, netProfit } from '@/lib/calculations'
 import type { JobWithRelations } from '@/lib/types'
 
@@ -18,12 +19,7 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
 
   return (
     <div className="screen page-content">
-      <div style={{ paddingTop: 16, paddingBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-primary)' }}>Jobs</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-          {jobs.length} total
-        </div>
-      </div>
+      <JobsRevenueChart jobs={jobs} />
 
       {jobs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 32 }}>
@@ -31,7 +27,8 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
           <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>No jobs yet</div>
         </div>
       ) : (
-        jobs.map((job) => {
+        <div className="jobs-list-cards">
+        {jobs.map((job) => {
           const status = statusConfig[mapJobStatusForDisplay(job)]
           return (
             <div
@@ -62,7 +59,8 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
               </div>
             </div>
           )
-        })
+        })}
+        </div>
       )}
     </div>
   )

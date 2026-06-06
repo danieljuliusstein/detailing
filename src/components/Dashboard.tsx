@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Car, Gear } from '@phosphor-icons/react'
 import type { DashboardKpis, RecentJobRow, WeekDay } from '@/lib/types'
+import InventorySection from '@/components/home/InventorySection'
 import { fmt } from '@/lib/calculations'
 
 interface DashboardProps {
@@ -145,6 +146,8 @@ export default function Dashboard({ kpis, recentJobs, jobsToday, weekDays, dayJo
           <JobRow key={job.id} job={job} onPress={() => router.push(`/jobs/${job.id}`)} />
         ))
       )}
+
+      <InventorySection />
     </div>
   )
 }

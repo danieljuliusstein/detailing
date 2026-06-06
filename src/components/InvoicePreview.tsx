@@ -96,8 +96,11 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
   const handlePdf = async () => {
     if (!invoice) return
     setBusy(true)
+    setMessage('')
     try {
       await downloadInvoicePdf(job, invoice, settings)
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'PDF export failed')
     } finally {
       setBusy(false)
     }

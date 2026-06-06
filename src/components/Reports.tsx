@@ -1,106 +1,207 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DownloadSimple, FileCsv } from '@phosphor-icons/react'
-import { getPLReport, exportJobsCSV, type DateRangeKey, type PLReport } from '@/lib/api'
-import { fmtDetailed } from '@/lib/calculations'
-
-const RANGES: { key: DateRangeKey; label: string }[] = [
-  { key: 'this_week', label: 'This week' },
-  { key: 'this_month', label: 'This month' },
-  { key: 'last_month', label: 'Last month' },
-  { key: 'this_year', label: 'This year' },
-]
-
-const expenseLabels: Record<keyof PLReport['expenses'], string> = {
-  supplies: 'Supplies', travel: 'Travel', equipment: 'Equipment',
-  marketing: 'Marketing', labor: 'Labor', overhead: 'Overhead', other: 'Other',
-}
+import PLProgressBarCard from '@/components/reports/PLProgressBarCard'
+import { exportJobsCSV, getPLReportBundle, type DateRangeKey } from '@/lib/api'
+import type { PLReport } from '@/lib/api/aggregates'
+import { fmt, fmtDetailed } from '@/lib/calculations'
+import { downloadReportPdf } from '@/lib/pdf/downloadReportPdf'
+import { loadSettings } from '@/lib/settings'
+import {
+  EXPENSE_ORDER,
+  EXPENSE_LABELS,
+  MARGIN_TARGET_PCT,
+  REPORT_FILTER_CHIPS,
+  computeDeltas,
+  deltaClass,
+  formatDelta,
+} from '@/lib/reports-metrics'
 
 export default function Reports() {
   const [range, setRange] = useState<DateRangeKey>('this_month')
-  const [report, setReport] = useState<PLReport | null>(null)
+  const [current, setCurrent] = useState<PLReport | null>(null)
+  const [prior, setPrior] = useState<PLReport | null>(null)
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
 
   useEffect(() => {
-    getPLReport(range).then(setReport)
+    getPLReportBundle(range).then(({ current: c, prior: p }) => {
+      setCurrent(c)
+      setPrior(p)
+    })
   }, [range])
 
+  const deltas = useMemo(() => {
+    if (!current || !prior) return null
+    return computeDeltas(current, prior)
+  }, [current, prior])
+
+  const expenseRows = useMemo(() => {
+    if (!current) return []
+    return EXPENSE_ORDER
+      .map((key) => ({ key, label: EXPENSE_LABELS[key], amount: current.expenses[key] }))
+      .filter((row) => row.amount > 0)
+  }, [current])
+
   const handleCSV = async () => {
-    const csv = await exportJobsCSV(range)
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `jobs-${range}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    setExportMessage('')
+    setExportBusy(true)
+    try {
+      const csv = await exportJobsCSV(range)
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `jobs-${range}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setExportMessage(e instanceof Error ? e.message : 'CSV export failed')
+    } finally {
+      setExportBusy(false)
+    }
   }
 
-  if (!report) {
-    return <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+  const handlePdf = async () => {
+    if (!current) return
+    setExportMessage('')
+    setExportBusy(true)
+    try {
+      const settings = loadSettings()
+      await downloadReportPdf(current, range, settings.business_name)
+    } catch (e) {
+      setExportMessage(e instanceof Error ? e.message : 'PDF export failed')
+    } finally {
+      setExportBusy(false)
+    }
   }
 
-  const marginColor = report.marginPct >= 50 ? 'var(--green)' : report.marginPct >= 30 ? 'var(--amber)' : 'var(--red)'
+  if (!current || !deltas) {
+    return (
+      <div className="screen page-content reports-screen" style={{ paddingTop: 40, textAlign: 'center', color: '#555' }}>
+        Loading…
+      </div>
+    )
+  }
 
   return (
-    <div className="screen page-content">
-      <div style={{ paddingTop: 16, paddingBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 600 }}>Reports</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{report.jobCount} jobs in range</div>
+    <div className="screen page-content reports-screen">
+      <div className="reports-header">
+        <div className="reports-title">Reports</div>
+        <div className="reports-subtitle">{current.jobCount} jobs in range</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 4 }}>
-        {RANGES.map((r) => {
-          const active = range === r.key
-          return (
-            <button key={r.key} onClick={() => setRange(r.key)} style={{
-              flexShrink: 0, padding: '8px 14px', borderRadius: 'var(--radius-full)', fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none',
-              background: active ? 'var(--green)' : 'var(--bg-surface)',
-              color: active ? '#071407' : 'var(--text-muted)',
-            }}>{r.label}</button>
-          )
-        })}
+      <div className="reports-filter-chips">
+        {REPORT_FILTER_CHIPS.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            className={`reports-filter-chip${range === chip.key ? ' reports-filter-chip--active' : ''}`}
+            onClick={() => setRange(chip.key)}
+          >
+            {chip.label}
+          </button>
+        ))}
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title">Profit & loss</div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span style={{ fontSize: 14 }}>Revenue</span>
-          <span className="money" style={{ fontSize: 14, fontWeight: 600 }}>{fmtDetailed(report.revenue)}</span>
+      <div className="reports-kpi-grid">
+        <div className="reports-kpi-card">
+          <div className="reports-kpi-label">REVENUE</div>
+          <div className="reports-kpi-value">{fmt(current.revenue)}</div>
+          <div className={`reports-kpi-delta ${deltaClass(deltas.revenuePct, 'revenue')}`}>
+            {formatDelta(deltas.revenuePct, 'percent', range)}
+          </div>
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Expenses</div>
-        {(Object.keys(expenseLabels) as (keyof PLReport['expenses'])[]).map((key) => {
-          const val = report.expenses[key]
-          if (val === 0) return null
-          return (
-            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, paddingLeft: 12 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{expenseLabels[key]}</span>
-              <span className="money money-negative" style={{ fontSize: 13 }}>−{fmtDetailed(val)}</span>
-            </div>
-          )
-        })}
-
-        <div className="divider" />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>Net profit</span>
-          <span className="money money-positive" style={{ fontSize: 16, fontWeight: 700 }}>{fmtDetailed(report.netProfit)}</span>
+        <div className="reports-kpi-card">
+          <div className="reports-kpi-label">NET PROFIT</div>
+          <div className="reports-kpi-value reports-kpi-value--green">{fmt(current.netProfit)}</div>
+          <div className={`reports-kpi-delta ${deltaClass(deltas.profitPct, 'profit')}`}>
+            {formatDelta(deltas.profitPct, 'percent', range)}
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          Margin <span style={{ color: marginColor, fontWeight: 600 }}>{report.marginPct}%</span>
+
+        <div className="reports-kpi-card">
+          <div className="reports-kpi-label">TOTAL EXPENSES</div>
+          <div className="reports-kpi-value">{fmt(current.totalExpenses)}</div>
+          <div className={`reports-kpi-delta ${deltaClass(deltas.expenseDollar, 'expense')}`}>
+            {formatDelta(deltas.expenseDollar, 'dollar', range)}
+          </div>
+        </div>
+
+        <div className="reports-kpi-card">
+          <div className="reports-kpi-label">MARGIN</div>
+          <div className="reports-kpi-value reports-kpi-value--green">{current.marginPct}%</div>
+          <div className="reports-kpi-delta reports-delta--neutral">
+            target: {MARGIN_TARGET_PCT}%
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <button className="btn-ghost" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <DownloadSimple size={18} /> PDF
+      <PLProgressBarCard report={current} range={range} />
+
+      <div className="reports-card">
+        <div className="reports-card-label">PROFIT &amp; LOSS BREAKDOWN</div>
+
+        <div className="reports-pl-row">
+          <div className="reports-pl-left">
+            <span className="reports-pl-dot reports-pl-dot--green" />
+            <span className="reports-pl-name">Revenue</span>
+          </div>
+          <span className="reports-pl-amount">{fmtDetailed(current.revenue)}</span>
+        </div>
+
+        <div className="reports-expenses-section">
+          <div className="reports-expenses-label">EXPENSES</div>
+          {expenseRows.map((row) => {
+            const pct = current.totalExpenses > 0
+              ? (row.amount / current.totalExpenses) * 100
+              : 0
+            return (
+              <div key={row.key} className="reports-expense-block">
+                <div className="reports-expense-row">
+                  <span className="reports-expense-name">{row.label}</span>
+                  <span className="reports-expense-amount">−{fmtDetailed(row.amount)}</span>
+                </div>
+                <div className="reports-expense-bar-track">
+                  <div className="reports-expense-bar-fill" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="reports-pl-divider" />
+
+        <div className="reports-pl-row reports-pl-row--profit">
+          <div className="reports-pl-left">
+            <span className="reports-pl-dot reports-pl-dot--green" />
+            <span className="reports-pl-name reports-pl-name--bold">Net profit</span>
+          </div>
+          <span className="reports-pl-amount reports-pl-amount--profit">{fmtDetailed(current.netProfit)}</span>
+        </div>
+
+        <div className="reports-margin-row">
+          <span className="reports-margin-label">Margin</span>
+          <span className="reports-margin-pill">{current.marginPct}%</span>
+        </div>
+      </div>
+
+      <div className="reports-export-grid">
+        <button type="button" className="reports-export-btn" onClick={handlePdf} disabled={exportBusy}>
+          <DownloadSimple size={18} color="#555" weight="regular" />
+          {exportBusy ? 'Exporting…' : 'PDF'}
         </button>
-        <button className="btn-ghost" onClick={handleCSV} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <FileCsv size={18} /> CSV
+        <button type="button" className="reports-export-btn" onClick={handleCSV} disabled={exportBusy}>
+          <FileCsv size={18} color="#555" weight="regular" />
+          CSV
         </button>
       </div>
+
+      {exportMessage && (
+        <div style={{ fontSize: 13, color: '#e06060', textAlign: 'center', marginTop: 8 }}>{exportMessage}</div>
+      )}
     </div>
   )
 }

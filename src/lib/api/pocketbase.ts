@@ -3,6 +3,7 @@ import {
   buildSupplyExpenseLine,
   isCompletingJob,
   mergeSupplyExpense,
+  overheadAmountForDates,
   resolveSuppliesUsed,
 } from '../supplies-logic'
 import { getPocketBase } from '../pocketbase'
@@ -11,7 +12,10 @@ import {
   computeJobsCSV,
   computeJobsForDate,
   computePLReport,
+  computePLReportForDates,
   computeWeekDays,
+  priorRangeFor,
+  rangeFor,
 } from './aggregates'
 import {
   appJobCreateToPb,
@@ -284,6 +288,18 @@ export async function getJobsForDate(date: string): Promise<RecentJobRow[]> {
 export async function getPLReport(range: DateRangeKey) {
   const [jobs, overhead] = await Promise.all([fetchJobsRaw(), overheadPb.getOverheadForRange(range)])
   return computePLReport(jobs, range, overhead)
+}
+
+export async function getPLReportBundle(range: DateRangeKey) {
+  const [jobs, expenses] = await Promise.all([fetchJobsRaw(), overheadPb.getOverheadExpenses()])
+  const { start, end } = rangeFor(range)
+  const prior = priorRangeFor(range)
+  const currentOverhead = overheadAmountForDates(expenses, start, end)
+  const priorOverhead = overheadAmountForDates(expenses, prior.start, prior.end)
+  return {
+    current: computePLReportForDates(jobs, start, end, currentOverhead),
+    prior: computePLReportForDates(jobs, prior.start, prior.end, priorOverhead),
+  }
 }
 
 export async function exportJobsCSV(range: DateRangeKey): Promise<string> {

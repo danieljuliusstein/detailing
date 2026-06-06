@@ -1,5 +1,4 @@
-import { pdf } from '@react-pdf/renderer'
-import InvoicePdfDocument from '@/components/pdf/InvoicePdfDocument'
+import { triggerDownload } from '@/lib/pdf/triggerDownload'
 import type { AppSettings } from '@/lib/settings'
 import type { Invoice, JobWithRelations } from '@/lib/types'
 
@@ -7,15 +6,18 @@ export async function downloadInvoicePdf(
   job: JobWithRelations,
   invoice: Invoice,
   settings: AppSettings
-) {
-  const blob = await pdf(
-    InvoicePdfDocument({ job, invoice, settings })
-  ).toBlob()
+): Promise<void> {
+  const res = await fetch('/api/pdf/invoice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job, invoice, settings }),
+  })
 
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${invoice.invoice_number}.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error ?? 'PDF export failed')
+  }
+
+  const blob = await res.blob()
+  triggerDownload(blob, `${invoice.invoice_number}.pdf`)
 }

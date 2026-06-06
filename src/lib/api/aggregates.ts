@@ -69,13 +69,32 @@ export function rangeFor(key: DateRangeKey, now = new Date()): { start: Date; en
   }
 }
 
-function jobInRange(job: Job, start: Date, end: Date): boolean {
+export function jobInRange(job: Job, start: Date, end: Date): boolean {
   const d = new Date(job.date + 'T12:00:00')
   return d >= start && d <= end
 }
 
-export function computePLReport(jobs: Job[], range: DateRangeKey, overhead = 0): PLReport {
-  const { start, end } = rangeFor(range)
+export function priorRangeFor(key: DateRangeKey, now = new Date()): { start: Date; end: Date } {
+  const y = now.getFullYear()
+  const m = now.getMonth()
+
+  switch (key) {
+    case 'this_month':
+      return { start: new Date(y, m - 1, 1), end: new Date(y, m, 0, 23, 59, 59) }
+    case 'last_month':
+      return { start: new Date(y, m - 2, 1), end: new Date(y, m - 1, 0, 23, 59, 59) }
+    case 'this_week': {
+      const thisStart = startOfWeek(now)
+      const prevEnd = new Date(thisStart.getFullYear(), thisStart.getMonth(), thisStart.getDate() - 1, 23, 59, 59)
+      const prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), prevEnd.getDate() - 6)
+      return { start: prevStart, end: prevEnd }
+    }
+    case 'this_year':
+      return { start: new Date(y - 1, 0, 1), end: new Date(y - 1, 11, 31, 23, 59, 59) }
+  }
+}
+
+export function computePLReportForDates(jobs: Job[], start: Date, end: Date, overhead = 0): PLReport {
   const filtered = jobs.filter((j) => jobInRange(j, start, end))
 
   const expenses = { supplies: 0, travel: 0, equipment: 0, marketing: 0, labor: 0, overhead: 0, other: 0 }
@@ -107,6 +126,11 @@ export function computePLReport(jobs: Job[], range: DateRangeKey, overhead = 0):
     marginPct,
     jobCount: filtered.length,
   }
+}
+
+export function computePLReport(jobs: Job[], range: DateRangeKey, overhead = 0): PLReport {
+  const { start, end } = rangeFor(range)
+  return computePLReportForDates(jobs, start, end, overhead)
 }
 
 export function computeJobsCSV(jobs: Job[], range: DateRangeKey, labelResolver: (job: Job) => { client: string; pkg: string }): string {
