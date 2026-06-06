@@ -8,6 +8,9 @@ import type { Supply, SupplyInput, SupplyKind } from '@/lib/types'
 
 export type SupplySheetMode = 'add' | 'edit' | 'restock'
 
+const CHEMICAL_UNITS = ['oz', 'gal', 'ml', 'L'] as const
+const CONSUMABLE_UNITS = ['each', 'box', 'pack'] as const
+
 interface SupplyEditSheetProps {
   supply: Supply | null
   kind: SupplyKind
@@ -18,6 +21,10 @@ interface SupplyEditSheetProps {
   onDelete?: (id: string) => Promise<void>
   onClose: () => void
   onModeChange?: (mode: SupplySheetMode) => void
+}
+
+function unitOptions(kind: SupplyKind): readonly string[] {
+  return kind === 'consumable' ? CONSUMABLE_UNITS : CHEMICAL_UNITS
 }
 
 export default function SupplyEditSheet({
@@ -31,8 +38,10 @@ export default function SupplyEditSheet({
   onClose,
   onModeChange,
 }: SupplyEditSheetProps) {
+  const defaultUnit = kind === 'consumable' ? 'each' : 'oz'
   const [name, setName] = useState('')
-  const [unit, setUnit] = useState(kind === 'consumable' ? 'each' : 'oz')
+  const [unit, setUnit] = useState(defaultUnit)
+  const [onHand, setOnHand] = useState('')
   const [qty, setQty] = useState('')
   const [totalCost, setTotalCost] = useState('')
   const [reorderAt, setReorderAt] = useState('')
@@ -42,10 +51,18 @@ export default function SupplyEditSheet({
   const [restockCost, setRestockCost] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const activeUnit = unit.trim() || defaultUnit
+  const baseUnits = unitOptions(kind)
+  const units =
+    supply && !baseUnits.includes(supply.unit as (typeof baseUnits)[number])
+      ? [...baseUnits, supply.unit]
+      : baseUnits
+
   useEffect(() => {
     if (mode === 'add') {
       setName('')
-      setUnit(kind === 'consumable' ? 'each' : 'oz')
+      setUnit(defaultUnit)
+      setOnHand('')
       setQty('')
       setTotalCost('')
       setReorderAt('')
@@ -54,14 +71,16 @@ export default function SupplyEditSheet({
       return
     }
     if (!supply) return
+    const opts = unitOptions(kind)
     setName(supply.name)
-    setUnit(supply.unit)
+    setUnit(opts.includes(supply.unit as (typeof opts)[number]) ? supply.unit : defaultUnit)
+    setOnHand(String(supply.quantity_on_hand))
     setReorderAt(supply.reorder_threshold != null ? String(supply.reorder_threshold) : '')
     setSupplier(supply.supplier ?? '')
     setNotes(supply.notes ?? '')
     setRestockQty('')
     setRestockCost('')
-  }, [supply, mode, kind])
+  }, [supply, mode, kind, defaultUnit])
 
   const computedCostPerUnit = useMemo(() => {
     const q = Number(qty)
@@ -93,7 +112,7 @@ export default function SupplyEditSheet({
         if (!trimmed || !quantity) return
         await onSaveAdd({
           name: trimmed,
-          unit: unit.trim() || 'oz',
+          unit: activeUnit,
           quantity_on_hand: quantity,
           reorder_threshold: Number(reorderAt) || undefined,
           cost_per_unit: computedCostPerUnit || undefined,
@@ -102,9 +121,12 @@ export default function SupplyEditSheet({
           notes: notes.trim() || undefined,
         })
       } else if (mode === 'edit' && supply) {
+        const quantity = Number(onHand)
+        if (!Number.isFinite(quantity) || quantity < 0) return
         await onSaveEdit(supply.id, {
           name: name.trim(),
-          unit: unit.trim() || supply.unit,
+          unit: activeUnit,
+          quantity_on_hand: quantity,
           reorder_threshold: Number(reorderAt) || undefined,
           supplier: supplier.trim() || undefined,
           notes: notes.trim() || undefined,
@@ -128,9 +150,9 @@ export default function SupplyEditSheet({
         <div className="inv-sheet-handle" />
         <div className="inv-sheet-title">{title}</div>
         <div className="inv-sheet-subtitle">
-          {mode === 'add' && 'New catalog item — purchase cost auto-calculates per unit'}
-          {mode === 'edit' && 'Update details — use Restock to add inventory'}
-          {mode === 'restock' && 'Add stock from a purchase — updates qty and cost/unit'}
+          {mode === 'add' && 'How you measure it, how much you have, and when to reorder'}
+          {mode === 'edit' && 'Update stock counts and alert levels — use Restock after a purchase'}
+          {mode === 'restock' && 'Log a purchase to add stock and update cost per unit'}
         </div>
 
         {supply && mode !== 'add' && onModeChange && (
@@ -152,16 +174,9 @@ export default function SupplyEditSheet({
           </div>
         )}
 
-        {mode === 'edit' && supply && (
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
-            <div>
-              On hand: <strong style={{ color: 'var(--text-primary)' }}>{supply.quantity_on_hand} {supply.unit}</strong>
-            </div>
-            <div>
-              {supply.cost_per_unit != null && supply.cost_per_unit > 0
-                ? <>Cost: <strong style={{ color: 'var(--green-text)' }}>{fmtDetailed(supply.cost_per_unit)}/{supply.unit}</strong></>
-                : <span style={{ color: 'var(--amber-text)' }}>No cost set — use Restock after a purchase to calculate $/unit</span>}
-            </div>
+        {mode === 'edit' && supply && supply.cost_per_unit != null && supply.cost_per_unit > 0 && (
+          <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 16 }}>
+            Cost: {fmtDetailed(supply.cost_per_unit)}/{activeUnit}
           </div>
         )}
 
@@ -175,26 +190,50 @@ export default function SupplyEditSheet({
               placeholder="Item name"
             />
 
-            <label className="inv-field-label">UNIT</label>
+            <label className="inv-field-label">MEASURE IN</label>
+            <select
+              className="inv-field-input"
+              value={activeUnit}
+              onChange={(e) => setUnit(e.target.value)}
+            >
+              {units.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8, marginBottom: 12 }}>
+              All amounts below use this unit ({activeUnit})
+            </div>
+          </>
+        )}
+
+        {mode === 'edit' && (
+          <>
+            <label className="inv-field-label">QUANTITY ON HAND ({activeUnit})</label>
             <input
               className="inv-field-input"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              placeholder={kind === 'consumable' ? 'each' : 'oz'}
+              type="number"
+              min={0}
+              step={activeUnit === 'each' ? 1 : 0.5}
+              value={onHand}
+              onChange={(e) => setOnHand(e.target.value)}
+              placeholder={`e.g. 128 ${activeUnit}`}
             />
           </>
         )}
 
         {mode === 'add' && (
           <>
-            <label className="inv-field-label">INITIAL QUANTITY</label>
+            <label className="inv-field-label">STARTING AMOUNT ({activeUnit})</label>
             <input
               className="inv-field-input"
               type="number"
               min={0}
+              step={activeUnit === 'each' ? 1 : 0.5}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              placeholder="e.g. 128"
+              placeholder={`e.g. 128 ${activeUnit}`}
             />
 
             <label className="inv-field-label">TOTAL PAID ($)</label>
@@ -210,7 +249,7 @@ export default function SupplyEditSheet({
 
             {computedCostPerUnit > 0 && (
               <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 12 }}>
-                Cost per {unit || 'unit'}: {fmtDetailed(computedCostPerUnit)}
+                Cost per {activeUnit}: {fmtDetailed(computedCostPerUnit)}
               </div>
             )}
           </>
@@ -219,18 +258,19 @@ export default function SupplyEditSheet({
         {mode === 'restock' && supply && (
           <>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
-              On hand: {supply.quantity_on_hand} {supply.unit}
+              Currently on hand: {supply.quantity_on_hand} {supply.unit}
               {supply.cost_per_unit ? ` · ${fmtDetailed(supply.cost_per_unit)}/${supply.unit}` : ''}
             </div>
 
-            <label className="inv-field-label">QUANTITY ADDED</label>
+            <label className="inv-field-label">ADD TO STOCK ({supply.unit})</label>
             <input
               className="inv-field-input"
               type="number"
               min={0}
+              step={supply.unit === 'each' ? 1 : 0.5}
               value={restockQty}
               onChange={(e) => setRestockQty(e.target.value)}
-              placeholder="e.g. 128"
+              placeholder={`e.g. 128 ${supply.unit}`}
             />
 
             <label className="inv-field-label">TOTAL PAID ($)</label>
@@ -254,15 +294,19 @@ export default function SupplyEditSheet({
 
         {mode !== 'restock' && (
           <>
-            <label className="inv-field-label">REORDER AT (optional)</label>
+            <label className="inv-field-label">LOW STOCK ALERT AT ({activeUnit})</label>
             <input
               className="inv-field-input"
               type="number"
               min={0}
+              step={activeUnit === 'each' ? 1 : 0.5}
               value={reorderAt}
               onChange={(e) => setReorderAt(e.target.value)}
-              placeholder="Low-stock alert threshold"
+              placeholder={`e.g. 32 ${activeUnit}`}
             />
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8, marginBottom: 12 }}>
+              Shows LOW when on hand drops below this amount
+            </div>
 
             <label className="inv-field-label">SUPPLIER (optional)</label>
             <input
