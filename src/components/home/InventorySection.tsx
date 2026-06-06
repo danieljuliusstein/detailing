@@ -17,6 +17,7 @@ import SupplyEditSheet, { type SupplySheetMode } from './SupplyEditSheet'
 import {
   createEquipment,
   createSupply,
+  createSupplyPurchase,
   deleteEquipment,
   deleteSupply,
   getEquipment,
@@ -447,7 +448,19 @@ export default function InventorySection() {
             await reload()
           }}
           onRestock={async (id, quantity, totalCost) => {
-            await restockSupply(id, { quantity, total_cost: totalCost || undefined })
+            const supply = catalog.find((s) => s.id === id)
+            if (totalCost > 0 && supply) {
+              await createSupplyPurchase({
+                date: new Date().toISOString().slice(0, 10),
+                name: supply.name,
+                amount: totalCost,
+                quantity,
+                supply_id: id,
+                vendor: supply.supplier,
+              })
+            } else {
+              await restockSupply(id, { quantity, total_cost: totalCost || undefined })
+            }
             await reload()
           }}
           onDelete={async (id) => {

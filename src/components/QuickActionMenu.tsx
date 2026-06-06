@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Briefcase, Receipt, UserPlus } from '@phosphor-icons/react'
+import { Briefcase, Flask, Receipt, UserPlus } from '@phosphor-icons/react'
 import { useQuickAction } from '@/providers/QuickActionContext'
 
 interface ActionItem {
@@ -15,7 +15,7 @@ interface ActionItem {
 
 export default function QuickActionMenu() {
   const router = useRouter()
-  const { menuOpen, closeMenu, openExpenseSheet } = useQuickAction()
+  const { menuOpen, closeMenu, openExpenseSheet, openSupplyPurchaseSheet } = useQuickAction()
   const firstActionRef = useRef<HTMLButtonElement>(null)
 
   const actions: ActionItem[] = [
@@ -35,6 +35,13 @@ export default function QuickActionMenu() {
       subtitle: 'One-time payment like LLC renewal',
       Icon: Receipt,
       onSelect: openExpenseSheet,
+    },
+    {
+      id: 'buy-supplies',
+      label: 'Buy supplies',
+      subtitle: 'Chemicals and consumables → expense + inventory',
+      Icon: Flask,
+      onSelect: openSupplyPurchaseSheet,
     },
     {
       id: 'add-client',

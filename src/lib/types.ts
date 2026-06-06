@@ -77,6 +77,7 @@ export type BusinessExpenseCategory =
   | 'marketing'
   | 'software'
   | 'equipment'
+  | 'supplies'
   | 'other'
 
 export interface BusinessExpense {
@@ -87,6 +88,10 @@ export interface BusinessExpense {
   category?: BusinessExpenseCategory
   vendor?: string
   notes?: string
+  supply_id?: string
+  quantity?: number
+  snapshot_qty_on_hand?: number
+  snapshot_cost_per_unit?: number
 }
 
 export interface BusinessExpenseInput {
@@ -96,6 +101,21 @@ export interface BusinessExpenseInput {
   category?: BusinessExpenseCategory
   vendor?: string
   notes?: string
+  supply_id?: string
+  quantity?: number
+  snapshot_qty_on_hand?: number
+  snapshot_cost_per_unit?: number
+}
+
+export interface SupplyPurchaseInput {
+  date: string
+  name: string
+  amount: number
+  quantity: number
+  vendor?: string
+  notes?: string
+  supply_id?: string
+  new_supply?: SupplyInput
 }
 
 export interface PhotoMeta {

@@ -12,6 +12,8 @@ import * as overheadLocal from './overhead-local'
 import * as overheadPb from './overhead-pocketbase'
 import * as businessExpensesLocal from './business-expenses-local'
 import * as businessExpensesPb from './business-expenses-pocketbase'
+import * as supplyPurchasesLocal from './supply-purchases-local'
+import * as supplyPurchasesPb from './supply-purchases-pocketbase'
 import * as photosLocal from './photos-local'
 import * as photosPb from './photos-pocketbase'
 import * as pb from './pocketbase'
@@ -64,6 +66,7 @@ import type {
   RestockInput,
   Supply,
   SupplyInput,
+  SupplyPurchaseInput,
   WeekDay,
 } from '../types'
 
@@ -499,6 +502,45 @@ export async function deleteBusinessExpense(id: string): Promise<boolean> {
     local: () => businessExpensesLocal.deleteBusinessExpense(id),
     pocketbase: () => businessExpensesPb.deleteBusinessExpense(id),
     buildQueue: () => ({ type: 'deleteBusinessExpense', params: { id } }),
+  })
+}
+
+export async function createSupplyPurchase(input: SupplyPurchaseInput): Promise<BusinessExpense> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => supplyPurchasesLocal.createSupplyPurchase(input),
+    pocketbase: () => supplyPurchasesPb.createSupplyPurchase(input),
+    buildQueue: (expense) => ({
+      type: 'createSupplyPurchase',
+      params: input,
+      localBusinessExpenseId: expense.id,
+      localSupplyId: expense.supply_id,
+    }),
+  })
+}
+
+export async function updateSupplyPurchase(
+  id: string,
+  input: Partial<SupplyPurchaseInput>
+): Promise<BusinessExpense | null> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => supplyPurchasesLocal.updateSupplyPurchase(id, input),
+    pocketbase: () => supplyPurchasesPb.updateSupplyPurchase(id, input),
+    buildQueue: (expense) =>
+      expense ? { type: 'updateSupplyPurchase', params: { id, input } } : null,
+  })
+}
+
+export async function deleteSupplyPurchase(id: string): Promise<boolean> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => supplyPurchasesLocal.deleteSupplyPurchase(id),
+    pocketbase: () => supplyPurchasesPb.deleteSupplyPurchase(id),
+    buildQueue: () => ({ type: 'deleteSupplyPurchase', params: { id } }),
   })
 }
 

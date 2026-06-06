@@ -21,6 +21,9 @@ export type QueueOperation =
   | { type: 'createBusinessExpense'; params: import('./types').BusinessExpenseInput; localBusinessExpenseId: string }
   | { type: 'updateBusinessExpense'; params: { id: string; input: Partial<import('./types').BusinessExpenseInput> } }
   | { type: 'deleteBusinessExpense'; params: { id: string } }
+  | { type: 'createSupplyPurchase'; params: import('./types').SupplyPurchaseInput; localBusinessExpenseId: string; localSupplyId?: string }
+  | { type: 'updateSupplyPurchase'; params: { id: string; input: Partial<import('./types').SupplyPurchaseInput> } }
+  | { type: 'deleteSupplyPurchase'; params: { id: string } }
   | { type: 'uploadJobPhoto'; params: { jobId: string; dataUrl: string; photoType: import('./types').PhotoType; filename: string } }
   | { type: 'deleteJobPhoto'; params: { jobId: string; filename: string } }
 

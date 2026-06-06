@@ -52,15 +52,15 @@ export function inventoryDeltaFromUsageChange(
     .map(([supply_id, quantity_used]) => ({ supply_id, quantity_used }))
 }
 
+/** Option A: supplies expensed at purchase; jobs only deduct inventory, no supplies P&L line. */
 export function applySupplyExpenses(
   suppliesUsed: SupplyUsage[],
-  catalog: Supply[],
+  _catalog: Supply[],
   existingExpenses: ExpenseLine[] = []
 ): { supplies_used: SupplyUsage[]; expenses: ExpenseLine[] } {
-  const supplyLine = buildSupplyExpenseLine(suppliesUsed, catalog)
   return {
     supplies_used: suppliesUsed,
-    expenses: mergeSupplyExpense(existingExpenses, supplyLine),
+    expenses: mergeSupplyExpense(existingExpenses, null),
   }
 }
 

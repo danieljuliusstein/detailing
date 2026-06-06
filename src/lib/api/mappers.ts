@@ -1,6 +1,7 @@
 import type {
   BusinessExpense,
   BusinessExpenseCategory,
+  BusinessExpenseInput,
   Client,
   Equipment,
   ExpenseLine,
@@ -272,8 +273,9 @@ export function appEquipmentToPb(input: {
 export function pbBusinessExpenseToApp(r: PbRecord): BusinessExpense {
   const category = str(r.category) as BusinessExpenseCategory | undefined
   const valid: BusinessExpenseCategory[] = [
-    'legal', 'licensing', 'taxes', 'insurance', 'vehicle', 'marketing', 'software', 'equipment', 'other',
+    'legal', 'licensing', 'taxes', 'insurance', 'vehicle', 'marketing', 'software', 'equipment', 'supplies', 'other',
   ]
+  const supplyId = r.supply_id
   return {
     id: r.id,
     date: String(r.date ?? '').slice(0, 10),
@@ -282,17 +284,14 @@ export function pbBusinessExpenseToApp(r: PbRecord): BusinessExpense {
     category: category && valid.includes(category) ? category : 'other',
     vendor: str(r.vendor),
     notes: str(r.notes),
+    supply_id: typeof supplyId === 'string' && supplyId ? supplyId : undefined,
+    quantity: typeof r.quantity === 'number' ? r.quantity : undefined,
+    snapshot_qty_on_hand: typeof r.snapshot_qty_on_hand === 'number' ? r.snapshot_qty_on_hand : undefined,
+    snapshot_cost_per_unit: typeof r.snapshot_cost_per_unit === 'number' ? r.snapshot_cost_per_unit : undefined,
   }
 }
 
-export function appBusinessExpenseToPb(input: {
-  date: string
-  name: string
-  amount: number
-  category?: BusinessExpenseCategory
-  vendor?: string
-  notes?: string
-}) {
+export function appBusinessExpenseToPb(input: BusinessExpenseInput) {
   return {
     date: input.date,
     name: input.name,
@@ -300,6 +299,10 @@ export function appBusinessExpenseToPb(input: {
     category: input.category ?? 'other',
     vendor: input.vendor ?? '',
     notes: input.notes ?? '',
+    supply_id: input.supply_id ?? '',
+    quantity: input.quantity ?? 0,
+    snapshot_qty_on_hand: input.snapshot_qty_on_hand ?? 0,
+    snapshot_cost_per_unit: input.snapshot_cost_per_unit ?? 0,
   }
 }
 

@@ -15,6 +15,7 @@ import {
 import * as invPb from './invoices-pocketbase'
 import * as overheadPb from './overhead-pocketbase'
 import * as businessExpensesPb from './business-expenses-pocketbase'
+import * as supplyPurchasesPb from './supply-purchases-pocketbase'
 import * as photosPb from './photos-pocketbase'
 import * as pb from './pocketbase'
 import * as equipmentPb from './equipment-pocketbase'
@@ -210,6 +211,26 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
     case 'deleteBusinessExpense': {
       const expenseId = maps.resolveBusinessExpense(op.params.id)
       await businessExpensesPb.deleteBusinessExpense(expenseId)
+      break
+    }
+    case 'createSupplyPurchase': {
+      const params = { ...op.params }
+      if (params.supply_id) params.supply_id = maps.resolveSupply(params.supply_id)
+      const expense = await supplyPurchasesPb.createSupplyPurchase(params)
+      maps.businessExpenses.set(op.localBusinessExpenseId, expense.id)
+      if (op.localSupplyId && expense.supply_id) {
+        maps.supplies.set(op.localSupplyId, expense.supply_id)
+      }
+      break
+    }
+    case 'updateSupplyPurchase': {
+      const expenseId = maps.resolveBusinessExpense(op.params.id)
+      await supplyPurchasesPb.updateSupplyPurchase(expenseId, op.params.input)
+      break
+    }
+    case 'deleteSupplyPurchase': {
+      const expenseId = maps.resolveBusinessExpense(op.params.id)
+      await supplyPurchasesPb.deleteSupplyPurchase(expenseId)
       break
     }
     case 'uploadJobPhoto': {

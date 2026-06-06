@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import BusinessExpenseSheet from '@/components/business/BusinessExpenseSheet'
+import SupplyPurchaseSheet from '@/components/business/SupplyPurchaseSheet'
 import { getBusinessExpenses } from '@/lib/api'
+import { isSupplyPurchase } from '@/lib/supply-purchase-logic'
 import { fmtDetailed } from '@/lib/calculations'
 import type { BusinessExpense } from '@/lib/types'
 
@@ -135,6 +137,7 @@ export default function BusinessExpenses() {
             <div style={{ fontSize: 14, fontWeight: 600 }}>{e.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               {formatRowDate(e.date)} · {e.category ?? 'other'}
+              {isSupplyPurchase(e) && e.quantity ? ` · ${e.quantity} units` : ''}
               {e.vendor ? ` · ${e.vendor}` : ''}
             </div>
           </div>
@@ -144,12 +147,14 @@ export default function BusinessExpenses() {
         </button>
       ))}
 
-      {(showAdd || editing) && (
-        <BusinessExpenseSheet
-          expense={editing}
-          onClose={closeSheet}
-          onSaved={handleSaved}
-        />
+      {showAdd && (
+        <BusinessExpenseSheet expense={null} onClose={closeSheet} onSaved={handleSaved} />
+      )}
+      {editing && isSupplyPurchase(editing) && (
+        <SupplyPurchaseSheet expense={editing} onClose={closeSheet} onSaved={handleSaved} />
+      )}
+      {editing && !isSupplyPurchase(editing) && (
+        <BusinessExpenseSheet expense={editing} onClose={closeSheet} onSaved={handleSaved} />
       )}
     </div>
   )
