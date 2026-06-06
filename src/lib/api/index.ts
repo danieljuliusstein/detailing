@@ -88,35 +88,40 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
     }
   }
 
-  try {
-    await pb.seedPackagesIfEmpty()
-  } catch (err) {
-    console.warn('[api] Package seed failed:', err)
-  }
-  try {
-    await suppliesPb.seedSuppliesIfEmpty()
-  } catch (err) {
-    console.warn('[api] Supply seed failed:', err)
-  }
-  try {
-    await migrateLocalToPocketBase()
-  } catch (err) {
-    console.warn('[api] Local data migration failed:', err)
-  }
-  try {
-    await flushOfflineQueue()
-  } catch (err) {
-    console.warn('[api] Offline queue flush failed:', err)
-  }
   clearWriteDegraded()
   const { loadSettingsAsync } = await import('../settings')
   await loadSettingsAsync()
+
+  // Non-blocking — keeps mobile connect fast on slow networks
+  void (async () => {
+    try {
+      await pb.seedPackagesIfEmpty()
+    } catch (err) {
+      console.warn('[api] Package seed failed:', err)
+    }
+    try {
+      await suppliesPb.seedSuppliesIfEmpty()
+    } catch (err) {
+      console.warn('[api] Supply seed failed:', err)
+    }
+    try {
+      await migrateLocalToPocketBase()
+    } catch (err) {
+      console.warn('[api] Local data migration failed:', err)
+    }
+    try {
+      await flushOfflineQueue()
+    } catch (err) {
+      console.warn('[api] Offline queue flush failed:', err)
+    }
+  })()
+
   return 'pocketbase'
 }
 
 async function initBackend(): Promise<'local' | 'pocketbase'> {
   try {
-    backend = await withTimeout(initBackendInner(), 12_000, 'Backend init')
+    backend = await withTimeout(initBackendInner(), 25_000, 'Backend init')
   } catch (err) {
     console.warn('[api] PocketBase init failed, using local storage:', err)
     backend = 'local'

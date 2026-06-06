@@ -192,11 +192,32 @@ export default function Settings() {
         <div style={{ fontSize: 22, fontWeight: 600 }}>Settings</div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Data backend</span>
-        <span className={`badge ${backend === 'pocketbase' ? 'badge-paid' : 'badge-draft'}`}>
-          {backend === '…' ? 'Checking…' : backend === 'pocketbase' ? 'PocketBase' : 'Local storage'}
-        </span>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Data backend</span>
+          <span className={`badge ${backend === 'pocketbase' ? 'badge-paid' : 'badge-draft'}`}>
+            {backend === '…' ? 'Checking…' : backend === 'pocketbase' ? 'PocketBase' : 'Local storage'}
+          </span>
+        </div>
+        {backend === 'local' && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--amber)', lineHeight: 1.45, marginBottom: 8 }}>
+              Showing data stored on this device only. Connect to PocketBase to load your real jobs and clients.
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ width: '100%' }}
+              onClick={async () => {
+                resetBackend()
+                await refreshSync()
+                window.location.reload()
+              }}
+            >
+              Reconnect to cloud
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="section-title">Business</div>

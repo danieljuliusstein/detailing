@@ -17,7 +17,7 @@ export function isPocketBaseConfigured(): boolean {
   return !!process.env.NEXT_PUBLIC_PB_URL
 }
 
-export async function checkPocketBaseHealth(timeoutMs = 4000): Promise<boolean> {
+export async function checkPocketBaseHealth(timeoutMs = 8000): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_PB_URL
   if (!url) return false
 

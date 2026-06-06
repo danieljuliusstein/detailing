@@ -1,3 +1,4 @@
+import { isPocketBaseConfigured } from './pocketbase'
 import type { Client, Invoice, Job, OverheadExpense, Package, Supply } from './types'
 
 const STORAGE_KEY = 'detailing_app_data_v1'
@@ -169,25 +170,45 @@ export function createSeedData(): AppData {
   return { packages, clients, jobs, invoices, supplies, overhead_expenses, job_photos: {} }
 }
 
+/** Empty store — used when PocketBase is configured so we never show demo seed data on fallback. */
+export function createEmptyData(): AppData {
+  return {
+    packages: [],
+    clients: [],
+    jobs: [],
+    invoices: [],
+    supplies: [],
+    overhead_expenses: [],
+    job_photos: {},
+  }
+}
+
+function defaultLocalData(): AppData {
+  return isPocketBaseConfigured() ? createEmptyData() : createSeedData()
+}
+
 export function loadData(): AppData {
   if (typeof window === 'undefined') return createSeedData()
 
   const raw = localStorage.getItem(STORAGE_KEY)
   if (!raw) {
-    const seed = createSeedData()
-    saveData(seed)
-    return seed
+    const initial = defaultLocalData()
+    // Only persist demo seed for offline-only dev; production phones should not get Marcus/Sarah demo jobs.
+    if (!isPocketBaseConfigured()) {
+      saveData(initial)
+    }
+    return initial
   }
 
   const parsed = JSON.parse(raw) as Partial<AppData>
-  const seed = createSeedData()
+  const fallback = defaultLocalData()
   return {
-    packages: parsed.packages ?? seed.packages,
-    clients: parsed.clients ?? seed.clients,
-    jobs: parsed.jobs ?? seed.jobs,
-    invoices: parsed.invoices ?? seed.invoices,
-    supplies: parsed.supplies ?? seed.supplies,
-    overhead_expenses: parsed.overhead_expenses ?? seed.overhead_expenses,
+    packages: parsed.packages ?? fallback.packages,
+    clients: parsed.clients ?? fallback.clients,
+    jobs: parsed.jobs ?? fallback.jobs,
+    invoices: parsed.invoices ?? fallback.invoices,
+    supplies: parsed.supplies ?? fallback.supplies,
+    overhead_expenses: parsed.overhead_expenses ?? fallback.overhead_expenses,
     job_photos: parsed.job_photos ?? {},
   }
 }
