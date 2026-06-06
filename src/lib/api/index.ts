@@ -88,16 +88,8 @@ async function initBackendInner(): Promise<'local' | 'pocketbase'> {
     return 'local'
   }
 
-  if (!isPocketBaseAuthenticated()) {
-    const authed = await ensurePocketBaseAuth()
-    if (!authed) {
-      return 'local'
-    }
-  } else {
-    const authed = await ensurePocketBaseAuth()
-    if (!authed) {
-      return 'local'
-    }
+  if (!(await ensurePocketBaseAuth())) {
+    return 'local'
   }
 
   clearWriteDegraded()
