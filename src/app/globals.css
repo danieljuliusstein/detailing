@@ -812,6 +812,8 @@ html, body {
   margin: 0 auto;
   background: var(--bg-base);
   position: relative;
+  /* Standalone PWA: keep content below notch/status bar (viewport-fit: cover) */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .auth-loading-screen {
