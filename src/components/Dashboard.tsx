@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation'
 import { Car, Gear } from '@phosphor-icons/react'
 import { timeAgo } from '@/lib/client-relationship-logic'
 import type { ClientWithStats, DashboardKpis, RecentJobRow, WeekDay } from '@/lib/types'
-import InventorySection from '@/components/home/InventorySection'
 import { fmt } from '@/lib/calculations'
 
 interface DashboardProps {
@@ -172,7 +171,6 @@ export default function Dashboard({ kpis, recentJobs, jobsToday, weekDays, dayJo
         ))
       )}
 
-      <InventorySection />
     </div>
   )
 }

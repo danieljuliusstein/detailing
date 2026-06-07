@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Briefcase, FileText, Flask, Receipt, UserPlus } from '@phosphor-icons/react'
+import { Briefcase, FileText, Flask, Receipt, Warehouse } from '@phosphor-icons/react'
 import { useQuickAction } from '@/providers/QuickActionContext'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
 
@@ -55,13 +55,13 @@ export default function QuickActionMenu() {
       onSelect: openSupplyPurchaseSheet,
     },
     {
-      id: 'add-client',
-      label: 'Add client',
-      subtitle: 'New customer contact',
-      Icon: UserPlus,
+      id: 'inventory',
+      label: 'Inventory',
+      subtitle: 'Chemicals, equipment, supplies & wish list',
+      Icon: Warehouse,
       onSelect: () => {
         closeMenu()
-        router.push('/clients/new')
+        router.push('/inventory')
       },
     },
   ]

@@ -186,7 +186,7 @@ export async function runNotificationsCron(): Promise<CronResult> {
         const push = await sendPushNotification({
           title: 'Low inventory',
           body: `${supply.name}: ${qty} ${supply.unit} on hand`,
-          url: '/settings/inventory',
+          url: '/inventory',
         })
         result.pushed += push.sent
         result.pushFailed += push.failed

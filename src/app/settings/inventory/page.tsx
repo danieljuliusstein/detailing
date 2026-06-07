@@ -1,7 +1,12 @@
 'use client'
 
-import Inventory from '@/components/Inventory'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-export default function InventoryPage() {
-  return <Inventory />
+export default function SettingsInventoryRedirect() {
+  const router = useRouter()
+  useEffect(() => {
+    router.replace('/inventory')
+  }, [router])
+  return null
 }

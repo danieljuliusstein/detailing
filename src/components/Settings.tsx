@@ -304,7 +304,7 @@ export default function Settings() {
       <div className="card" style={{ marginBottom: 20 }}>
         <div
           className="card-pressable"
-          onClick={() => router.push('/settings/inventory')}
+          onClick={() => router.push('/inventory')}
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0, padding: '10px 0', border: 'none', background: 'transparent' }}
         >
           <span style={{ fontSize: 14 }}>Inventory</span>
