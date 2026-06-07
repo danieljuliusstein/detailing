@@ -1,6 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode, type TouchEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type TouchEvent,
+} from 'react'
 import { Trash } from '@phosphor-icons/react'
 import RowContextMenu from './RowContextMenu'
 
@@ -42,8 +49,19 @@ export default function SwipeableRow({
     movedX: 0,
   })
   const blockClickRef = useRef(false)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const isOpen = openRowId === rowId
+
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    const blockScrollDuringHorizontalSwipe = (e: globalThis.TouchEvent) => {
+      if (gesture.current.axis === 'x') e.preventDefault()
+    }
+    el.addEventListener('touchmove', blockScrollDuringHorizontalSwipe, { passive: false })
+    return () => el.removeEventListener('touchmove', blockScrollDuringHorizontalSwipe)
+  }, [])
 
   useEffect(() => {
     if (!isOpen) setOffset(0)
@@ -168,6 +186,7 @@ export default function SwipeableRow({
           </div>
         )}
         <div
+          ref={contentRef}
           className="swipe-row-content"
           style={{
             transform: `translateX(${offset}px)`,
