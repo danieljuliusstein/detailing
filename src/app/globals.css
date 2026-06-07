@@ -354,6 +354,8 @@ html, body {
   left: 0;
   right: 0;
   pointer-events: auto;
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .quick-action-backdrop {
@@ -373,6 +375,7 @@ html, body {
 .quick-action-sheet {
   position: relative;
   width: 100%;
+  touch-action: pan-y;
   background: var(--inv-sheet);
   border-radius: 20px 20px 0 0;
   border-top: 0.5px solid #2e2e2e;
@@ -1098,6 +1101,8 @@ html, body {
   margin: 0 auto;
   left: 0;
   right: 0;
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .inv-sheet-overlay {
@@ -1115,6 +1120,7 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  touch-action: pan-y;
   background: var(--inv-sheet);
   border-radius: 20px 20px 0 0;
   border-top: 0.5px solid #2e2e2e;
@@ -1128,6 +1134,8 @@ html, body {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   padding-bottom: 8px;
 }
 

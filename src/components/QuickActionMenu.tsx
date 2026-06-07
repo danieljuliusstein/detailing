@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Briefcase, FileText, Flask, Receipt, UserPlus } from '@phosphor-icons/react'
 import { useQuickAction } from '@/providers/QuickActionContext'
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
 
 interface ActionItem {
   id: string
@@ -67,11 +68,10 @@ export default function QuickActionMenu() {
 
   useEffect(() => {
     if (!menuOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    lockBodyScroll()
     firstActionRef.current?.focus()
     return () => {
-      document.body.style.overflow = prev
+      unlockBodyScroll()
     }
   }, [menuOpen])
 

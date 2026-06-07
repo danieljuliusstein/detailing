@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from '@phosphor-icons/react'
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
 
 interface BottomSheetProps {
   title: string
@@ -22,14 +23,13 @@ export default function BottomSheet({
   footer,
 }: BottomSheetProps) {
   useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    lockBodyScroll()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      unlockBodyScroll()
       window.removeEventListener('keydown', onKey)
     }
   }, [onClose])
