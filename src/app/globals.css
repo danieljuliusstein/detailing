@@ -998,11 +998,12 @@ html, body {
   width: 100%;
   padding: 10px 0;
   gap: 12px;
-  background: none;
+  background: inherit;
   border: none;
   cursor: pointer;
   text-align: left;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .inv-item-row:active {
@@ -1166,8 +1167,6 @@ html, body {
   z-index: 1;
   /* Opaque match for inv-sub-body (rgba(0,0,0,0.15) on --inv-card) — hides delete zone at rest */
   background: #1a1a1a;
-  /* pan-x: vertical drags pass through to the page; horizontal handled in JS for swipe-delete */
-  touch-action: pan-x;
 }
 
 .swipe-row-content .inv-item-row {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   CaretDown,
   Flask,
@@ -90,6 +90,25 @@ const SECTIONS: {
     isWishlist: true,
   },
 ]
+
+function InventoryItemRow({ onPress, children }: { onPress: () => void; children: ReactNode }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className="inv-item-row"
+      onClick={onPress}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onPress()
+        }
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 function notifyLowStock(name: string) {
   if (typeof window === 'undefined' || !('Notification' in window)) return
@@ -287,10 +306,8 @@ export default function InventoryPage() {
                         deleteConfirmMessage={`Remove "${item.name}" from your wish list?`}
                         showDivider={index < wishlist.length - 1}
                       >
-                        <button
-                          type="button"
-                          className="inv-item-row"
-                          onClick={() => {
+                        <InventoryItemRow
+                          onPress={() => {
                             setSwipedRowId(null)
                             setAddingWishlist(false)
                             setEditingWishlist(item)
@@ -303,7 +320,7 @@ export default function InventoryPage() {
                               <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
                             </span>
                           </div>
-                        </button>
+                        </InventoryItemRow>
                       </SwipeableRow>
                     ))}
 
@@ -323,10 +340,8 @@ export default function InventoryPage() {
                         deleteConfirmMessage={`Delete "${item.name}" from equipment?`}
                         showDivider={index < equipment.length - 1}
                       >
-                        <button
-                          type="button"
-                          className="inv-item-row"
-                          onClick={() => {
+                        <InventoryItemRow
+                          onPress={() => {
                             setSwipedRowId(null)
                             setAddingEquipment(false)
                             setEditingEquipment(item)
@@ -342,7 +357,7 @@ export default function InventoryPage() {
                               <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
                             </span>
                           </div>
-                        </button>
+                        </InventoryItemRow>
                       </SwipeableRow>
                     ))}
 
@@ -360,10 +375,8 @@ export default function InventoryPage() {
                           deleteConfirmMessage={`Delete "${item.name}" from inventory?`}
                           showDivider={index < sectionItems.length - 1}
                         >
-                          <button
-                            type="button"
-                            className="inv-item-row"
-                            onClick={() => {
+                          <InventoryItemRow
+                            onPress={() => {
                               setSwipedRowId(null)
                               openSupplyEdit(item, section.supplyKind!)
                             }}
@@ -383,7 +396,7 @@ export default function InventoryPage() {
                                 <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
                               </span>
                             </div>
-                          </button>
+                          </InventoryItemRow>
                         </SwipeableRow>
                       )
                     })}
