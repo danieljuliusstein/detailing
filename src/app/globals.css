@@ -1114,6 +1114,7 @@ html, body {
   max-height: 88vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--inv-sheet);
   border-radius: 20px 20px 0 0;
   border-top: 0.5px solid #2e2e2e;
@@ -1147,11 +1148,48 @@ html, body {
   margin: 0 auto 20px;
 }
 
+.inv-sheet-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.inv-sheet-top-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.inv-sheet-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #252525;
+  border: 0.5px solid #333;
+  border-radius: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inv-sheet-close:active {
+  background: #2e2e2e;
+}
+
 .inv-sheet-title {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 4px;
+}
+
+.inv-sheet-top .inv-sheet-subtitle {
+  margin-bottom: 0;
 }
 
 .inv-sheet-subtitle {
@@ -1367,6 +1405,24 @@ html, body {
   background: var(--inv-sheet);
   border: 0.5px solid var(--text-primary);
   color: var(--text-primary);
+}
+
+.inv-sheet-cancel {
+  flex: 1;
+  background: transparent;
+  border: 0.5px solid #333;
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 13px;
+  cursor: pointer;
+}
+
+.inv-sheet-actions--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 /* Jobs revenue chart */

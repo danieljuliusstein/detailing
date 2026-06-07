@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import BottomSheet from '@/components/BottomSheet'
 
 export interface JobExpenseDraft {
   travel_cost: number
@@ -29,13 +30,22 @@ export default function JobExpensesSheet({ value, onSave, onClose }: JobExpenses
   }
 
   return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true" aria-label="Job expenses">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-title">Job expenses</div>
-        <div className="inv-sheet-subtitle">Travel, marketing, and equipment for this job</div>
-
+    <BottomSheet
+      title="Job expenses"
+      subtitle="Travel, marketing, and equipment for this job"
+      ariaLabel="Job expenses"
+      onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--split">
+          <button type="button" className="inv-sheet-save" onClick={handleSave}>
+            Done
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      }
+    >
         <label className="inv-field-label">Travel / gas</label>
         <input
           type="number"
@@ -66,10 +76,6 @@ export default function JobExpensesSheet({ value, onSave, onClose }: JobExpenses
           style={{ marginBottom: 20 }}
         />
 
-        <button type="button" className="inv-sheet-save" onClick={handleSave}>
-          Done
-        </button>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

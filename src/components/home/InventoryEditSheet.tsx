@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Trash } from '@phosphor-icons/react'
+import BottomSheet from '@/components/BottomSheet'
 import {
   categoryLabel,
   formatUpdatedDate,
@@ -66,13 +67,33 @@ export default function InventoryEditSheet({
     : `${categoryLabel(category)} · last updated ${item ? formatUpdatedDate(item.updatedAt) : '—'}`
 
   return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-title">{isNew ? `Add ${categoryLabel(category).toLowerCase()}` : name || 'Edit item'}</div>
-        <div className="inv-sheet-subtitle">{subtitle}</div>
-
+    <BottomSheet
+      title={isNew ? `Add ${categoryLabel(category).toLowerCase()}` : name || 'Edit item'}
+      subtitle={subtitle}
+      onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--split">
+          {!isNew ? (
+            <button
+              type="button"
+              className="inv-sheet-delete"
+              onClick={onDelete}
+              aria-label="Delete item"
+              style={{ gridColumn: '1 / -1', width: '100%' }}
+            >
+              <Trash size={18} weight="bold" color="#f87171" />
+            </button>
+          ) : null}
+          <button type="button" className="inv-sheet-save inv-sheet-save--outline" onClick={handleSave}>
+            {isNew ? 'Add item' : 'Save changes'}
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      }
+    >
+      <div className="inv-sheet-body">
         <label className="inv-field-label">NAME</label>
         <input
           className="inv-field-input"
@@ -124,18 +145,7 @@ export default function InventoryEditSheet({
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. almost out, need 1 gallon jug..."
         />
-
-        <div className="inv-sheet-actions">
-          {!isNew && (
-            <button type="button" className="inv-sheet-delete" onClick={onDelete} aria-label="Delete item">
-              <Trash size={18} weight="bold" color="#f87171" />
-            </button>
-          )}
-          <button type="button" className="inv-sheet-save inv-sheet-save--outline" onClick={handleSave}>
-            {isNew ? 'Add item' : 'Save changes'}
-          </button>
-        </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

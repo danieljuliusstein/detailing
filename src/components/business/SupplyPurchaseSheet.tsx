@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { CaretDown, Trash } from '@phosphor-icons/react'
+import BottomSheet from '@/components/BottomSheet'
 import { costPerUnitFromPurchase } from '@/lib/supplies-logic'
 import { isSupplyPurchase } from '@/lib/supply-purchase-logic'
 import {
@@ -282,17 +283,34 @@ export default function SupplyPurchaseSheet({
   }
 
   return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true" aria-label="Buy supplies">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-header">
-          <div className="inv-sheet-title">{isEdit ? 'Edit supply purchase' : 'Buy supplies'}</div>
-          <div className="inv-sheet-subtitle">
-            Expense hits P&amp;L this month and stock is added to inventory
-          </div>
+    <BottomSheet
+      title={isEdit ? 'Edit supply purchase' : 'Buy supplies'}
+      subtitle="Expense hits P&L this month and stock is added to inventory"
+      ariaLabel="Buy supplies"
+      onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--split">
+          {isEdit ? (
+            <button
+              type="button"
+              className="inv-sheet-delete"
+              onClick={handleDelete}
+              disabled={saving}
+              aria-label="Delete purchase"
+              style={{ gridColumn: '1 / -1', width: '100%' }}
+            >
+              <Trash size={18} color="var(--red)" />
+            </button>
+          ) : null}
+          <button type="button" className="inv-sheet-save" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Log purchase'}
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
         </div>
-
+      }
+    >
         <div className="inv-sheet-body">
           <label className="inv-field-label">Date</label>
           <input
@@ -412,23 +430,6 @@ export default function SupplyPurchaseSheet({
           )}
         </div>
 
-        <div className="inv-sheet-actions">
-          {isEdit && (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={handleDelete}
-              disabled={saving}
-              aria-label="Delete purchase"
-            >
-              <Trash size={18} color="var(--red)" />
-            </button>
-          )}
-          <button type="button" className="inv-sheet-save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Log purchase'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

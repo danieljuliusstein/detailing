@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Trash } from '@phosphor-icons/react'
+import BottomSheet from '@/components/BottomSheet'
 import type { Equipment, EquipmentInput, EquipmentStatus } from '@/lib/types'
 
 export type EquipmentSheetMode = 'add' | 'edit'
@@ -72,17 +73,38 @@ export default function EquipmentEditSheet({
   }
 
   return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-title">
-          {mode === 'add' ? 'Add equipment' : item?.name ?? 'Edit equipment'}
+    <BottomSheet
+      title={mode === 'add' ? 'Add equipment' : item?.name ?? 'Edit equipment'}
+      subtitle={mode === 'add' ? 'New durable tool or machine' : 'Update equipment details'}
+      onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--split">
+          {mode === 'edit' && item && onDelete ? (
+            <button
+              type="button"
+              className="inv-sheet-delete"
+              onClick={() => onDelete(item.id)}
+              aria-label="Delete equipment"
+              style={{ gridColumn: '1 / -1', width: '100%' }}
+            >
+              <Trash size={18} weight="bold" color="#f87171" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="inv-sheet-save inv-sheet-save--outline"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Saving…' : mode === 'add' ? 'Add equipment' : 'Save changes'}
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
         </div>
-        <div className="inv-sheet-subtitle">
-          {mode === 'add' ? 'New durable tool or machine' : 'Update equipment details'}
-        </div>
-
+      }
+    >
+      <div className="inv-sheet-body">
         <label className="inv-field-label">NAME</label>
         <input
           className="inv-field-input"
@@ -143,28 +165,7 @@ export default function EquipmentEditSheet({
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. upgraded from entry-level DA..."
         />
-
-        <div className="inv-sheet-actions">
-          {mode === 'edit' && item && onDelete && (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={() => onDelete(item.id)}
-              aria-label="Delete equipment"
-            >
-              <Trash size={18} weight="bold" color="#f87171" />
-            </button>
-          )}
-          <button
-            type="button"
-            className="inv-sheet-save inv-sheet-save--outline"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? 'Saving…' : mode === 'add' ? 'Add equipment' : 'Save changes'}
-          </button>
-        </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

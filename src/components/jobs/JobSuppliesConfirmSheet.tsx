@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Warning } from '@phosphor-icons/react'
+import BottomSheet from '@/components/BottomSheet'
 import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
 import { resolveSuppliesUsed } from '@/lib/supplies-logic'
 import type { Package, Supply, SupplyUsage } from '@/lib/types'
@@ -25,14 +26,6 @@ export default function JobSuppliesConfirmSheet({
     resolveSuppliesUsed({ supplies_used: initialUsed ?? [] }, pkg, initialUsed)
   )
 
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [])
-
   const lowWarnings = useMemo(() => {
     const warnings: string[] = []
     for (const usage of value) {
@@ -49,15 +42,12 @@ export default function JobSuppliesConfirmSheet({
   }, [value, supplies])
 
   return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true" aria-label="Confirm supplies used">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-title">Supplies used</div>
-        <div className="inv-sheet-subtitle">
-          Confirm or adjust supplies for this job before saving
-        </div>
-
+    <BottomSheet
+      title="Supplies used"
+      subtitle="Confirm or adjust supplies for this job before saving"
+      ariaLabel="Confirm supplies used"
+      onClose={onClose}
+    >
         <JobSuppliesPicker supplies={supplies} value={value} onChange={setValue} />
 
         {lowWarnings.length > 0 && (
@@ -77,7 +67,6 @@ export default function JobSuppliesConfirmSheet({
         <button type="button" className="btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={onClose}>
           Cancel
         </button>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

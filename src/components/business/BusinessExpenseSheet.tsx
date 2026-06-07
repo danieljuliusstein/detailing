@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Trash } from '@phosphor-icons/react'
+import BottomSheet from '@/components/BottomSheet'
 import {
   createBusinessExpense,
   deleteBusinessExpense,
@@ -109,15 +110,34 @@ export default function BusinessExpenseSheet({
   }
 
   return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true" aria-label="Business expense">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-title">{isEdit ? 'Edit expense' : 'Log business expense'}</div>
-        <div className="inv-sheet-subtitle">
-          Dated one-time payment — shows in P&amp;L for that month only
+    <BottomSheet
+      title={isEdit ? 'Edit expense' : 'Log business expense'}
+      subtitle="Dated one-time payment — shows in P&L for that month only"
+      ariaLabel="Business expense"
+      onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--split">
+          {isEdit ? (
+            <button
+              type="button"
+              className="inv-sheet-delete"
+              onClick={handleDelete}
+              disabled={saving}
+              aria-label="Delete expense"
+              style={{ gridColumn: '1 / -1', width: '100%' }}
+            >
+              <Trash size={18} color="var(--red)" />
+            </button>
+          ) : null}
+          <button type="button" className="inv-sheet-save" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Log expense'}
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
         </div>
-
+      }
+    >
         <label className="inv-field-label">Date</label>
         <input
           type="date"
@@ -183,28 +203,6 @@ export default function BusinessExpenseSheet({
           <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 12 }}>Saved</div>
         )}
 
-        <div className="inv-sheet-actions">
-          {isEdit && (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={handleDelete}
-              disabled={saving}
-              aria-label="Delete expense"
-            >
-              <Trash size={18} color="var(--red)" />
-            </button>
-          )}
-          <button
-            type="button"
-            className="inv-sheet-save"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Log expense'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

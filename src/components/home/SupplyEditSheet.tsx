@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Trash } from '@phosphor-icons/react'
+import BottomSheet from '@/components/BottomSheet'
 import { costPerUnitFromPurchase } from '@/lib/supplies-logic'
 import { fmtDetailed } from '@/lib/calculations'
 import type { Supply, SupplyInput, SupplyKind } from '@/lib/types'
@@ -143,18 +144,46 @@ export default function SupplyEditSheet({
     }
   }
 
-  return (
-    <div className="inv-sheet-root" role="dialog" aria-modal="true">
-      <button type="button" className="inv-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="inv-sheet">
-        <div className="inv-sheet-handle" />
-        <div className="inv-sheet-title">{title}</div>
-        <div className="inv-sheet-subtitle">
-          {mode === 'add' && 'How you measure it, how much you have, and when to reorder'}
-          {mode === 'edit' && 'Update stock counts and alert levels — use Restock after a purchase'}
-          {mode === 'restock' && 'Log a purchase to add stock and update cost per unit'}
-        </div>
+  const subtitle =
+    mode === 'add'
+      ? 'How you measure it, how much you have, and when to reorder'
+      : mode === 'edit'
+        ? 'Update stock counts and alert levels — use Restock after a purchase'
+        : 'Log a purchase to add stock and update cost per unit'
 
+  return (
+    <BottomSheet
+      title={title}
+      subtitle={subtitle}
+      onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--split">
+          {mode === 'edit' && supply && onDelete ? (
+            <button
+              type="button"
+              className="inv-sheet-delete"
+              onClick={() => onDelete(supply.id)}
+              aria-label="Delete item"
+              style={{ gridColumn: '1 / -1', width: '100%' }}
+            >
+              <Trash size={18} weight="bold" color="#f87171" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="inv-sheet-save inv-sheet-save--outline"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Saving…' : mode === 'add' ? 'Add to catalog' : mode === 'restock' ? 'Restock' : 'Save changes'}
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+        </div>
+      }
+    >
+      <div className="inv-sheet-body">
         {supply && mode !== 'add' && onModeChange && (
           <div className="inv-status-toggle" style={{ marginBottom: 16 }}>
             <button
@@ -325,28 +354,7 @@ export default function SupplyEditSheet({
             />
           </>
         )}
-
-        <div className="inv-sheet-actions">
-          {mode === 'edit' && supply && onDelete && (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={() => onDelete(supply.id)}
-              aria-label="Delete item"
-            >
-              <Trash size={18} weight="bold" color="#f87171" />
-            </button>
-          )}
-          <button
-            type="button"
-            className="inv-sheet-save inv-sheet-save--outline"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? 'Saving…' : mode === 'add' ? 'Add to catalog' : mode === 'restock' ? 'Restock' : 'Save changes'}
-          </button>
-        </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
