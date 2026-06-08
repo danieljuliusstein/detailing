@@ -168,33 +168,35 @@ export function computeJobsCSV(jobs: Job[], range: DateRangeKey, labelResolver: 
 
 export function computeDashboard(
   jobs: JobWithRelations[],
-  invoices: Invoice[]
-): { kpis: DashboardKpis; recentJobs: RecentJobRow[]; jobsToday: number } {
+  invoices: Invoice[],
+  mtdOverhead = 0,
+  mtdBusiness = 0
+): { kpis: DashboardKpis; recentJobs: RecentJobRow[]; jobsToday: number; priorRevenueMtd: number } {
   const now = new Date()
   const monthStart = startOfMonth(now)
   const monthEnd = endOfMonth(now)
   const weekStart = startOfWeek(now)
   const weekEnd = endOfWeek(now)
   const todayStr = now.toISOString().split('T')[0]
+  const priorMonth = priorRangeFor('this_month', now)
 
-  const mtdJobs = jobs.filter((j) => {
-    const d = new Date(j.date + 'T12:00:00')
-    return d >= monthStart && d <= monthEnd
-  })
+  const mtdPl = computePLReportForDates(jobs, monthStart, monthEnd, mtdOverhead, mtdBusiness)
+  const priorMtdJobs = jobs.filter((j) => jobInRange(j, priorMonth.start, priorMonth.end))
+  const priorRevenueMtd = priorMtdJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
 
-  const revenueMtd = mtdJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
-  const profitMtd = mtdJobs.reduce((s, j) => s + netProfit(j), 0)
-
-  const outstanding = invoices
-    .filter((i) => i.status === 'sent' || i.status === 'partial' || i.status === 'overdue')
-    .reduce((s, i) => s + i.balance_due, 0)
+  const outstandingInvoices = invoices.filter(
+    (i) => i.status === 'sent' || i.status === 'partial' || i.status === 'overdue'
+  )
+  const outstanding = outstandingInvoices.reduce((s, i) => s + i.balance_due, 0)
 
   const jobsThisWeek = jobs.filter((j) => {
     const d = new Date(j.date + 'T12:00:00')
     return d >= weekStart && d <= weekEnd
   }).length
 
-  const jobsToday = jobs.filter((j) => j.date === todayStr).length
+  const todayJobs = jobs.filter((j) => j.date === todayStr)
+  const jobsToday = todayJobs.length
+  const revenueToday = todayJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
 
   const recentJobs: RecentJobRow[] = [...jobs]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -215,9 +217,19 @@ export function computeDashboard(
     })
 
   return {
-    kpis: { revenueMtd, profitMtd, outstanding, jobsThisWeek },
+    kpis: {
+      revenueMtd: mtdPl.revenue,
+      expensesMtd: mtdPl.totalExpenses,
+      profitMtd: mtdPl.netProfit,
+      marginMtd: mtdPl.marginPct,
+      outstanding,
+      outstandingInvoiceCount: outstandingInvoices.length,
+      revenueToday,
+      jobsThisWeek,
+    },
     recentJobs,
     jobsToday,
+    priorRevenueMtd,
   }
 }
 

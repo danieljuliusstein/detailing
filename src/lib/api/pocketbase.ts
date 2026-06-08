@@ -33,6 +33,7 @@ import {
 import type {
   Client,
   ClientWithStats,
+  DashboardData,
   DashboardKpis,
   Invoice,
   Job,
@@ -48,6 +49,7 @@ import * as overheadPb from './overhead-pocketbase'
 import { getBusinessExpensesMerged } from './business-expenses-merge'
 import { businessExpensesTotalForDates } from '../business-expenses-logic'
 import { enrichClientWithStats } from '../client-stats'
+import { buildDashboardInsights } from '../dashboard-insights'
 
 const JOB_EXPAND = 'client_id,package_id,invoice_id'
 
@@ -301,13 +303,21 @@ export async function getClientJobs(clientId: string): Promise<JobWithRelations[
   return records.map(pbJobToAppWithRelations)
 }
 
-export async function getDashboardData(): Promise<{
-  kpis: DashboardKpis
-  recentJobs: RecentJobRow[]
-  jobsToday: number
-}> {
-  const [jobs, invoices] = await Promise.all([fetchJobsExpanded(), fetchInvoices()])
-  return computeDashboard(jobs, invoices)
+export async function getDashboardData(): Promise<DashboardData> {
+  const [jobs, invoices, overheadItems, businessItems] = await Promise.all([
+    fetchJobsExpanded(),
+    fetchInvoices(),
+    overheadPb.getOverheadExpenses(),
+    getBusinessExpensesMerged(),
+  ])
+  const { start, end } = rangeFor('this_month')
+  const mtdOverhead = overheadAmountForDates(overheadItems, start, end)
+  const mtdBusiness = businessExpensesTotalForDates(businessItems, start, end)
+  const base = computeDashboard(jobs, invoices, mtdOverhead, mtdBusiness)
+  return {
+    ...base,
+    insights: buildDashboardInsights(jobs, invoices, base.kpis, base.priorRevenueMtd),
+  }
 }
 
 export async function getWeekDays(): Promise<WeekDay[]> {

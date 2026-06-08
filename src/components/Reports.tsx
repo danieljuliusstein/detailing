@@ -1,31 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { DownloadSimple, FileCsv } from '@phosphor-icons/react'
-import PLProgressBarCard from '@/components/reports/PLProgressBarCard'
+import ReportComparisonChart from '@/components/reports/ReportComparisonChart'
+import ReportExpenseBreakdown from '@/components/reports/ReportExpenseBreakdown'
+import ReportHeroCard from '@/components/reports/ReportHeroCard'
+import ReportLeadSources from '@/components/reports/ReportLeadSources'
+import ReportSection from '@/components/reports/ReportSection'
 import { exportJobsCSV, getClients, getJobs, getPLReportBundle, type DateRangeKey } from '@/lib/api'
 import { buildLeadSourceReport, type LeadSourceRow } from '@/lib/lead-source-report'
 import type { PLReport } from '@/lib/api/aggregates'
-import { fmt, fmtDetailed, isLoss } from '@/lib/calculations'
 import { downloadReportPdf } from '@/lib/pdf/downloadReportPdf'
 import { loadSettings } from '@/lib/settings'
-import {
-  EXPENSE_ORDER,
-  EXPENSE_LABELS,
-  MARGIN_TARGET_PCT,
-  REPORT_FILTER_CHIPS,
-  computeDeltas,
-  dollarDeltaClass,
-  formatBreakdownNetProfit,
-  formatDollarDelta,
-  formatKpiNetProfit,
-  formatMarginPill,
-  formatPercentDelta,
-  formatTotalExpensesAmount,
-  marginPillClass,
-  percentDeltaClass,
-} from '@/lib/reports-metrics'
+import { REPORT_FILTER_CHIPS, shouldShowLeadSourceReport } from '@/lib/reports-metrics'
 import { FINANCIAL_DATA_CHANGED } from '@/lib/financial-data-events'
 
 export default function Reports() {
@@ -67,18 +55,6 @@ export default function Reports() {
     }
   }, [loadReport, pathname])
 
-  const deltas = useMemo(() => {
-    if (!current || !prior) return null
-    return computeDeltas(current, prior)
-  }, [current, prior])
-
-  const expenseRows = useMemo(() => {
-    if (!current) return []
-    return EXPENSE_ORDER
-      .map((key) => ({ key, label: EXPENSE_LABELS[key], amount: current.expenses[key] }))
-      .filter((row) => row.amount > 0)
-  }, [current])
-
   const handleCSV = async () => {
     setExportMessage('')
     setExportBusy(true)
@@ -112,7 +88,11 @@ export default function Reports() {
     }
   }
 
-  if (!current || !prior || !deltas) {
+  const showLeadSources = current
+    ? shouldShowLeadSourceReport(leadSourceRows.length, current.jobCount)
+    : false
+
+  if (!current || !prior) {
     return (
       <div className="screen page-content reports-screen" style={{ paddingTop: 40, textAlign: 'center', color: '#555' }}>
         Loading…
@@ -124,7 +104,6 @@ export default function Reports() {
     <div className="screen page-content reports-screen">
       <div className="reports-header">
         <div className="reports-title">Reports</div>
-        <div className="reports-subtitle">{current.jobCount} jobs in range</div>
       </div>
 
       <div className="reports-filter-chips">
@@ -140,136 +119,20 @@ export default function Reports() {
         ))}
       </div>
 
-      <div className="reports-kpi-grid">
-        <div className="reports-kpi-card">
-          <div className="reports-kpi-label">REVENUE</div>
-          <div className="reports-kpi-value">{fmt(current.revenue)}</div>
-          <div
-            className={`reports-kpi-delta ${percentDeltaClass(current.revenue, prior.revenue, 'revenue')}`}
-          >
-            {formatPercentDelta(current.revenue, prior.revenue, range)}
-          </div>
-        </div>
+      <ReportHeroCard report={current} prior={prior} range={range} />
 
-        <div className="reports-kpi-card">
-          <div className="reports-kpi-label">NET PROFIT</div>
-          <div
-            className={`reports-kpi-value ${
-              isLoss(current.netProfit) ? 'reports-kpi-value--loss' : 'reports-kpi-value--green'
-            }`}
-          >
-            {formatKpiNetProfit(current.netProfit)}
-          </div>
-          <div
-            className={`reports-kpi-delta ${percentDeltaClass(current.netProfit, prior.netProfit, 'profit')}`}
-          >
-            {formatPercentDelta(current.netProfit, prior.netProfit, range)}
-          </div>
-        </div>
+      <ReportSection label="Expense breakdown" subtitle="Share of total expenses">
+        <ReportExpenseBreakdown report={current} />
+      </ReportSection>
 
-        <div className="reports-kpi-card">
-          <div className="reports-kpi-label">TOTAL EXPENSES</div>
-          <div className="reports-kpi-value">{fmt(current.totalExpenses)}</div>
-          <div
-            className={`reports-kpi-delta ${dollarDeltaClass(current.totalExpenses, prior.totalExpenses)}`}
-          >
-            {formatDollarDelta(current.totalExpenses, prior.totalExpenses, range)}
-          </div>
-        </div>
+      <ReportSection label="Revenue vs expenses" subtitle="Why you made or lost money">
+        <ReportComparisonChart report={current} />
+      </ReportSection>
 
-        <div className="reports-kpi-card">
-          <div className="reports-kpi-label">MARGIN</div>
-          <div
-            className={`reports-kpi-value ${
-              isLoss(current.marginPct) ? 'reports-kpi-value--loss' : 'reports-kpi-value--green'
-            }`}
-          >
-            {current.marginPct}%
-          </div>
-          <div className="reports-kpi-delta reports-delta--neutral">
-            target: {MARGIN_TARGET_PCT}%
-          </div>
-        </div>
-      </div>
-
-      <PLProgressBarCard report={current} range={range} />
-
-      <div className="reports-card">
-        <div className="reports-card-label">PROFIT &amp; LOSS BREAKDOWN</div>
-
-        <div className="reports-pl-row reports-pl-row--revenue">
-          <div className="reports-pl-left">
-            <span className="reports-pl-dot reports-pl-dot--green" />
-            <span className="reports-pl-name reports-pl-name--headline">Revenue</span>
-          </div>
-          <span className="reports-pl-amount reports-pl-amount--headline">{fmtDetailed(current.revenue)}</span>
-        </div>
-
-        <div className="reports-expenses-section">
-          <div className="reports-expenses-label">EXPENSES</div>
-          {expenseRows.map((row) => (
-            <div key={row.key} className="reports-expense-row">
-              <span className="reports-expense-name">{row.label}</span>
-              <span className="reports-expense-amount">−{fmtDetailed(row.amount)}</span>
-            </div>
-          ))}
-          <div className="reports-total-expenses-inset">
-            <span className="reports-total-expenses-label">Total expenses</span>
-            <span className="reports-total-expenses-amount">
-              {formatTotalExpensesAmount(current.totalExpenses)}
-            </span>
-          </div>
-        </div>
-
-        <div className="reports-pl-row reports-pl-row--profit">
-          <div className="reports-pl-left">
-            <span
-              className={`reports-pl-dot ${
-                isLoss(current.netProfit) ? 'reports-pl-dot--red' : 'reports-pl-dot--green'
-              }`}
-            />
-            <span className="reports-pl-name reports-pl-name--bold">Net profit</span>
-          </div>
-          <span
-            className={`reports-pl-amount ${
-              isLoss(current.netProfit) ? 'reports-pl-amount--loss' : 'reports-pl-amount--profit'
-            }`}
-          >
-            {formatBreakdownNetProfit(current.netProfit)}
-          </span>
-        </div>
-
-        <div className="reports-margin-row">
-          <span className="reports-margin-label">Margin</span>
-          <span className={marginPillClass(current.marginPct)}>{formatMarginPill(current.marginPct)}</span>
-        </div>
-      </div>
-
-      {leadSourceRows.length > 0 && (
-        <div className="reports-card" style={{ marginBottom: 16 }}>
-          <div className="reports-card-label">LEAD SOURCE ROI</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-            Revenue and jobs by how clients found you
-          </div>
-          {leadSourceRows.map((row) => {
-            const maxRevenue = leadSourceRows[0]?.revenue ?? 1
-            const pct = Math.round((row.revenue / maxRevenue) * 100)
-            return (
-              <div key={row.source} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 500 }}>{row.source}</span>
-                  <span className="money" style={{ color: 'var(--green)' }}>{fmt(row.revenue)}</span>
-                </div>
-                <div style={{ height: 6, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--green)', borderRadius: 3 }} />
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {row.clientCount} client{row.clientCount !== 1 ? 's' : ''} · {row.jobCount} job{row.jobCount !== 1 ? 's' : ''} · avg {fmt(row.avgTicket)}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+      {showLeadSources && (
+        <ReportSection label="Lead sources" subtitle="Where your clients come from">
+          <ReportLeadSources rows={leadSourceRows} />
+        </ReportSection>
       )}
 
       <div className="reports-export-grid">
@@ -284,7 +147,7 @@ export default function Reports() {
       </div>
 
       {exportMessage && (
-        <div style={{ fontSize: 13, color: '#e06060', textAlign: 'center', marginTop: 8 }}>{exportMessage}</div>
+        <div className="reports-export-error">{exportMessage}</div>
       )}
     </div>
   )

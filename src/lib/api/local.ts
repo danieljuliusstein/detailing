@@ -13,10 +13,12 @@ import {
   resolveSuppliesUsed,
 } from '../supplies-logic'
 import { enrichClientWithStats } from '../client-stats'
+import { buildDashboardInsights } from '../dashboard-insights'
 import { loadData, newId, saveData } from '../storage'
 import type {
   Client,
   ClientWithStats,
+  DashboardData,
   DashboardKpis,
   Job,
   JobEditData,
@@ -213,14 +215,15 @@ export function createJob(input: QuickJobData): Job {
   return job
 }
 
-export function getDashboardData(): {
-  kpis: DashboardKpis
-  recentJobs: RecentJobRow[]
-  jobsToday: number
-} {
+export function getDashboardData(): DashboardData {
   const data = loadData()
   const jobs = data.jobs.map((j) => hydrateJob(j, data))
-  return computeDashboard(jobs, data.invoices.map((i) => normalizeInvoice(i)))
+  const invoices = data.invoices.map((i) => normalizeInvoice(i))
+  const base = computeDashboard(jobs, invoices)
+  return {
+    ...base,
+    insights: buildDashboardInsights(jobs, invoices, base.kpis, base.priorRevenueMtd),
+  }
 }
 
 export function updateJob(id: string, updates: JobEditData): Job | null {

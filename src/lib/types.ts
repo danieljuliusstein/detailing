@@ -245,9 +245,21 @@ export interface QuickJobData {
 
 export interface DashboardKpis {
   revenueMtd: number
+  expensesMtd: number
   profitMtd: number
+  marginMtd: number
   outstanding: number
+  outstandingInvoiceCount: number
+  revenueToday: number
   jobsThisWeek: number
+}
+
+export interface DashboardData {
+  kpis: DashboardKpis
+  recentJobs: RecentJobRow[]
+  jobsToday: number
+  priorRevenueMtd: number
+  insights: string[]
 }
 
 export interface RecentJobRow {

@@ -1,15 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, ChatCircle, Phone } from '@phosphor-icons/react'
-import { fmt } from '@/lib/calculations'
+import CurrencyAmount from '@/components/ui/CurrencyAmount'
+import ClientCardMenu from '@/components/clients/ClientCardMenu'
 import {
-  retentionColor,
   timeAgo,
   type ClientDerived,
   type ClientTag,
 } from '@/lib/client-relationship-logic'
-import { cadencePresetLabel } from '@/lib/package-cadence'
 import type { ClientWithStats } from '@/lib/types'
 
 const TAG_LABELS: Record<Exclude<ClientTag, null>, string> = {
@@ -39,7 +37,6 @@ export default function ClientCard({ client, derived }: ClientCardProps) {
         : derived.isVip
           ? AVATAR_CLASS.vip
           : AVATAR_CLASS.default
-  const fillColor = retentionColor(derived.retentionScore)
 
   const lastServiceLine = client.lastJobDate && client.lastServiceName
     ? `${client.lastServiceName} · ${timeAgo(client.lastJobDate)}`
@@ -47,14 +44,14 @@ export default function ClientCard({ client, derived }: ClientCardProps) {
       ? timeAgo(client.lastJobDate)
       : 'No jobs yet'
 
-  const retentionTitle = `Based on ${client.lastServiceName ?? 'service'} cadence (${cadencePresetLabel(derived.expectedReturnDays).toLowerCase()})`
+  const secondaryLine = client.phone || client.email || null
 
   const openDetail = () => router.push(`/clients/${client.id}`)
 
   return (
     <div className="clients-card">
-      <button type="button" className="clients-card-body" onClick={openDetail}>
-        <div className="clients-card-top">
+      <div className="clients-card-body">
+        <button type="button" className="clients-card-main" onClick={openDetail}>
           <div className={`clients-avatar ${avatarClass}`}>{derived.initials}</div>
           <div className="clients-card-center">
             <div className="clients-name-row">
@@ -69,61 +66,18 @@ export default function ClientCard({ client, derived }: ClientCardProps) {
               )}
             </div>
             <div className="clients-last-service">{lastServiceLine}</div>
+            {secondaryLine && (
+              <div className="clients-contact-line">{secondaryLine}</div>
+            )}
           </div>
           <div className="clients-card-right">
-            <div className="clients-lifetime">{fmt(client.totalRevenue)}</div>
+            <CurrencyAmount value={client.totalRevenue} variant="revenue" className="clients-lifetime" />
             <div className="clients-job-count">
               {client.jobCount} job{client.jobCount !== 1 ? 's' : ''}
             </div>
           </div>
-        </div>
-
-        <div className="clients-retention" title={retentionTitle}>
-          <span className="clients-retention-label">Visit frequency</span>
-          <div className="clients-retention-track">
-            <div
-              className="clients-retention-fill"
-              style={{ width: `${derived.retentionScore}%`, background: fillColor }}
-            />
-          </div>
-          <span className="clients-retention-pct">{derived.retentionScore}%</span>
-        </div>
-      </button>
-
-      <div className="clients-actions">
-        <a
-          href={client.phone ? `tel:${client.phone}` : undefined}
-          className={`clients-action-btn${client.phone ? '' : ' clients-action-btn--disabled'}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!client.phone) e.preventDefault()
-          }}
-        >
-          <Phone size={14} aria-hidden="true" />
-          Call
-        </a>
-        <a
-          href={client.phone ? `sms:${client.phone}` : undefined}
-          className={`clients-action-btn${client.phone ? '' : ' clients-action-btn--disabled'}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!client.phone) e.preventDefault()
-          }}
-        >
-          <ChatCircle size={14} aria-hidden="true" />
-          Text
-        </a>
-        <button
-          type="button"
-          className="clients-action-btn clients-action-btn--primary"
-          onClick={(e) => {
-            e.stopPropagation()
-            router.push(`/jobs/new?clientId=${client.id}`)
-          }}
-        >
-          <CalendarPlus size={14} aria-hidden="true" />
-          Book job
         </button>
+        <ClientCardMenu client={client} />
       </div>
     </div>
   )

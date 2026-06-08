@@ -49,6 +49,7 @@ import type {
   Client,
   ClientInput,
   ClientWithStats,
+  DashboardData,
   DashboardKpis,
   Invoice,
   Job,
@@ -236,12 +237,7 @@ export async function updateJob(id: string, data: JobEditData): Promise<Job | nu
   return job
 }
 
-export async function getDashboardData(): Promise<{
-  kpis: DashboardKpis
-  recentJobs: RecentJobRow[]
-  jobsToday: number
-  weekDays: WeekDay[]
-}> {
+export async function getDashboardData(): Promise<DashboardData & { weekDays: WeekDay[] }> {
   const resolved = await resolveBackend()
   if (resolved === 'pocketbase') {
     const [base, weekDays] = await Promise.all([pb.getDashboardData(), pb.getWeekDays()])

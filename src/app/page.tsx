@@ -14,6 +14,7 @@ export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState('')
   const [dayJobs, setDayJobs] = useState<RecentJobRow[]>([])
   const [dueClients, setDueClients] = useState<ClientWithStats[]>([])
+  const [insights, setInsights] = useState<string[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function HomePage() {
         setWeekDays(data.weekDays)
         const derived = buildDerivedMap(clients)
         setDueClients(overdueClients(clients, derived))
+        setInsights(data.insights)
         const today = data.weekDays.find((d) => d.isToday)?.date ?? data.weekDays[0]?.date ?? ''
         setSelectedDate(today)
       })
@@ -71,6 +73,7 @@ export default function HomePage() {
       weekDays={weekDays}
       dayJobs={dayJobs}
       dueClients={dueClients}
+      insights={insights}
       selectedDate={selectedDate}
       onDaySelect={setSelectedDate}
     />

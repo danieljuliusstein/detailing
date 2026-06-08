@@ -4,12 +4,8 @@ import { useRouter } from 'next/navigation'
 import { PencilSimple, Phone, ChatText, Envelope } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import { fmt, mapJobStatusForDisplay } from '@/lib/calculations'
+import { JOB_STATUS_CONFIG } from '@/lib/job-status-display'
 import type { Client, JobWithRelations } from '@/lib/types'
-
-const statusBadge: Record<string, string> = {
-  paid: 'badge-paid', invoiced: 'badge-pending', overdue: 'badge-overdue',
-  scheduled: 'badge-scheduled', completed: 'badge-draft',
-}
 
 interface ClientDetailProps {
   client: Client
@@ -79,7 +75,8 @@ export default function ClientDetail({ client, jobs, totalRevenue }: ClientDetai
         <div className="card" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 14 }}>No jobs yet</div>
       ) : (
         jobs.map((job) => {
-          const status = mapJobStatusForDisplay(job)
+          const statusKey = mapJobStatusForDisplay(job)
+          const status = JOB_STATUS_CONFIG[statusKey]
           return (
             <div key={job.id} className="card-pressable" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               onClick={() => router.push(`/jobs/${job.id}`)}>
@@ -88,7 +85,7 @@ export default function ClientDetail({ client, jobs, totalRevenue }: ClientDetai
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   {new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
-                <span className={`badge ${statusBadge[status]}`} style={{ marginTop: 5 }}>{status}</span>
+                <span className={status.className} style={{ marginTop: 5 }}>{status.label}</span>
               </div>
               <div className="money money-positive" style={{ fontSize: 15, fontWeight: 700 }}>{fmt(job.revenue)}</div>
             </div>

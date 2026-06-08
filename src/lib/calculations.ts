@@ -67,24 +67,42 @@ export function formatScheduledLabel(date: string, startTime?: string): string {
   return dayLabel
 }
 
-export const fmt = (n: number, opts?: { decimals?: number; forceSign?: boolean }) => {
+export interface FmtOptions {
+  decimals?: number
+  /** @deprecated Use default signed formatting; minus is always shown for negatives */
+  forceSign?: boolean
+  /** Show absolute magnitude (for expense rows displayed as positive red amounts) */
+  unsigned?: boolean
+}
+
+/** Whole-dollar macro formatting for dashboards, lists, and reports. Negatives render as -$1,234. */
+export const fmt = (n: number, opts?: FmtOptions) => {
+  const decimals = opts?.decimals ?? 0
+  const magnitude = opts?.unsigned ? Math.abs(n) : n
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: opts?.decimals ?? 0,
-    maximumFractionDigits: opts?.decimals ?? 0,
-  }).format(Math.abs(n))
-  if (opts?.forceSign && n < 0) return `−${formatted}`
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(Math.abs(magnitude))
+  if (!opts?.unsigned && n < 0) return `-${formatted}`
   return formatted
 }
 
-export const fmtDetailed = (n: number, forceSign = false) => {
+/** Invoice line items: show cents only when the amount has a fractional part. */
+export function fmtLineItem(n: number): string {
+  const hasCents = Math.round(Math.abs(n) * 100) % 100 !== 0
+  return fmt(n, { decimals: hasCents ? 2 : 0 })
+}
+
+export const fmtDetailed = (n: number, _forceSign = false) => {
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Math.abs(n))
-  if (forceSign && n < 0) return `−${formatted}`
+  if (n < 0) return `-${formatted}`
   return formatted
 }
 
@@ -95,7 +113,7 @@ export function fmtSigned(n: number, decimals = 2): string {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(Math.abs(n))
-  return n < 0 ? `−${formatted}` : formatted
+  return n < 0 ? `-${formatted}` : formatted
 }
 
 export function isLoss(n: number): boolean {

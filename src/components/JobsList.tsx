@@ -3,15 +3,13 @@
 import { useRouter } from 'next/navigation'
 import { ClipboardText } from '@phosphor-icons/react'
 import JobsRevenueChart from '@/components/jobs/JobsRevenueChart'
-import { fmt, mapJobStatusForDisplay, netProfit } from '@/lib/calculations'
+import CurrencyAmount from '@/components/ui/CurrencyAmount'
+import { mapJobStatusForDisplay, netProfit } from '@/lib/calculations'
+import { JOB_STATUS_CONFIG } from '@/lib/job-status-display'
 import type { JobWithRelations } from '@/lib/types'
 
-const statusConfig = {
-  paid: { label: 'Paid', className: 'badge-paid' },
-  invoiced: { label: 'Invoice sent', className: 'badge-pending' },
-  overdue: { label: 'Overdue', className: 'badge-overdue' },
-  completed: { label: 'Completed', className: 'badge-draft' },
-  scheduled: { label: 'Scheduled', className: 'badge-scheduled' },
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
@@ -28,38 +26,31 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
         </div>
       ) : (
         <div className="jobs-list-cards">
-        {jobs.map((job) => {
-          const status = statusConfig[mapJobStatusForDisplay(job)]
-          return (
-            <div
-              key={job.id}
-              className="card-pressable"
-              style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}
-              onClick={() => router.push(`/jobs/${job.id}`)}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>
-                  {job.client?.name ?? 'Unknown'}
+          {jobs.map((job) => {
+            const status = JOB_STATUS_CONFIG[mapJobStatusForDisplay(job)]
+            const profit = netProfit(job)
+            const subtitle = `${capitalize(job.vehicle_type)} • ${capitalize(job.location_type)} · ${new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+
+            return (
+              <div
+                key={job.id}
+                className="card-pressable dashboard-job-card dashboard-job-card--compact"
+                onClick={() => router.push(`/jobs/${job.id}`)}
+              >
+                <div className="dashboard-job-card__main">
+                  <div className="dashboard-job-card__name">{job.client?.name ?? 'Unknown'}</div>
+                  <div className="dashboard-job-card__meta">{subtitle}</div>
+                  <span className={status.className}>{status.label}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {job.package?.name ?? '—'} · {job.vehicle_type} ·{' '}
-                  {new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
-                <span className={`badge ${status.className}`} style={{ marginTop: 5 }}>
-                  {status.label}
-                </span>
-              </div>
-              <div style={{ textAlign: 'right', marginLeft: 12 }}>
-                <div className="money money-positive" style={{ fontSize: 15, fontWeight: 700 }}>
-                  {fmt(job.revenue)}
-                </div>
-                <div className="money money-neutral" style={{ fontSize: 11, marginTop: 2 }}>
-                  {fmt(netProfit(job))} profit
+                <div className="dashboard-job-card__figures">
+                  <CurrencyAmount value={job.revenue} variant="revenue" className="dashboard-job-card__revenue" />
+                  <div className="dashboard-job-card__profit">
+                    <CurrencyAmount value={profit} variant="profit" /> profit
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
         </div>
       )}
     </div>

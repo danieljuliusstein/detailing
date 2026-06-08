@@ -83,7 +83,7 @@ export function formatPct(value: number, revenue: number): string {
 export function formatPctSigned(value: number, revenue: number): string {
   if (revenue === 0) return '—'
   const pct = Math.round((value / revenue) * 100)
-  if (pct < 0) return `−${Math.abs(pct)}%`
+  if (pct < 0) return `-${Math.abs(pct)}%`
   return `${pct}%`
 }
 
@@ -98,13 +98,90 @@ export function formatOverflowAmount(expense: number, revenue: number): string {
 
 export function formatMarginPill(marginPct: number): string {
   const rounded = Math.round(marginPct)
-  if (rounded < 0) return `−${Math.abs(rounded)}%`
+  if (rounded < 0) return `-${Math.abs(rounded)}%`
   return `${rounded}%`
 }
 
 export function formatTotalExpensesAmount(total: number): string {
   if (total === 0) return fmtSigned(0, 2)
-  return `−${fmtSigned(total, 2)}`
+  return '-' + fmtSigned(total, 2)
+}
+
+export interface ExpenseBreakdownRow {
+  key: keyof PLReport['expenses']
+  label: string
+  amount: number
+  pctOfTotal: number
+  color: string
+}
+
+export interface ComparisonBarRow {
+  label: string
+  amount: number
+  widthPct: number
+  color: string
+}
+
+/** Expense slice colors — muted, not alarm red. */
+export const EXPENSE_BREAKDOWN_COLORS: Record<keyof PLReport['expenses'], string> = {
+  supplies: '#60a5fa',
+  travel: '#a78bfa',
+  equipment: '#fbbf24',
+  marketing: '#f472b6',
+  labor: '#34d399',
+  overhead: '#94a3b8',
+  business: '#fb923c',
+  other: '#78716c',
+}
+
+export function formatNetProfitLabel(netProfit: number): string {
+  return netProfit < 0 ? 'Net loss' : 'Net profit'
+}
+
+export function formatExpensePctOfTotal(amount: number, totalExpenses: number): string {
+  if (totalExpenses <= 0) return '0%'
+  return `${Math.round((amount / totalExpenses) * 100)}%`
+}
+
+export function buildExpenseBreakdown(report: PLReport): ExpenseBreakdownRow[] {
+  const { expenses, totalExpenses } = report
+  return EXPENSE_ORDER.map((key) => ({
+    key,
+    label: EXPENSE_LABELS[key],
+    amount: expenses[key],
+    pctOfTotal: totalExpenses > 0 ? (expenses[key] / totalExpenses) * 100 : 0,
+    color: EXPENSE_BREAKDOWN_COLORS[key],
+  }))
+    .filter((row) => row.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+}
+
+export function buildComparisonBars(report: PLReport): ComparisonBarRow[] {
+  const { revenue, totalExpenses } = report
+  const max = Math.max(revenue, totalExpenses, 1)
+  return [
+    {
+      label: 'Revenue',
+      amount: revenue,
+      widthPct: (revenue / max) * 100,
+      color: '#3dc97a',
+    },
+    {
+      label: 'Expenses',
+      amount: totalExpenses,
+      widthPct: (totalExpenses / max) * 100,
+      color: '#6b7280',
+    },
+  ]
+}
+
+export function shouldShowLeadSourceReport(
+  leadSourceCount: number,
+  jobCount: number
+): boolean {
+  if (jobCount < 3) return false
+  if (leadSourceCount <= 1) return false
+  return true
 }
 
 export function buildPLProgressBars(report: PLReport): {

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import ClientCard from '@/components/clients/ClientCard'
-import { fmt } from '@/lib/calculations'
+import CurrencyAmount from '@/components/ui/CurrencyAmount'
 import {
   buildDerivedMap,
   filterBySegment,
@@ -72,7 +72,8 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
         <div>
           <h1 className="clients-title">Clients</h1>
           <p className="clients-subtitle">
-            {clients.length} client{clients.length !== 1 ? 's' : ''} · {fmt(lifetimeTotal)} lifetime
+            {clients.length} client{clients.length !== 1 ? 's' : ''} ·{' '}
+            <CurrencyAmount value={lifetimeTotal} variant="revenue" /> lifetime
           </p>
         </div>
         <button
@@ -102,7 +103,7 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
       <div className="clients-search-wrap">
         <MagnifyingGlass
           size={16}
-          color="#555"
+          color="var(--text-secondary)"
           className="clients-search-icon"
           aria-hidden="true"
         />
