@@ -33,9 +33,10 @@ const styles = StyleSheet.create({
   logo: {
     width: 64,
     height: 64,
-    backgroundColor: '#000000',
+    backgroundColor: '#ffffff',
     borderRadius: 6,
     objectFit: 'contain',
+    padding: 4,
   },
   businessName: {
     fontSize: 19,

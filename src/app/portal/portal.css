@@ -542,7 +542,9 @@
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  background: transparent;
+  background: #ffffff;
+  padding: 4px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;

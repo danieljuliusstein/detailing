@@ -8,14 +8,18 @@ interface AppLogoProps {
 
 export default function AppLogo({ size = 48, className = '', priority = false }: AppLogoProps) {
   return (
-    <Image
-      src="/logo.png"
-      alt="Detailing"
-      width={size}
-      height={size}
-      className={className}
-      priority={priority}
-      style={{ display: 'block' }}
-    />
+    <span
+      className={`business-logo-wrap ${className}`.trim()}
+      style={{ width: size, height: size, position: 'relative' }}
+    >
+      <Image
+        src="/logo.png"
+        alt="Detailing"
+        fill
+        className="business-logo"
+        priority={priority}
+        sizes={`${size}px`}
+      />
+    </span>
   )
 }

@@ -365,21 +365,24 @@ html, body {
   font-size: inherit;
 }
 
-.business-logo {
-  display: block;
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  border-radius: var(--radius-md);
+/* Black logo artwork always sits on a white tile */
+.business-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-}
-
-/* Light tile so dark logos stay visible on the dark invoice preview card */
-.invoice-doc-card .business-logo {
   background: #ffffff;
   border-radius: 10px;
   padding: 4px;
   box-sizing: border-box;
+}
+
+.business-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .invoice-header {
