@@ -1,5 +1,6 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import BottomNav from './BottomNav'
 import BusinessExpenseSheet from './business/BusinessExpenseSheet'
 import SupplyPurchaseSheet from './business/SupplyPurchaseSheet'
@@ -21,14 +22,17 @@ function QuickActionOverlays() {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const isPortal = pathname.startsWith('/portal')
+
   return (
     <SyncProvider>
       <QuickActionProvider>
         <ServiceWorkerCleanup />
-        <div className="app-shell">
+        <div className={`app-shell${isPortal ? ' app-shell--portal' : ''}`}>
           {children}
           <BottomNav />
-          <QuickActionOverlays />
+          {!isPortal && <QuickActionOverlays />}
         </div>
       </QuickActionProvider>
     </SyncProvider>

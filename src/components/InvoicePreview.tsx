@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Envelope, FilePdf, PaperPlaneTilt, Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
@@ -11,11 +11,11 @@ import {
   markInvoicePaid,
   markInvoiceSent,
 } from '@/lib/api'
-import { fmtDetailed } from '@/lib/calculations'
 import { PAYMENT_METHODS } from '@/lib/invoices'
 import { downloadInvoicePdf } from '@/lib/pdf/downloadInvoicePdf'
 import { createShareLink } from '@/lib/portal-client'
-import { loadSettings } from '@/lib/settings'
+import InvoiceDocumentBody from '@/components/invoice/InvoiceDocumentBody'
+import { loadSettings, loadSettingsAsync, type AppSettings } from '@/lib/settings'
 import type { JobWithRelations } from '@/lib/types'
 
 const invoiceStatusBadge: Record<string, string> = {
@@ -28,16 +28,28 @@ const invoiceStatusBadge: Record<string, string> = {
 
 export default function InvoicePreview({ job: initialJob }: { job: JobWithRelations }) {
   const router = useRouter()
-  const settings = loadSettings()
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [job, setJob] = useState(initialJob)
   const [busy, setBusy] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [payAmount, setPayAmount] = useState(0)
   const [payMethod, setPayMethod] = useState<string>(PAYMENT_METHODS[0])
   const [message, setMessage] = useState('')
+  const [portalUrl, setPortalUrl] = useState<string | undefined>()
 
   const invoice = job.invoice
   const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    loadSettingsAsync().then(setSettings)
+  }, [])
+
+  useEffect(() => {
+    if (!invoice?.id || !job.client_id) return
+    createShareLink({ clientId: job.client_id, jobId: job.id, scope: 'invoice' })
+      .then((link) => setPortalUrl(link.url))
+      .catch(() => setPortalUrl(undefined))
+  }, [invoice?.id, job.client_id, job.id])
 
   const refresh = useCallback(async () => {
     const updated = await getJob(job.id)
@@ -111,7 +123,7 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
     setBusy(true)
     setMessage('')
     try {
-      await downloadInvoicePdf(job, invoice, settings)
+      await downloadInvoicePdf(job, invoice, settings, portalUrl)
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'PDF export failed')
     } finally {
@@ -174,73 +186,8 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
         <span className={`badge ${invoiceStatusBadge[status] ?? 'badge-draft'}`}>{status}</span>
       </div>
 
-      <div className="card" style={{ background: 'var(--bg-surface-hover)', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 'var(--radius-md)',
-            border: '1px dashed var(--border-strong)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-dim)', flexShrink: 0,
-          }}>Logo</div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{settings.business_name}</div>
-            {settings.business_phone && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{settings.business_phone}</div>}
-            {settings.business_email && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{settings.business_email}</div>}
-          </div>
-        </div>
-
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>INVOICE</div>
-        <div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)', marginBottom: 16 }}>{invoice.invoice_number}</div>
-
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Bill to</div>
-        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>{job.client?.name}</div>
-
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          {new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          {' · '}{job.vehicle_type} · {job.package?.name}
-        </div>
-
-        <div className="divider" />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 13 }}>{job.package?.name}</span>
-          <span className="money" style={{ fontSize: 13 }}>{fmtDetailed(job.revenue)}</span>
-        </div>
-        {job.tip > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Tip</span>
-            <span className="money" style={{ fontSize: 13 }}>{fmtDetailed(job.tip)}</span>
-          </div>
-        )}
-
-        <div className="divider" />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>Total</span>
-          <span className="money money-positive" style={{ fontSize: 18, fontWeight: 700 }}>{fmtDetailed(invoice.total)}</span>
-        </div>
-
-        {invoice.payments.length > 0 && (
-          <>
-            <div className="section-title" style={{ marginTop: 8 }}>Payments</div>
-            {invoice.payments.map((p, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{p.method} · {p.date}</span>
-                <span className="money money-positive" style={{ fontSize: 13 }}>{fmtDetailed(p.amount)}</span>
-              </div>
-            ))}
-          </>
-        )}
-
-        {invoice.balance_due > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--amber)' }}>Balance due</span>
-            <span className="money" style={{ fontSize: 13, fontWeight: 700, color: 'var(--amber)' }}>{fmtDetailed(invoice.balance_due)}</span>
-          </div>
-        )}
-
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 16, lineHeight: 1.5 }}>
-          {settings.invoice_terms_footer}
-        </div>
+      <div className="card invoice-doc-card" style={{ marginBottom: 16 }}>
+        <InvoiceDocumentBody job={job} invoice={invoice} settings={settings} portalUrl={portalUrl} />
       </div>
 
       {showPayment && (

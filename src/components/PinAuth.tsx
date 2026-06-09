@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Car } from '@phosphor-icons/react'
+import AppLogo from '@/components/AppLogo'
 import { useAuth } from '@/providers/AuthProvider'
 
 export default function PinAuth() {
@@ -74,7 +74,9 @@ export default function PinAuth() {
         background: 'var(--bg-base)',
       }}
     >
-      <Car size={48} weight="duotone" color="var(--green)" aria-hidden="true" style={{ marginBottom: 16 }} />
+      <div style={{ marginBottom: 16 }}>
+        <AppLogo size={56} priority />
+      </div>
       <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 6, color: 'var(--text-primary)' }}>
         {needsSetup ? 'Set your PIN' : 'Enter PIN'}
       </h1>

@@ -1,6 +1,7 @@
 import PortalView from '@/components/portal/PortalView'
-import { buildPortalPayload } from '@/lib/server/portal-data'
-import { getAppBaseUrl, validatePortalToken } from '@/lib/server/portal-tokens'
+import PortalErrorScreen from '@/components/portal/PortalErrorScreen'
+import { buildPortalPayload, loadPortalBusiness } from '@/lib/server/portal-data'
+import { getRequestAppBaseUrl, validatePortalToken } from '@/lib/server/portal-tokens'
 
 export default async function PortalPage({
   params,
@@ -11,23 +12,16 @@ export default async function PortalPage({
   const record = await validatePortalToken(token)
 
   if (!record) {
-    return (
-      <div className="screen page-content" style={{ paddingTop: 48, textAlign: 'center' }}>
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Link expired or invalid</div>
-        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-          Please contact the business for a new link.
-        </div>
-      </div>
-    )
+    const baseUrl = await getRequestAppBaseUrl()
+    const business = await loadPortalBusiness(baseUrl).catch(() => undefined)
+    return <PortalErrorScreen type="LINK_EXPIRED" business={business} />
   }
 
-  const payload = await buildPortalPayload(record, getAppBaseUrl())
+  const payload = await buildPortalPayload(record, await getRequestAppBaseUrl())
   if (!payload) {
-    return (
-      <div className="screen page-content" style={{ paddingTop: 48, textAlign: 'center' }}>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>Content unavailable</div>
-      </div>
-    )
+    const baseUrl = await getRequestAppBaseUrl()
+    const business = await loadPortalBusiness(baseUrl).catch(() => undefined)
+    return <PortalErrorScreen type="UNAVAILABLE" business={business} />
   }
 
   return <PortalView payload={payload} token={token} />

@@ -5,12 +5,13 @@ import type { Invoice, JobWithRelations } from '@/lib/types'
 export async function downloadInvoicePdf(
   job: JobWithRelations,
   invoice: Invoice,
-  settings: AppSettings
+  settings: AppSettings,
+  portalUrl?: string
 ): Promise<void> {
   const res = await fetch('/api/pdf/invoice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ job, invoice, settings }),
+    body: JSON.stringify({ job, invoice, settings, portalUrl }),
   })
 
   if (!res.ok) {

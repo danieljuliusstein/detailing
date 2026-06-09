@@ -131,6 +131,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace('/auth')
   }, [router, bumpAuth])
 
+  const contextValue = {
+    isAuthenticated: authenticated,
+    needsSetup,
+    setupPin: setupPinFn,
+    login,
+    logout,
+  }
+
+  // Public routes (portal links) must render SSR content immediately — never block on client mount.
+  if (!ready && isPublicRoute) {
+    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  }
+
   if (!ready) {
     return (
       <div className="auth-loading-screen">
@@ -140,11 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   if (isPublicRoute) {
-    return (
-      <AuthContext.Provider value={{ isAuthenticated: authenticated, needsSetup, setupPin: setupPinFn, login, logout }}>
-        {children}
-      </AuthContext.Provider>
-    )
+    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   }
 
   if (!authenticated && !needsSetup) {
@@ -155,11 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
-  return (
-    <AuthContext.Provider value={{ isAuthenticated: authenticated, needsSetup, setupPin: setupPinFn, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

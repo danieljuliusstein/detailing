@@ -32,6 +32,20 @@ export function getAppBaseUrl(): string {
   ).replace(/\/$/, '')
 }
 
+/** Prefer the incoming request host so portal asset URLs match how the client opened the link. */
+export async function getRequestAppBaseUrl(): Promise<string> {
+  try {
+    const { headers } = await import('next/headers')
+    const h = await headers()
+    const host = h.get('x-forwarded-host') ?? h.get('host')
+    const proto = h.get('x-forwarded-proto') ?? 'http'
+    if (host) return `${proto}://${host}`.replace(/\/$/, '')
+  } catch {
+    // headers() unavailable outside a request
+  }
+  return getAppBaseUrl()
+}
+
 export async function createPortalToken(input: {
   clientId: string
   scope: PortalScope

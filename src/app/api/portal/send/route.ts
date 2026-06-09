@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       html: `
         <p>Hi ${clientName ?? 'there'},</p>
         <p>${message ?? 'Here is your secure link to view your service details.'}</p>
-        <p><a href="${portalUrl}">${portalUrl}</a></p>
+        <p><a href="${portalUrl}">View your service portal</a></p>
         <p>— ${businessName}</p>
       `,
     })

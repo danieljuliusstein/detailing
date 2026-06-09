@@ -67,7 +67,9 @@ export async function loadSettingsFromPocketBase(): Promise<AppSettings | null> 
     let logoUrl: string | undefined
     const logo = record.logo
     if (typeof logo === 'string' && logo) {
-      logoUrl = pb().files.getURL(record, logo)
+      logoUrl = '/api/business-logo'
+    } else {
+      logoUrl = '/logo.png'
     }
 
     return recordToSettings(record, logoUrl)
@@ -132,9 +134,7 @@ export async function saveSettingsToPocketBase(
 
   let logoUrl: string | undefined
   const logo = record.logo
-  if (typeof logo === 'string' && logo) {
-    logoUrl = pb().files.getURL(record, logo)
-  }
+  logoUrl = typeof logo === 'string' && logo ? '/api/business-logo' : '/logo.png'
 
   return recordToSettings(record, logoUrl)
 }

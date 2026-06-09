@@ -51,25 +51,31 @@ export interface PortalPayload {
   photos: PortalPhoto[]
 }
 
-async function loadSettings(pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>) {
+export async function loadPortalBusiness(appBaseUrl: string): Promise<PortalPayload['business']> {
+  const pb = await authenticateServerPocketBase()
+  return loadSettings(pb, appBaseUrl)
+}
+
+async function loadSettings(
+  pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>,
+  appBaseUrl: string
+) {
   const records = await pb.collection('app_settings').getFullList({ limit: 1 })
   const s = records[0]
+  const base = appBaseUrl.replace(/\/$/, '')
+
   if (!s) {
     return {
       name: 'Detailing',
       phone: '',
       email: '',
       address: '',
-      logoUrl: undefined as string | undefined,
+      logoUrl: `${base}/api/business-logo`,
       termsFooter: undefined as string | undefined,
     }
   }
 
-  let logoUrl: string | undefined
-  const logo = s.logo
-  if (typeof logo === 'string' && logo) {
-    logoUrl = pb.files.getURL(s, logo)
-  }
+  const logoUrl = `${base}/api/business-logo`
 
   return {
     name: String(s.business_name ?? 'Detailing'),
@@ -86,7 +92,7 @@ export async function buildPortalPayload(
   appBaseUrl: string
 ): Promise<PortalPayload | null> {
   const pb = await authenticateServerPocketBase()
-  const business = await loadSettings(pb)
+  const business = await loadSettings(pb, appBaseUrl)
   const scope = tokenRecord.scope
 
   let clientName = 'Client'
@@ -212,4 +218,34 @@ export async function streamPortalPhoto(
   const bytes = await res.arrayBuffer()
   const contentType = res.headers.get('content-type') ?? 'image/jpeg'
   return { bytes, contentType }
+}
+
+export async function streamBusinessLogo(): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  try {
+    const { readFileSync } = await import('fs')
+    const { join } = await import('path')
+    const buf = readFileSync(join(process.cwd(), 'public', 'logo.png'))
+    return { bytes: Uint8Array.from(buf).buffer, contentType: 'image/png' }
+  } catch {
+    // fall through to PocketBase upload
+  }
+
+  const pb = await authenticateServerPocketBase()
+  const records = await pb.collection('app_settings').getFullList({ limit: 1 })
+  const s = records[0]
+  const logo = s?.logo
+
+  if (s && typeof logo === 'string' && logo) {
+    const url = pb.files.getURL(s, logo)
+    const res = await fetch(url, {
+      headers: { Authorization: pb.authStore.token },
+    })
+    if (res.ok) {
+      const bytes = await res.arrayBuffer()
+      const contentType = res.headers.get('content-type')?.split(';')[0] ?? 'image/png'
+      return { bytes, contentType }
+    }
+  }
+
+  return null
 }

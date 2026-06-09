@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import InvoicePdfDocument from '@/components/pdf/InvoicePdfDocument'
+import { resolveInvoiceLogoDataUri } from '@/lib/invoice-logo-server'
 import type { AppSettings } from '@/lib/settings'
 import type { Invoice, JobWithRelations } from '@/lib/types'
 
@@ -15,8 +16,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing invoice data' }, { status: 400 })
     }
 
+    const logoDataUri = await resolveInvoiceLogoDataUri(settings.logo_url)
+    const portalUrl = typeof body.portalUrl === 'string' ? body.portalUrl : undefined
+
     const buffer = await renderToBuffer(
-      <InvoicePdfDocument job={job} invoice={invoice} settings={settings} />
+      <InvoicePdfDocument
+        job={job}
+        invoice={invoice}
+        settings={settings}
+        logoDataUri={logoDataUri}
+        portalUrl={portalUrl}
+      />
     )
 
     const filename = `${invoice.invoice_number}.pdf`.replace(/[^\w.-]/g, '_')
