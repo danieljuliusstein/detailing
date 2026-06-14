@@ -8,6 +8,11 @@ import AddJobPhotoSheet from '@/components/jobs/AddJobPhotoSheet'
 import JobPhotoLightbox from '@/components/jobs/JobPhotoLightbox'
 import ShareLinkActions from '@/components/portal/ShareLinkActions'
 import { deleteJobPhoto, getJobPhotos, uploadJobPhoto } from '@/lib/api'
+import {
+  isJobPhotoTypeAtLimit,
+  jobPhotoLimitMessage,
+  MAX_JOB_PHOTOS_PER_TYPE,
+} from '@/lib/job-photo-limits'
 import type { JobPhoto, JobWithRelations, PhotoType } from '@/lib/types'
 
 function formatJobDate(date: string): string {
@@ -34,14 +39,26 @@ function PhotoSection({
   const label = type === 'before' ? 'Before' : 'After'
   const labelClass =
     type === 'before' ? 'job-photos__section-label--before' : 'job-photos__section-label--after'
+  const atLimit = isJobPhotoTypeAtLimit(photos.length)
 
   return (
     <section className="job-photos__section">
       <div className="job-photos__section-head">
-        <h2 className={`job-photos__section-label ${labelClass}`}>{label}</h2>
-        <button type="button" className="job-photos__add-chip" onClick={onAdd} disabled={uploading}>
+        <div>
+          <h2 className={`job-photos__section-label ${labelClass}`}>{label}</h2>
+          <p className="job-photos__section-cap">
+            {photos.length}/{MAX_JOB_PHOTOS_PER_TYPE} · saved compressed
+          </p>
+        </div>
+        <button
+          type="button"
+          className="job-photos__add-chip"
+          onClick={onAdd}
+          disabled={uploading || atLimit}
+          title={atLimit ? jobPhotoLimitMessage(type) : undefined}
+        >
           <CameraPlus size={14} weight="bold" aria-hidden="true" />
-          Add
+          {atLimit ? 'Full' : 'Add'}
         </button>
       </div>
       <div className="job-photos__grid">
@@ -53,7 +70,7 @@ function PhotoSection({
           photos.map((p, i) => (
             <button key={p.filename} type="button" className="job-photos__thumb" onClick={() => onOpen(i)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" />
+              <img src={p.url} alt="" loading="lazy" />
             </button>
           ))
         )}
@@ -69,6 +86,7 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
   const [addType, setAddType] = useState<PhotoType | null>(null)
   const [lightbox, setLightbox] = useState<{ type: PhotoType; index: number } | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
+  const [error, setError] = useState('')
 
   const loadPhotos = useCallback(async () => {
     const list = await getJobPhotos(job.id)
@@ -82,12 +100,25 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
   const beforePhotos = photos.filter((p) => p.type === 'before')
   const afterPhotos = photos.filter((p) => p.type === 'after')
 
+  const tryOpenAdd = (type: PhotoType) => {
+    const count = type === 'before' ? beforePhotos.length : afterPhotos.length
+    if (isJobPhotoTypeAtLimit(count)) {
+      setError(jobPhotoLimitMessage(type))
+      return
+    }
+    setError('')
+    setAddType(type)
+  }
+
   const handleUpload = async (file: File, type: PhotoType) => {
     setUploading(true)
     setAddType(null)
+    setError('')
     try {
       await uploadJobPhoto(job.id, file, type)
       await loadPhotos()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setUploading(false)
     }
@@ -115,6 +146,8 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
           </div>
           <span className="job-photos__count">{photos.length}</span>
         </header>
+
+        {error ? <div className="job-photos__error">{error}</div> : null}
 
         {(beforePhotos.length > 0 || afterPhotos.length > 0) && (
           <div className="job-photos__compare">
@@ -145,7 +178,7 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
           type="before"
           photos={beforePhotos}
           uploading={uploading}
-          onAdd={() => setAddType('before')}
+          onAdd={() => tryOpenAdd('before')}
           onOpen={(index) => setLightbox({ type: 'before', index })}
         />
 
@@ -153,7 +186,7 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
           type="after"
           photos={afterPhotos}
           uploading={uploading}
-          onAdd={() => setAddType('after')}
+          onAdd={() => tryOpenAdd('after')}
           onOpen={(index) => setLightbox({ type: 'after', index })}
         />
       </div>

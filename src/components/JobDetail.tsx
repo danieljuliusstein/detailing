@@ -1,12 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, FileText, PencilSimple, Link } from '@phosphor-icons/react'
+import { CalendarPlus, FileText, PencilSimple, Link, Trash } from '@phosphor-icons/react'
 import JobPhotosEntry from '@/components/jobs/JobPhotosEntry'
 import { suggestNextServiceDate } from '@/lib/next-service'
 import { normalizeReturnDays } from '@/lib/package-cadence'
 import BackButton from '@/components/BackButton'
 import ShareLinkActions from '@/components/portal/ShareLinkActions'
+import { deleteJob } from '@/lib/api'
 import {
   effectiveRate,
   fmtDetailed,
@@ -40,6 +42,7 @@ interface JobDetailProps {
 
 export default function JobDetail({ job }: JobDetailProps) {
   const router = useRouter()
+  const [cancelling, setCancelling] = useState(false)
   const expenses = jobExpensesForDisplay(job)
   const profit = netProfit(job)
   const rate = effectiveRate(job)
@@ -63,6 +66,31 @@ export default function JobDetail({ job }: JobDetailProps) {
     job.client
   const returnDays = normalizeReturnDays(job.package?.expected_return_days)
   const nextServiceDate = showNextService ? suggestNextServiceDate(job.date, returnDays) : null
+
+  const isUpcoming = job.status === 'scheduled' || job.status === 'in_progress'
+
+  const handleCancel = () => {
+    const dateLabel = new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })
+    const clientName = job.client?.name ?? 'this client'
+    const confirmed = window.confirm(
+      `Cancel the appointment for ${clientName} on ${dateLabel}? The time slot will be freed on your website calendar. This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setCancelling(true)
+    void deleteJob(job.id).then((result) => {
+      if (result.ok) {
+        router.replace('/jobs')
+        return
+      }
+      setCancelling(false)
+      window.alert(result.error ?? 'Could not cancel this appointment. Try again.')
+    })
+  }
 
   return (
     <div className="screen page-content">
@@ -236,6 +264,19 @@ export default function JobDetail({ job }: JobDetailProps) {
         <PencilSimple size={16} weight="regular" color="var(--text-secondary)" />
         Edit job
       </button>
+
+      {isUpcoming ? (
+        <button
+          type="button"
+          className="btn-danger"
+          disabled={cancelling}
+          onClick={handleCancel}
+          style={{ width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          <Trash size={16} weight="regular" aria-hidden="true" />
+          {cancelling ? 'Cancelling…' : 'Cancel appointment'}
+        </button>
+      ) : null}
     </div>
   )
 }

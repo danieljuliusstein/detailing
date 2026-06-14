@@ -412,3 +412,72 @@ export async function getCollectionCounts(): Promise<Record<string, number>> {
   }
   return counts
 }
+
+export type DeleteJobResult = { ok: boolean; error?: string }
+
+async function deleteRecordsByJobFilter(collection: string, jobId: string): Promise<void> {
+  const escaped = escapeFilterValue(jobId)
+  try {
+    const records = await pb().collection(collection).getFullList<PbRecord>({
+      filter: `job_id = "${escaped}"`,
+    })
+    for (const record of records) {
+      await pb().collection(collection).delete(record.id)
+    }
+  } catch (err) {
+    const status = err && typeof err === 'object' && 'status' in err ? (err as { status: number }).status : 0
+    if (status === 404) return
+    throw err
+  }
+}
+
+async function clearQuoteJobLinks(jobId: string): Promise<void> {
+  const escaped = escapeFilterValue(jobId)
+  try {
+    const quotes = await pb().collection('quotes').getFullList<PbRecord>({
+      filter: `job_id = "${escaped}"`,
+    })
+    for (const quote of quotes) {
+      try {
+        await pb().collection('quotes').update(quote.id, { job_id: '' })
+      } catch {
+        await pb().collection('quotes').update(quote.id, { job_id: null })
+      }
+    }
+  } catch (err) {
+    const status = err && typeof err === 'object' && 'status' in err ? (err as { status: number }).status : 0
+    if (status === 404) return
+    throw err
+  }
+}
+
+export async function deleteJob(id: string): Promise<DeleteJobResult> {
+  if (!(await ensurePocketBaseAuth())) {
+    return { ok: false, error: 'Could not authenticate with PocketBase' }
+  }
+
+  try {
+    const job = await pb().collection('jobs').getOne<PbRecord>(id)
+
+    await deleteRecordsByJobFilter('invoices', id)
+
+    const invoiceId = job.invoice_id
+    if (typeof invoiceId === 'string' && invoiceId) {
+      try {
+        await pb().collection('invoices').delete(invoiceId)
+      } catch {
+        // already removed
+      }
+    }
+
+    await clearQuoteJobLinks(id)
+    await deleteRecordsByJobFilter('damage_docs', id)
+    await deleteRecordsByJobFilter('portal_tokens', id)
+
+    await pb().collection('jobs').delete(id)
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete job'
+    return { ok: false, error: message }
+  }
+}

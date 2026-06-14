@@ -279,6 +279,21 @@ export function updateJob(id: string, updates: JobEditData): Job | null {
   return data.jobs[idx]
 }
 
+export function deleteJob(id: string): boolean {
+  const data = loadData()
+  const job = data.jobs.find((j) => j.id === id)
+  if (!job) return false
+
+  data.invoices = data.invoices.filter((i) => i.job_id !== id && i.id !== job.invoice_id)
+  if (data.quotes) {
+    data.quotes = data.quotes.map((q) => (q.job_id === id ? { ...q, job_id: undefined } : q))
+  }
+  delete data.job_photos[id]
+  data.jobs = data.jobs.filter((j) => j.id !== id)
+  saveData(data)
+  return true
+}
+
 export function getClient(id: string): Client | null {
   return loadData().clients.find((c) => c.id === id) ?? null
 }

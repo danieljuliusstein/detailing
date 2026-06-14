@@ -1,4 +1,5 @@
 import { getPocketBase } from '../pocketbase'
+import { isJobPhotoTypeAtLimit, jobPhotoLimitMessage } from '../job-photo-limits'
 import { pbJobToApp, type PbRecord } from './mappers'
 import type { JobPhoto, PhotoMeta, PhotoType } from '../types'
 
@@ -34,6 +35,11 @@ export async function uploadJobPhoto(
 ): Promise<JobPhoto> {
   const record = await pb().collection('jobs').getOne<PbRecord>(jobId)
   const existingMeta = Array.isArray(record.photo_meta) ? [...(record.photo_meta as PhotoMeta[])] : []
+
+  const typeCount = existingMeta.filter((m) => m.type === type).length
+  if (isJobPhotoTypeAtLimit(typeCount)) {
+    throw new Error(jobPhotoLimitMessage(type))
+  }
 
   const formData = new FormData()
   formData.append('photos+', file)

@@ -1,4 +1,5 @@
 import { loadData, newId, saveData } from '../storage'
+import { isJobPhotoTypeAtLimit, jobPhotoLimitMessage } from '../job-photo-limits'
 import type { JobPhoto, PhotoType } from '../types'
 
 export function getJobPhotos(jobId: string): JobPhoto[] {
@@ -16,8 +17,14 @@ export async function uploadJobPhoto(
   file: File,
   type: PhotoType
 ): Promise<JobPhoto> {
-  const dataUrl = await readFileAsDataUrl(file)
   const data = loadData()
+  const existing = data.job_photos[jobId] ?? []
+  const typeCount = existing.filter((p) => p.type === type).length
+  if (isJobPhotoTypeAtLimit(typeCount)) {
+    throw new Error(jobPhotoLimitMessage(type))
+  }
+
+  const dataUrl = await readFileAsDataUrl(file)
   const photo = { id: newId(), data_url: dataUrl, type }
   if (!data.job_photos[jobId]) data.job_photos[jobId] = []
   data.job_photos[jobId].push(photo)

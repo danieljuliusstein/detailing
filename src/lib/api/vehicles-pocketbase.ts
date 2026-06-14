@@ -48,8 +48,17 @@ export async function getVehicle(id: string): Promise<Vehicle | null> {
 }
 
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
-  const record = await pb().collection('vehicles').create<PbRecord>(appVehicleToPb(input))
-  return pbVehicleToApp(record, vehiclePhotoUrl(record))
+  try {
+    const record = await pb().collection('vehicles').create<PbRecord>(appVehicleToPb(input))
+    return pbVehicleToApp(record, vehiclePhotoUrl(record))
+  } catch (err) {
+    if (isMissingCollectionError(err)) {
+      throw new Error(
+        'Vehicles are not set up on the server yet. Ask your admin to run PocketBase migrations (vehicles collection missing).'
+      )
+    }
+    throw err
+  }
 }
 
 export async function updateVehicle(id: string, input: Partial<VehicleInput>): Promise<Vehicle | null> {

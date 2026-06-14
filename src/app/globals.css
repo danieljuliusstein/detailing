@@ -753,6 +753,21 @@ html, body {
 .btn-ghost:active { background: var(--bg-surface-active); }
 .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.btn-danger {
+  background: transparent;
+  color: var(--red-text);
+  font-size: 15px;
+  border: 0.5px solid rgba(248, 113, 113, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  width: 100%;
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-danger:active { background: var(--red-dim); opacity: 0.9; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .input {
   background: var(--bg-surface);
   border: 0.5px solid var(--border);
@@ -846,18 +861,20 @@ html, body {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   width: 100%;
   max-width: 390px;
+  margin-inline: auto;
   background: #111111;
   border-top: 0.5px solid var(--border);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: center;
+  grid-template-columns: 1fr 1fr 72px 1fr 1fr;
+  align-items: end;
   min-height: 56px;
-  padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
   z-index: 100;
+  box-sizing: border-box;
 }
 
 .bottom-nav-tab {
@@ -898,13 +915,15 @@ html, body {
 
 .bottom-nav-fab {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 2px;
 }
 
 .bottom-nav-fab-link {
   width: 52px;
   height: 52px;
+  margin-top: -22px;
   background: var(--green);
   border-radius: 50%;
   border: none;
@@ -915,6 +934,7 @@ html, body {
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
   transition: transform 200ms ease, opacity 200ms ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .bottom-nav-fab-link--open {
@@ -1409,7 +1429,7 @@ html, body {
 }
 
 .page-content {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
 }
 
 .app-shell {

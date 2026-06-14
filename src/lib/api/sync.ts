@@ -123,6 +123,23 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
       await pb.updateJob(resolvedId, data)
       break
     }
+    case 'deleteJob': {
+      const localId = op.params.id
+      if (maps.jobs.has(localId)) {
+        const result = await pb.deleteJob(maps.jobs.get(localId)!)
+        if (!result.ok) throw new Error(result.error ?? 'Failed to delete job')
+        maps.jobs.delete(localId)
+        break
+      }
+      try {
+        const resolvedId = await resolveJobId(localId)
+        const result = await pb.deleteJob(resolvedId)
+        if (!result.ok) throw new Error(result.error ?? 'Failed to delete job')
+      } catch {
+        // Job never synced to server — nothing to delete remotely.
+      }
+      break
+    }
     case 'createInvoiceForJob': {
       const jobId = maps.resolveJob(op.params.jobId)
       const resolvedId = maps.jobs.has(op.params.jobId) ? jobId : await resolveJobId(op.params.jobId)

@@ -173,6 +173,14 @@
 
 /* Add photo sheet (custom — lighter than inv-sheet) */
 .damage-sheet-root {
+  --dmg-s1: #161616;
+  --dmg-s2: #1e1e1e;
+  --dmg-bdr: rgba(255, 255, 255, 0.08);
+  --dmg-t1: #f5f5f4;
+  --dmg-t2: #9b9b96;
+  --dmg-t3: #6b6b67;
+  --dmg-grn: #4ade80;
+
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -191,10 +199,12 @@
 
 .damage-sheet {
   position: relative;
-  background: var(--dmg-s1);
+  background: var(--dmg-s1, #161616);
   border-radius: 20px 20px 0 0;
-  padding: 0 14px 28px;
+  padding: 0 14px calc(28px + env(safe-area-inset-bottom, 0px));
   z-index: 1;
+  border-top: 1px solid var(--dmg-bdr, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
 }
 
 .damage-sheet__handle {
@@ -208,8 +218,8 @@
 .damage-sheet__title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--dmg-t1);
-  font-family: var(--font-display);
+  color: var(--dmg-t1, #f5f5f4);
+  font-family: var(--font-display, var(--font-syne), sans-serif);
   margin-bottom: 14px;
 }
 
@@ -248,12 +258,12 @@
 .damage-sheet-row__title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--dmg-t1);
+  color: var(--dmg-t1, #f5f5f4);
 }
 
 .damage-sheet-row__sub {
   font-size: 11px;
-  color: var(--dmg-t2);
+  color: var(--dmg-t2, #9b9b96);
   margin-top: 2px;
 }
 
@@ -263,7 +273,7 @@
   text-align: center;
   padding: 14px;
   font-size: 13px;
-  color: var(--dmg-t3);
+  color: var(--dmg-t3, #6b6b67);
   background: none;
   border: none;
   cursor: pointer;

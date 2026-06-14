@@ -7,6 +7,8 @@ function opReferencesJob(op: QueueOperation, jobId: string): boolean {
       return op.localJobId === jobId
     case 'updateJob':
       return op.params.id === jobId
+    case 'deleteJob':
+      return op.params.id === jobId
     case 'createInvoiceForJob':
       return op.params.jobId === jobId
     case 'uploadJobPhoto':
@@ -22,6 +24,7 @@ function isStaleQueueItem(item: QueueItem): boolean {
   for (const demoId of DEMO_JOB_IDS) {
     if (opReferencesJob(op, demoId)) return true
   }
+  if (op.type === 'deleteJob' && isDemoJobId(op.params.id)) return true
   if (op.type === 'updateJob' && isDemoJobId(op.params.id)) return true
   if (op.type === 'createInvoiceForJob' && isDemoJobId(op.params.jobId)) return true
   if (op.type === 'uploadJobPhoto' && isDemoJobId(op.params.jobId)) return true
@@ -48,6 +51,8 @@ export function describeQueueItem(item: QueueItem): string {
   switch (op.type) {
     case 'updateJob':
       return `update job ${op.params.id}`
+    case 'deleteJob':
+      return `delete job ${op.params.id}`
     case 'createInvoiceForJob':
       return `invoice for job ${op.params.jobId}`
     case 'createJob':
@@ -63,6 +68,19 @@ export async function purgeStaleQueueItems(): Promise<number> {
   let removed = 0
   for (const item of items) {
     if (isStaleQueueItem(item)) {
+      await removeQueueItem(item.id)
+      removed++
+    }
+  }
+  return removed
+}
+
+/** Remove pending sync ops for a deleted job (create/update/photos/invoices). */
+export async function purgeQueueItemsForJob(jobId: string): Promise<number> {
+  const items = await getQueueItems()
+  let removed = 0
+  for (const item of items) {
+    if (opReferencesJob(item.operation, jobId)) {
       await removeQueueItem(item.id)
       removed++
     }

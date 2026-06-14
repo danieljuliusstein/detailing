@@ -5,6 +5,7 @@
 export type QueueOperation =
   | { type: 'createJob'; params: import('./types').QuickJobData; localJobId: string }
   | { type: 'updateJob'; params: { id: string; data: import('./types').JobEditData } }
+  | { type: 'deleteJob'; params: { id: string } }
   | { type: 'createInvoiceForJob'; params: { jobId: string } }
   | { type: 'markInvoiceSent'; params: { invoiceId: string } }
   | { type: 'addPayment'; params: { invoiceId: string; payment: import('./types').Payment } }

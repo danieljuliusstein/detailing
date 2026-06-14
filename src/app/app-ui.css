@@ -612,6 +612,10 @@
   border-top: 0.5px solid #1e1e1e;
 }
 
+.bottom-nav-tab {
+  padding-bottom: 2px;
+}
+
 .bottom-nav-tab-label {
   font-size: 10px;
   text-transform: uppercase;
@@ -624,12 +628,13 @@
 }
 
 .bottom-nav-fab-link {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
+  margin-top: -22px;
 }
 
 .bottom-nav-fab-link svg {
-  color: #fff !important;
+  color: #071407 !important;
 }
 
 /* ── Upcoming status pill ── */

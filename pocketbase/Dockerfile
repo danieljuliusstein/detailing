@@ -17,4 +17,4 @@ VOLUME ["/pb/pb_data"]
 
 EXPOSE 8080
 
-CMD ["./pocketbase", "serve", "--http=0.0.0.0:8080", "--dir=/pb/pb_data", "--hooksDir=/pb/pb_hooks"]
+CMD ["./pocketbase", "serve", "--http=0.0.0.0:8080", "--dir=/pb/pb_data", "--hooksDir=/pb/pb_hooks", "--migrationsDir=/pb/pb_migrations"]

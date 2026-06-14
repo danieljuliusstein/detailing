@@ -39,6 +39,7 @@ import * as equipmentLocal from './equipment-local'
 import * as equipmentPb from './equipment-pocketbase'
 import * as suppliesLocal from './supplies-local'
 import * as suppliesPb from './supplies-pocketbase'
+import { compressJobPhoto } from '../compress-job-photo'
 import { notifyFinancialDataChanged } from '../financial-data-events'
 import { getBusinessExpensesMerged } from './business-expenses-merge'
 import { clearWriteDegraded, executeWrite } from './write-router'
@@ -243,6 +244,22 @@ export async function updateJob(id: string, data: JobEditData): Promise<Job | nu
   })
   notifyFinancialDataChanged()
   return job
+}
+
+export async function deleteJob(id: string): Promise<{ ok: boolean; error?: string }> {
+  const resolved = await resolveBackend()
+  const result = await executeWrite({
+    resolvedBackend: resolved,
+    local: () => ({ ok: local.deleteJob(id) }),
+    pocketbase: () => pb.deleteJob(id),
+    buildQueue: (r) => (r.ok ? { type: 'deleteJob', params: { id } } : null),
+  })
+  if (result.ok) {
+    const { purgeQueueItemsForJob } = await import('./queue-utils')
+    await purgeQueueItemsForJob(id)
+    notifyFinancialDataChanged()
+  }
+  return result
 }
 
 export async function getDashboardData(): Promise<DashboardData & { weekDays: WeekDay[] }> {
@@ -635,12 +652,13 @@ async function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 export async function uploadJobPhoto(jobId: string, file: File, type: PhotoType): Promise<JobPhoto> {
+  const prepared = await compressJobPhoto(file)
   const resolved = await resolveBackend()
-  const dataUrlPromise = readFileAsDataUrl(file)
+  const dataUrlPromise = readFileAsDataUrl(prepared)
   return executeWrite({
     resolvedBackend: resolved,
-    local: () => photosLocal.uploadJobPhoto(jobId, file, type),
-    pocketbase: () => photosPb.uploadJobPhoto(jobId, file, type),
+    local: () => photosLocal.uploadJobPhoto(jobId, prepared, type),
+    pocketbase: () => photosPb.uploadJobPhoto(jobId, prepared, type),
     buildQueue: async (photo) => ({
       type: 'uploadJobPhoto',
       params: {
