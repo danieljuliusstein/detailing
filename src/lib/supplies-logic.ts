@@ -139,7 +139,7 @@ export function inventoryRowVariant(supply: Supply): InventoryRowVariant {
   return ''
 }
 
-export type SupplyFilterChip = 'all' | 'low' | 'out'
+export type SupplyFilterChip = 'all' | 'low' | 'out' | 'not_in_expenses'
 
 export function groupSupplies(items: Supply[]): { attention: Supply[]; stocked: Supply[] } {
   const attention: Supply[] = []

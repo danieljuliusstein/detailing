@@ -5,12 +5,13 @@ import {
   inventoryRowVariant,
   isLowStock,
   isOutOfStock,
+  type SupplyFilterChip,
 } from '@/lib/supplies-logic'
 import type { HomeInventoryItem } from '@/lib/home-inventory'
 import type { Equipment, Supply, SupplyKind } from '@/lib/types'
 
 export type SectionKey = 'chemicals' | 'equipment' | 'supplies' | 'wishlist'
-export type SupplyFilterChip = 'all' | 'low' | 'out' | 'not_in_expenses'
+export type { SupplyFilterChip }
 
 export const SUPPLY_FILTER_CHIPS: { id: SupplyFilterChip; label: string }[] = [
   { id: 'all', label: 'All' },
