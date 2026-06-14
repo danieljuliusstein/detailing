@@ -1,6 +1,6 @@
 import { isDemoAppData } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
-import type { BusinessExpense, Client, Equipment, Invoice, Job, OverheadExpense, Package, Quote, Supply } from './types'
+import type { BusinessExpense, Client, DamageRecord, Equipment, Invoice, Job, OverheadExpense, Package, Quote, Supply, Vehicle } from './types'
 
 function useDevDemoSeed(): boolean {
   return process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
@@ -25,6 +25,8 @@ export interface AppData {
   overhead_expenses: OverheadExpense[]
   business_expenses?: BusinessExpense[]
   job_photos: Record<string, JobPhotoLocal[]>
+  vehicles?: Vehicle[]
+  damage_docs?: DamageRecord[]
 }
 
 function generateId(): string {
@@ -181,7 +183,71 @@ export function createSeedData(): AppData {
     },
   ]
 
-  return { packages, clients, jobs, invoices, supplies, equipment, overhead_expenses, business_expenses: [], job_photos: {} }
+  const vehicles: Vehicle[] = [
+    {
+      id: 'veh_marcus_truck',
+      client_id: 'cli_marcus',
+      year: 2019,
+      make: 'Ford',
+      model: 'F-150',
+      color: 'Oxford White',
+      color_hex: '#e8e8e8',
+      plate: 'GA-4821',
+      type: 'truck',
+    },
+    {
+      id: 'veh_sarah_tesla',
+      client_id: 'cli_sarah',
+      year: 2022,
+      make: 'Tesla',
+      model: 'Model 3',
+      color: 'Midnight Blue',
+      color_hex: '#1a3a6a',
+      plate: 'DX91AB',
+      type: 'sedan',
+    },
+  ]
+
+  const damage_docs: DamageRecord[] = [
+    {
+      id: 'dmg_001',
+      vehicle_id: 'veh_sarah_tesla',
+      area: 'Front bumper',
+      note: 'Small paint chip, pre-existing — noted by client at intake',
+      date: '2026-06-02',
+      captured_at: '2026-06-02T09:14:00.000Z',
+      photo_url: null,
+    },
+    {
+      id: 'dmg_002',
+      vehicle_id: 'veh_sarah_tesla',
+      area: 'Driver door',
+      note: 'Light surface scratch, approx 4 inches, clear coat only',
+      date: '2026-05-15',
+      captured_at: '2026-05-15T14:30:00.000Z',
+      photo_url: null,
+    },
+    {
+      id: 'dmg_003',
+      vehicle_id: 'veh_sarah_tesla',
+      area: 'Rear quarter panel',
+      note: 'Hail pitting, minor. Pre-existing per client.',
+      date: '2026-02-14',
+      captured_at: '2026-02-14T11:05:00.000Z',
+      photo_url: null,
+    },
+    {
+      id: 'dmg_004',
+      vehicle_id: 'veh_marcus_truck',
+      area: 'Tailgate',
+      note: 'Scuff marks from loading equipment — documented at intake',
+      date: '2026-05-28',
+      captured_at: '2026-05-28T08:45:00.000Z',
+      photo_url: null,
+    },
+  ]
+
+  return { packages, clients, jobs, invoices, supplies, equipment, overhead_expenses, business_expenses: [], job_photos: {}, vehicles, damage_docs }
 }
 
 /** Empty store — used when PocketBase is configured so we never show demo seed data on fallback. */
@@ -196,6 +262,8 @@ export function createEmptyData(): AppData {
     overhead_expenses: [],
     business_expenses: [],
     job_photos: {},
+    vehicles: [],
+    damage_docs: [],
   }
 }
 
@@ -225,6 +293,8 @@ export function loadData(): AppData {
     supplies: parsed.supplies ?? fallback.supplies,
     overhead_expenses: parsed.overhead_expenses ?? fallback.overhead_expenses,
     job_photos: parsed.job_photos ?? {},
+    vehicles: parsed.vehicles ?? fallback.vehicles ?? [],
+    damage_docs: parsed.damage_docs ?? fallback.damage_docs ?? [],
   }
 
   // Phone may still have demo saved from an earlier visit — drop it when cloud is configured.

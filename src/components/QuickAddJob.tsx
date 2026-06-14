@@ -3,22 +3,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Boat,
-  Bus,
   CalendarBlank,
-  Car,
   CaretLeft,
   CheckCircle,
   Circle,
   Clock,
-  DotsThree,
   House,
-  Jeep,
   MagnifyingGlass,
   MapPin,
   Plus,
-  Truck,
-  type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import JobExpensesSheet, { type JobExpenseDraft } from '@/components/jobs/JobExpensesSheet'
 import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
@@ -27,6 +20,7 @@ import './QuickAddJob.css'
 import { fmt } from '@/lib/calculations'
 import { deriveInitials } from '@/lib/client-relationship-logic'
 import type { ClientWithStats, Package, QuickJobData, Supply, SupplyUsage, VehicleType } from '@/lib/types'
+import { VEHICLE_TYPE_OPTIONS } from '@/lib/vehicle-type-icons'
 
 interface QuickAddJobProps {
   packages: Package[]
@@ -37,14 +31,7 @@ interface QuickAddJobProps {
   onSave: (data: QuickJobData) => Promise<{ id: string }>
 }
 
-const VEHICLE_TYPES: { id: VehicleType; label: string; Icon: PhosphorIcon }[] = [
-  { id: 'sedan', label: 'Sedan', Icon: Car },
-  { id: 'suv', label: 'SUV', Icon: Jeep },
-  { id: 'truck', label: 'Truck', Icon: Truck },
-  { id: 'van', label: 'Van', Icon: Bus },
-  { id: 'boat', label: 'Boat', Icon: Boat },
-  { id: 'other', label: 'Other', Icon: DotsThree },
-]
+const VEHICLE_TYPES = VEHICLE_TYPE_OPTIONS
 
 function formatHeaderDate(d: Date): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })

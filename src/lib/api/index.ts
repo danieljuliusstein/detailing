@@ -18,6 +18,10 @@ import * as supplyPurchasesLocal from './supply-purchases-local'
 import * as supplyPurchasesPb from './supply-purchases-pocketbase'
 import * as photosLocal from './photos-local'
 import * as photosPb from './photos-pocketbase'
+import * as vehiclesLocal from './vehicles-local'
+import * as vehiclesPb from './vehicles-pocketbase'
+import * as damageLocal from './damage-docs-local'
+import * as damagePb from './damage-docs-pocketbase'
 import * as pb from './pocketbase'
 import { clearQueue } from '../offline-queue'
 import {
@@ -49,6 +53,8 @@ import type {
   Client,
   ClientInput,
   ClientWithStats,
+  DamageRecord,
+  DamageRecordInput,
   DashboardData,
   DashboardKpis,
   Invoice,
@@ -75,6 +81,8 @@ import type {
   Supply,
   SupplyInput,
   SupplyPurchaseInput,
+  Vehicle,
+  VehicleInput,
   WeekDay,
 } from '../types'
 
@@ -531,6 +539,7 @@ export async function createBusinessExpense(input: BusinessExpenseInput): Promis
       type: 'createBusinessExpense',
       params: input,
       localBusinessExpenseId: expense.id,
+      localEquipmentId: input.equipment_id,
     }),
   })
   notifyFinancialDataChanged()
@@ -653,3 +662,78 @@ export async function deleteJobPhoto(jobId: string, filename: string): Promise<v
     buildQueue: () => ({ type: 'deleteJobPhoto', params: { jobId, filename } }),
   })
 }
+
+export async function getVehiclesForClient(clientId: string): Promise<Vehicle[]> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? vehiclesPb.getVehiclesForClient(clientId)
+    : vehiclesLocal.getVehiclesForClient(clientId)
+}
+
+export async function getVehicle(id: string): Promise<Vehicle | null> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? vehiclesPb.getVehicle(id)
+    : vehiclesLocal.getVehicle(id)
+}
+
+export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => vehiclesLocal.createVehicle(input),
+    pocketbase: () => vehiclesPb.createVehicle(input),
+    buildQueue: (item) => ({ type: 'createVehicle', params: input, localVehicleId: item.id }),
+  })
+}
+
+export async function updateVehicle(id: string, input: Partial<VehicleInput>): Promise<Vehicle | null> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? vehiclesPb.updateVehicle(id, input)
+    : vehiclesLocal.updateVehicle(id, input)
+}
+
+export async function getDamageDocsForVehicle(vehicleId: string): Promise<DamageRecord[]> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? damagePb.getDamageDocsForVehicle(vehicleId)
+    : damageLocal.getDamageDocsForVehicle(vehicleId)
+}
+
+export async function getDamageDoc(id: string): Promise<DamageRecord | null> {
+  return (await resolveBackend()) === 'pocketbase'
+    ? damagePb.getDamageDoc(id)
+    : damageLocal.getDamageDoc(id)
+}
+
+export async function createDamageDoc(
+  input: DamageRecordInput,
+  photoFile?: File | null
+): Promise<DamageRecord> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => damageLocal.createDamageDoc(input),
+    pocketbase: () => damagePb.createDamageDoc(input, photoFile),
+    buildQueue: (item) => ({ type: 'createDamageDoc', params: input, localDamageId: item.id }),
+  })
+}
+
+export async function updateDamageDocNote(id: string, note: string): Promise<DamageRecord | null> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => damageLocal.updateDamageDocNote(id, note),
+    pocketbase: () => damagePb.updateDamageDocNote(id, note),
+    buildQueue: () => ({ type: 'updateDamageDocNote', params: { id, note } }),
+  })
+}
+
+export async function deleteDamageDoc(id: string): Promise<boolean> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => damageLocal.deleteDamageDoc(id),
+    pocketbase: () => damagePb.deleteDamageDoc(id),
+    buildQueue: () => ({ type: 'deleteDamageDoc', params: { id } }),
+  })
+}
+
+export { dataUrlToFile } from './damage-docs-pocketbase'

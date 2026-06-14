@@ -49,6 +49,7 @@ export interface Supply {
   supplier?: string
   kind?: SupplyKind
   notes?: string
+  image_url?: string
 }
 
 export interface Equipment {
@@ -59,6 +60,7 @@ export interface Equipment {
   supplier?: string
   notes?: string
   status?: EquipmentStatus
+  image_url?: string
 }
 
 export interface OverheadExpense {
@@ -92,6 +94,7 @@ export interface BusinessExpense {
   vendor?: string
   notes?: string
   supply_id?: string
+  equipment_id?: string
   quantity?: number
   snapshot_qty_on_hand?: number
   snapshot_cost_per_unit?: number
@@ -105,6 +108,7 @@ export interface BusinessExpenseInput {
   vendor?: string
   notes?: string
   supply_id?: string
+  equipment_id?: string
   quantity?: number
   snapshot_qty_on_hand?: number
   snapshot_cost_per_unit?: number
@@ -142,6 +146,55 @@ export interface Client {
   tags?: string[]
   notes?: string
   created?: string
+}
+
+export interface Vehicle {
+  id: string
+  client_id: string
+  year?: number
+  make: string
+  model: string
+  color?: string
+  color_hex?: string
+  vin?: string
+  plate?: string
+  type: VehicleType
+  photo_url?: string
+  created?: string
+}
+
+export interface VehicleInput {
+  client_id: string
+  year?: number
+  make: string
+  model: string
+  color?: string
+  color_hex?: string
+  vin?: string
+  plate?: string
+  type: VehicleType
+  photo_url?: string
+}
+
+export interface DamageRecord {
+  id: string
+  vehicle_id: string
+  area: string
+  note: string
+  date: string
+  captured_at: string
+  photo_url: string | null
+  linked_job_id?: string
+}
+
+export interface DamageRecordInput {
+  vehicle_id: string
+  area: string
+  note: string
+  date: string
+  captured_at: string
+  photo_url?: string | null
+  linked_job_id?: string
 }
 
 export interface Job {
@@ -266,12 +319,16 @@ export interface RecentJobRow {
   id: string
   clientName: string
   package: string
+  packageId?: string
   vehicleType: string
   locationType: LocationType
   revenue: number
   profit: number
   status: 'paid' | 'invoiced' | 'scheduled' | 'completed' | 'overdue'
   scheduledDate?: string
+  startTime?: string
+  clientAddress?: string
+  jobStatus?: JobStatus
 }
 
 export interface JobEditData {
@@ -300,6 +357,13 @@ export interface SupplyInput {
   supplier?: string
   kind?: SupplyKind
   notes?: string
+  image_url?: string
+}
+
+export interface SupplyAddOptions {
+  logExpense?: boolean
+  totalPaid?: number
+  purchaseDate?: string
 }
 
 export interface RestockInput {
@@ -314,6 +378,12 @@ export interface EquipmentInput {
   supplier?: string
   notes?: string
   status?: EquipmentStatus
+  image_url?: string
+}
+
+export interface EquipmentAddOptions {
+  logExpense?: boolean
+  purchaseDate?: string
 }
 
 export interface OverheadInput {

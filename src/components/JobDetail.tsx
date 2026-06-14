@@ -1,7 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, FileText, Camera, PencilSimple, Link } from '@phosphor-icons/react'
+import { CalendarPlus, FileText, PencilSimple, Link } from '@phosphor-icons/react'
+import JobPhotosEntry from '@/components/jobs/JobPhotosEntry'
 import { suggestNextServiceDate } from '@/lib/next-service'
 import { normalizeReturnDays } from '@/lib/package-cadence'
 import BackButton from '@/components/BackButton'
@@ -189,24 +190,24 @@ export default function JobDetail({ job }: JobDetailProps) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <button
-          className="btn-ghost"
-          onClick={() => router.push(`/jobs/${job.id}/invoice`)}
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '14px 8px' }}
-        >
-          <FileText size={22} weight="regular" color="var(--text-secondary)" aria-hidden="true" />
-          <span style={{ fontSize: 12 }}>Invoice</span>
-        </button>
-        <button
-          className="btn-ghost"
-          onClick={() => router.push(`/jobs/${job.id}/photos`)}
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '14px 8px' }}
-        >
-          <Camera size={22} weight="regular" color="var(--text-secondary)" aria-hidden="true" />
-          <span style={{ fontSize: 12 }}>Photos ({job.photo_count})</span>
-        </button>
-      </div>
+      <button
+        className="btn-ghost"
+        onClick={() => router.push(`/jobs/${job.id}/invoice`)}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+          padding: '14px 8px',
+          width: '100%',
+          marginBottom: 10,
+        }}
+      >
+        <FileText size={22} weight="regular" color="var(--text-secondary)" aria-hidden="true" />
+        <span style={{ fontSize: 12 }}>Invoice</span>
+      </button>
+
+      <JobPhotosEntry job={job} onPress={() => router.push(`/jobs/${job.id}/photos`)} />
 
       {job.notes && (
         <div className="card" style={{ marginBottom: 12 }}>

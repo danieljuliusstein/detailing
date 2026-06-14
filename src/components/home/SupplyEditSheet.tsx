@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Trash } from '@phosphor-icons/react'
+import { CaretDown, Trash, Warning } from '@phosphor-icons/react'
 import BottomSheet from '@/components/BottomSheet'
+import AcquisitionToggle, { type AcquisitionMode } from '@/components/inventory/AcquisitionToggle'
+import InventoryImagePicker from '@/components/inventory/InventoryImagePicker'
 import { costPerUnitFromPurchase } from '@/lib/supplies-logic'
 import { fmtDetailed } from '@/lib/calculations'
-import type { Supply, SupplyInput, SupplyKind } from '@/lib/types'
+import type { Supply, SupplyAddOptions, SupplyInput, SupplyKind } from '@/lib/types'
 
 export type SupplySheetMode = 'add' | 'edit' | 'restock'
 
@@ -16,7 +18,7 @@ interface SupplyEditSheetProps {
   supply: Supply | null
   kind: SupplyKind
   mode: SupplySheetMode
-  onSaveAdd: (input: SupplyInput) => Promise<void>
+  onSaveAdd: (input: SupplyInput, options?: SupplyAddOptions) => Promise<void>
   onSaveEdit: (id: string, input: Partial<SupplyInput>) => Promise<void>
   onRestock: (id: string, quantity: number, totalCost: number) => Promise<void>
   onDelete?: (id: string) => Promise<void>
@@ -48,6 +50,10 @@ export default function SupplyEditSheet({
   const [reorderAt, setReorderAt] = useState('')
   const [supplier, setSupplier] = useState('')
   const [notes, setNotes] = useState('')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [acquisition, setAcquisition] = useState<AcquisitionMode>('bought_new')
+  const [costPerUnitManual, setCostPerUnitManual] = useState('')
+  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [restockQty, setRestockQty] = useState('')
   const [restockCost, setRestockCost] = useState('')
   const [saving, setSaving] = useState(false)
@@ -69,6 +75,10 @@ export default function SupplyEditSheet({
       setReorderAt('')
       setSupplier('')
       setNotes('')
+      setImageUrl(null)
+      setAcquisition('bought_new')
+      setCostPerUnitManual('')
+      setPurchaseDate(new Date().toISOString().slice(0, 10))
       return
     }
     if (!supply) return
@@ -79,6 +89,7 @@ export default function SupplyEditSheet({
     setReorderAt(supply.reorder_threshold != null ? String(supply.reorder_threshold) : '')
     setSupplier(supply.supplier ?? '')
     setNotes(supply.notes ?? '')
+    setImageUrl(supply.image_url ?? null)
     setRestockQty('')
     setRestockCost('')
   }, [supply, mode, kind, defaultUnit])
@@ -86,9 +97,9 @@ export default function SupplyEditSheet({
   const computedCostPerUnit = useMemo(() => {
     const q = Number(qty)
     const c = Number(totalCost)
-    if (mode !== 'add' || !q || !c) return 0
+    if (mode !== 'add' || acquisition !== 'bought_new' || !q || !c) return 0
     return costPerUnitFromPurchase(q, c)
-  }, [mode, qty, totalCost])
+  }, [mode, qty, totalCost, acquisition])
 
   const restockCostPerUnit = useMemo(() => {
     const q = Number(restockQty)
@@ -111,16 +122,29 @@ export default function SupplyEditSheet({
         const trimmed = name.trim()
         const quantity = Number(qty)
         if (!trimmed || !quantity) return
-        await onSaveAdd({
+        const input: SupplyInput = {
           name: trimmed,
           unit: activeUnit,
           quantity_on_hand: quantity,
           reorder_threshold: Number(reorderAt) || undefined,
-          cost_per_unit: computedCostPerUnit || undefined,
+          cost_per_unit:
+            acquisition === 'bought_new'
+              ? computedCostPerUnit || undefined
+              : Number(costPerUnitManual) || undefined,
           supplier: supplier.trim() || undefined,
           kind,
           notes: notes.trim() || undefined,
-        })
+          image_url: imageUrl ?? undefined,
+        }
+        const includeExpense = acquisition === 'bought_new'
+        const options: SupplyAddOptions = includeExpense
+          ? {
+              logExpense: true,
+              totalPaid: Number(totalCost) || undefined,
+              purchaseDate,
+            }
+          : { logExpense: false }
+        await onSaveAdd(input, options)
       } else if (mode === 'edit' && supply) {
         const quantity = Number(onHand)
         if (!Number.isFinite(quantity) || quantity < 0) return
@@ -131,6 +155,7 @@ export default function SupplyEditSheet({
           reorder_threshold: Number(reorderAt) || undefined,
           supplier: supplier.trim() || undefined,
           notes: notes.trim() || undefined,
+          image_url: imageUrl ?? undefined,
         })
       } else if (mode === 'restock' && supply) {
         const quantity = Number(restockQty)
@@ -151,10 +176,14 @@ export default function SupplyEditSheet({
         ? 'Update stock counts and alert levels — use Restock after a purchase'
         : 'Log a purchase to add stock and update cost per unit'
 
+  const saveLabel =
+    saving ? 'Saving…' : mode === 'add' ? 'Add to catalog' : mode === 'restock' ? 'Restock' : 'Save changes'
+
   return (
     <BottomSheet
       title={title}
       subtitle={subtitle}
+      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
         <div className="inv-sheet-actions inv-sheet-actions--split">
@@ -164,18 +193,18 @@ export default function SupplyEditSheet({
               className="inv-sheet-delete"
               onClick={() => onDelete(supply.id)}
               aria-label="Delete item"
-              style={{ gridColumn: '1 / -1', width: '100%' }}
+              style={{ gridColumn: '1 / -1' }}
             >
               <Trash size={18} weight="bold" color="#f87171" />
             </button>
           ) : null}
           <button
             type="button"
-            className="inv-sheet-save inv-sheet-save--outline"
+            className="inv-sheet-save"
             onClick={handleSave}
             disabled={saving}
           >
-            {saving ? 'Saving…' : mode === 'add' ? 'Add to catalog' : mode === 'restock' ? 'Restock' : 'Save changes'}
+            {saveLabel}
           </button>
           <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
             Cancel
@@ -184,174 +213,340 @@ export default function SupplyEditSheet({
       }
     >
       <div className="inv-sheet-body">
-        {supply && mode !== 'add' && onModeChange && (
-          <div className="inv-status-toggle" style={{ marginBottom: 16 }}>
-            <button
-              type="button"
-              className={`inv-status-btn${mode === 'edit' ? ' inv-status-btn--ok' : ''}`}
-              onClick={() => onModeChange('edit')}
-            >
-              Details
-            </button>
-            <button
-              type="button"
-              className={`inv-status-btn${mode === 'restock' ? ' inv-status-btn--low' : ''}`}
-              onClick={() => onModeChange('restock')}
-            >
-              Restock
-            </button>
+        {mode !== 'restock' && (
+          <div className="inv-sheet-section">
+            <InventoryImagePicker imageUrl={imageUrl} onChange={setImageUrl} />
           </div>
         )}
 
-        {mode === 'edit' && supply && supply.cost_per_unit != null && supply.cost_per_unit > 0 && (
-          <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 16 }}>
-            Cost: {fmtDetailed(supply.cost_per_unit)}/{activeUnit}
+        {supply && mode !== 'add' && onModeChange && (
+          <div className="inv-sheet-section">
+            <div className="inv-status-toggle">
+              <button
+                type="button"
+                className={`inv-status-btn${mode === 'edit' ? ' inv-status-btn--ok' : ''}`}
+                onClick={() => onModeChange('edit')}
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                className={`inv-status-btn${mode === 'restock' ? ' inv-status-btn--low' : ''}`}
+                onClick={() => onModeChange('restock')}
+              >
+                Restock
+              </button>
+            </div>
           </div>
+        )}
+
+        {mode === 'edit' && supply && (
+          <>
+            <div className="inv-sheet-divider" />
+            <div className="inv-sheet-section">
+              <div className="item-detail-panel">
+                <p className="item-detail-panel__title">Current stock</p>
+                <div className="item-detail-row">
+                  <span className="item-detail-row__label">On hand</span>
+                  <span>{supply.quantity_on_hand} {supply.unit}</span>
+                </div>
+                {supply.cost_per_unit != null && supply.cost_per_unit > 0 && (
+                  <div className="item-detail-row">
+                    <span className="item-detail-row__label">Cost / {supply.unit}</span>
+                    <span>{fmtDetailed(supply.cost_per_unit)}</span>
+                  </div>
+                )}
+                {supply.reorder_threshold != null && (
+                  <div className="item-detail-row">
+                    <span className="item-detail-row__label">Reorder at</span>
+                    <span>{supply.reorder_threshold} {supply.unit}</span>
+                  </div>
+                )}
+                {supply.supplier && (
+                  <div className="item-detail-row">
+                    <span className="item-detail-row__label">Supplier</span>
+                    <span>{supply.supplier}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
 
         {mode !== 'restock' && (
           <>
-            <label className="inv-field-label">NAME</label>
-            <input
-              className="inv-field-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Item name"
-            />
+            <div className="inv-sheet-divider" />
+            <div className="inv-sheet-section">
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="supply-name">Name</label>
+                <input
+                  id="supply-name"
+                  className="inv-field-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Item name"
+                />
+              </div>
 
-            <label className="inv-field-label">MEASURE IN</label>
-            <select
-              className="inv-field-input"
-              value={activeUnit}
-              onChange={(e) => setUnit(e.target.value)}
-            >
-              {units.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8, marginBottom: 12 }}>
-              All amounts below use this unit ({activeUnit})
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="supply-unit">Measure in</label>
+                <div className="inv-select-wrap">
+                  <select
+                    id="supply-unit"
+                    className="inv-field-input"
+                    value={activeUnit}
+                    onChange={(e) => setUnit(e.target.value)}
+                  >
+                    {units.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                  <CaretDown className="inv-select-wrap__icon" size={16} weight="bold" aria-hidden />
+                </div>
+                <p className="inv-field-hint">All amounts below use this unit ({activeUnit})</p>
+              </div>
             </div>
           </>
         )}
 
         {mode === 'edit' && (
-          <>
-            <label className="inv-field-label">QUANTITY ON HAND ({activeUnit})</label>
-            <input
-              className="inv-field-input"
-              type="number"
-              min={0}
-              step={activeUnit === 'each' ? 1 : 0.5}
-              value={onHand}
-              onChange={(e) => setOnHand(e.target.value)}
-              placeholder={`e.g. 128 ${activeUnit}`}
-            />
-          </>
+          <div className="inv-sheet-section">
+            <div className="inv-field">
+              <label className="inv-field-label" htmlFor="supply-on-hand">
+                Quantity on hand ({activeUnit})
+              </label>
+              <input
+                id="supply-on-hand"
+                className="inv-field-input"
+                type="number"
+                min={0}
+                step={activeUnit === 'each' ? 1 : 0.5}
+                value={onHand}
+                onChange={(e) => setOnHand(e.target.value)}
+                placeholder={`e.g. 128 ${activeUnit}`}
+              />
+            </div>
+          </div>
         )}
 
         {mode === 'add' && (
           <>
-            <label className="inv-field-label">STARTING AMOUNT ({activeUnit})</label>
-            <input
-              className="inv-field-input"
-              type="number"
-              min={0}
-              step={activeUnit === 'each' ? 1 : 0.5}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              placeholder={`e.g. 128 ${activeUnit}`}
-            />
+            <div className="inv-sheet-divider" />
+            <div className="inv-sheet-section">
+              <AcquisitionToggle value={acquisition} onChange={setAcquisition} />
 
-            <label className="inv-field-label">TOTAL PAID ($)</label>
-            <input
-              className="inv-field-input"
-              type="number"
-              min={0}
-              step="0.01"
-              value={totalCost}
-              onChange={(e) => setTotalCost(e.target.value)}
-              placeholder="e.g. 19.20"
-            />
-
-            {computedCostPerUnit > 0 && (
-              <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 12 }}>
-                Cost per {activeUnit}: {fmtDetailed(computedCostPerUnit)}
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="supply-qty">
+                  Starting amount ({activeUnit})
+                </label>
+                <input
+                  id="supply-qty"
+                  className="inv-field-input"
+                  type="number"
+                  min={0}
+                  step={activeUnit === 'each' ? 1 : 0.5}
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  placeholder={`e.g. 128 ${activeUnit}`}
+                />
               </div>
-            )}
+
+              {acquisition === 'bought_new' ? (
+                <>
+                  <div className="inv-field">
+                    <label className="inv-field-label" htmlFor="supply-paid">Amount paid</label>
+                    <div className="inv-input-affix inv-input-affix--pre">
+                      <span className="inv-input-affix__pre">$</span>
+                      <input
+                        id="supply-paid"
+                        className="inv-field-input"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={totalCost}
+                        onChange={(e) => setTotalCost(e.target.value)}
+                        placeholder="19.20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="inv-field-row">
+                    <div className="inv-field">
+                      <label className="inv-field-label" htmlFor="supply-vendor">Vendor</label>
+                      <input
+                        id="supply-vendor"
+                        className="inv-field-input"
+                        value={supplier}
+                        onChange={(e) => setSupplier(e.target.value)}
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div className="inv-field">
+                      <label className="inv-field-label" htmlFor="supply-date">Purchase date</label>
+                      <input
+                        id="supply-date"
+                        className="inv-field-input"
+                        type="date"
+                        value={purchaseDate}
+                        onChange={(e) => setPurchaseDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {computedCostPerUnit > 0 && (
+                    <p className="inv-computed-cost">
+                      Cost per {activeUnit}: {fmtDetailed(computedCostPerUnit)}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="inv-field">
+                    <label className="inv-field-label" htmlFor="supply-cpu">
+                      Cost per {activeUnit}
+                      <span className="inv-field-label-optional">(optional)</span>
+                    </label>
+                    <div className="inv-input-affix inv-input-affix--pre">
+                      <span className="inv-input-affix__pre">$</span>
+                      <input
+                        id="supply-cpu"
+                        className="inv-field-input"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={costPerUnitManual}
+                        onChange={(e) => setCostPerUnitManual(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <p className="inv-field-hint">For job costing only — not logged as expense</p>
+                  </div>
+
+                  <div className="inv-field">
+                    <label className="inv-field-label" htmlFor="supply-supplier-no-exp">
+                      Supplier
+                      <span className="inv-field-label-optional">(optional)</span>
+                    </label>
+                    <input
+                      id="supply-supplier-no-exp"
+                      className="inv-field-input"
+                      value={supplier}
+                      onChange={(e) => setSupplier(e.target.value)}
+                      placeholder="Where you buy it"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           </>
         )}
 
         {mode === 'restock' && supply && (
           <>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
-              Currently on hand: {supply.quantity_on_hand} {supply.unit}
-              {supply.cost_per_unit ? ` · ${fmtDetailed(supply.cost_per_unit)}/${supply.unit}` : ''}
-            </div>
+            <div className="inv-sheet-section">
+              <p className="inv-field-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+                Currently on hand: {supply.quantity_on_hand} {supply.unit}
+                {supply.cost_per_unit ? ` · ${fmtDetailed(supply.cost_per_unit)}/${supply.unit}` : ''}
+              </p>
 
-            <label className="inv-field-label">ADD TO STOCK ({supply.unit})</label>
-            <input
-              className="inv-field-input"
-              type="number"
-              min={0}
-              step={supply.unit === 'each' ? 1 : 0.5}
-              value={restockQty}
-              onChange={(e) => setRestockQty(e.target.value)}
-              placeholder={`e.g. 128 ${supply.unit}`}
-            />
-
-            <label className="inv-field-label">TOTAL PAID ($)</label>
-            <input
-              className="inv-field-input"
-              type="number"
-              min={0}
-              step="0.01"
-              value={restockCost}
-              onChange={(e) => setRestockCost(e.target.value)}
-              placeholder="e.g. 19.20"
-            />
-
-            {restockCostPerUnit > 0 && (
-              <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 12 }}>
-                This purchase: {fmtDetailed(restockCostPerUnit)}/{supply.unit} (blended into stock)
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="restock-qty">
+                  Add to stock ({supply.unit})
+                </label>
+                <input
+                  id="restock-qty"
+                  className="inv-field-input"
+                  type="number"
+                  min={0}
+                  step={supply.unit === 'each' ? 1 : 0.5}
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(e.target.value)}
+                  placeholder={`e.g. 128 ${supply.unit}`}
+                />
               </div>
-            )}
+
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="restock-paid">Total paid</label>
+                <div className="inv-input-affix inv-input-affix--pre">
+                  <span className="inv-input-affix__pre">$</span>
+                  <input
+                    id="restock-paid"
+                    className="inv-field-input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={restockCost}
+                    onChange={(e) => setRestockCost(e.target.value)}
+                    placeholder="19.20"
+                  />
+                </div>
+                {restockCostPerUnit > 0 && (
+                  <p className="inv-computed-cost">
+                    This purchase: {fmtDetailed(restockCostPerUnit)}/{supply.unit} (blended into stock)
+                  </p>
+                )}
+              </div>
+            </div>
           </>
         )}
 
         {mode !== 'restock' && (
           <>
-            <label className="inv-field-label">LOW STOCK ALERT AT ({activeUnit})</label>
-            <input
-              className="inv-field-input"
-              type="number"
-              min={0}
-              step={activeUnit === 'each' ? 1 : 0.5}
-              value={reorderAt}
-              onChange={(e) => setReorderAt(e.target.value)}
-              placeholder={`e.g. 32 ${activeUnit}`}
-            />
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8, marginBottom: 12 }}>
-              Shows LOW when on hand drops below this amount
+            <div className="inv-sheet-divider" />
+            <div className="inv-sheet-section">
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="supply-reorder">
+                  Low stock alert at ({activeUnit})
+                  <span className="inv-alert-badge">
+                    <Warning size={10} weight="fill" aria-hidden />
+                    Alert
+                  </span>
+                </label>
+                <input
+                  id="supply-reorder"
+                  className="inv-field-input"
+                  type="number"
+                  min={0}
+                  step={activeUnit === 'each' ? 1 : 0.5}
+                  value={reorderAt}
+                  onChange={(e) => setReorderAt(e.target.value)}
+                  placeholder={`e.g. 32 ${activeUnit}`}
+                />
+                <p className="inv-field-hint">Shows LOW when on hand drops below this amount</p>
+              </div>
+
+              {mode === 'edit' && (
+                <div className="inv-field">
+                  <label className="inv-field-label" htmlFor="supply-supplier-edit">
+                    Supplier
+                    <span className="inv-field-label-optional">(optional)</span>
+                  </label>
+                  <input
+                    id="supply-supplier-edit"
+                    className="inv-field-input"
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    placeholder="Where you buy it"
+                  />
+                </div>
+              )}
+
+              <div className="inv-field">
+                <label className="inv-field-label" htmlFor="supply-notes">
+                  Notes
+                  <span className="inv-field-label-optional">(optional)</span>
+                </label>
+                <textarea
+                  id="supply-notes"
+                  className="inv-field-textarea"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. need 1 gallon jug next order..."
+                />
+              </div>
             </div>
-
-            <label className="inv-field-label">SUPPLIER (optional)</label>
-            <input
-              className="inv-field-input"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder="Where you buy it"
-            />
-
-            <label className="inv-field-label">NOTES (optional)</label>
-            <textarea
-              className="inv-field-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. need 1 gallon jug next order..."
-            />
           </>
         )}
       </div>

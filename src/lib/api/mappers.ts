@@ -3,6 +3,8 @@ import type {
   BusinessExpenseCategory,
   BusinessExpenseInput,
   Client,
+  DamageRecord,
+  DamageRecordInput,
   Equipment,
   ExpenseLine,
   Invoice,
@@ -16,6 +18,8 @@ import type {
   Supply,
   SupplyKind,
   SupplyUsage,
+  Vehicle,
+  VehicleInput,
 } from '../types'
 
 /** PocketBase record shape (partial — expand fields vary) */
@@ -255,6 +259,7 @@ export function pbSupplyToApp(r: PbRecord): Supply {
     supplier: str(r.supplier),
     kind: kind && ['chemical', 'consumable', 'other'].includes(kind) ? kind : 'other',
     notes: str(r.notes),
+    image_url: str(r.image_url),
   }
 }
 
@@ -267,6 +272,7 @@ export function appSupplyToPb(input: {
   supplier?: string
   kind?: SupplyKind
   notes?: string
+  image_url?: string
 }) {
   return {
     name: input.name,
@@ -277,6 +283,7 @@ export function appSupplyToPb(input: {
     supplier: input.supplier ?? '',
     kind: input.kind ?? 'other',
     notes: input.notes ?? '',
+    image_url: input.image_url ?? '',
   }
 }
 
@@ -289,6 +296,7 @@ export function pbEquipmentToApp(r: PbRecord): Equipment {
     supplier: str(r.supplier),
     notes: str(r.notes),
     status: (str(r.status) as Equipment['status']) ?? 'active',
+    image_url: str(r.image_url),
   }
 }
 
@@ -299,6 +307,7 @@ export function appEquipmentToPb(input: {
   supplier?: string
   notes?: string
   status?: Equipment['status']
+  image_url?: string
 }) {
   return {
     name: input.name,
@@ -307,6 +316,7 @@ export function appEquipmentToPb(input: {
     supplier: input.supplier ?? '',
     notes: input.notes ?? '',
     status: input.status ?? 'active',
+    image_url: input.image_url ?? '',
   }
 }
 
@@ -316,6 +326,7 @@ export function pbBusinessExpenseToApp(r: PbRecord): BusinessExpense {
     'legal', 'licensing', 'taxes', 'insurance', 'vehicle', 'marketing', 'software', 'equipment', 'supplies', 'other',
   ]
   const supplyId = r.supply_id
+  const equipmentId = r.equipment_id
   return {
     id: r.id,
     date: String(r.date ?? '').slice(0, 10),
@@ -325,6 +336,7 @@ export function pbBusinessExpenseToApp(r: PbRecord): BusinessExpense {
     vendor: str(r.vendor),
     notes: str(r.notes),
     supply_id: typeof supplyId === 'string' && supplyId ? supplyId : undefined,
+    equipment_id: typeof equipmentId === 'string' && equipmentId ? equipmentId : undefined,
     quantity: typeof r.quantity === 'number' ? r.quantity : undefined,
     snapshot_qty_on_hand: typeof r.snapshot_qty_on_hand === 'number' ? r.snapshot_qty_on_hand : undefined,
     snapshot_cost_per_unit: typeof r.snapshot_cost_per_unit === 'number' ? r.snapshot_cost_per_unit : undefined,
@@ -340,6 +352,7 @@ export function appBusinessExpenseToPb(input: BusinessExpenseInput) {
     vendor: input.vendor ?? '',
     notes: input.notes ?? '',
     supply_id: input.supply_id ?? '',
+    equipment_id: input.equipment_id ?? '',
     quantity: input.quantity ?? 0,
     snapshot_qty_on_hand: input.snapshot_qty_on_hand ?? 0,
     snapshot_cost_per_unit: input.snapshot_cost_per_unit ?? 0,
@@ -373,6 +386,61 @@ export function appOverheadToPb(input: {
     billing_cycle: input.billing_cycle ?? 'monthly',
     next_due: input.next_due ?? '',
     notes: input.notes ?? '',
+  }
+}
+
+export function pbVehicleToApp(r: PbRecord, photoUrl?: string | null): Vehicle {
+  return {
+    id: r.id,
+    client_id: relationId(r.client_id),
+    year: typeof r.year === 'number' ? r.year : undefined,
+    make: String(r.make ?? ''),
+    model: String(r.model ?? ''),
+    color: str(r.color),
+    color_hex: str(r.color_hex),
+    vin: str(r.vin),
+    plate: str(r.plate),
+    type: (r.type as Vehicle['type']) ?? 'sedan',
+    photo_url: photoUrl ?? undefined,
+    created: r.created,
+  }
+}
+
+export function appVehicleToPb(input: Vehicle | VehicleInput) {
+  return {
+    client_id: input.client_id,
+    year: input.year ?? 0,
+    make: input.make,
+    model: input.model,
+    color: input.color ?? '',
+    color_hex: input.color_hex ?? '',
+    vin: input.vin ?? '',
+    plate: input.plate ?? '',
+    type: input.type,
+  }
+}
+
+export function pbDamageToApp(r: PbRecord, photoUrl?: string | null): DamageRecord {
+  return {
+    id: r.id,
+    vehicle_id: relationId(r.vehicle_id),
+    area: String(r.area ?? ''),
+    note: String(r.note ?? ''),
+    date: String(r.date ?? '').slice(0, 10),
+    captured_at: str(r.captured_at) ?? r.created ?? new Date().toISOString(),
+    photo_url: photoUrl ?? null,
+    linked_job_id: str(relationId(r.job_id)) || undefined,
+  }
+}
+
+export function appDamageToPb(input: DamageRecordInput) {
+  return {
+    vehicle_id: input.vehicle_id,
+    job_id: input.linked_job_id ?? '',
+    area: input.area,
+    note: input.note ?? '',
+    date: input.date,
+    captured_at: input.captured_at,
   }
 }
 

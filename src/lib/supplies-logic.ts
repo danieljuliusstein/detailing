@@ -127,6 +127,54 @@ export function isLowStock(supply: Supply): boolean {
   return supply.quantity_on_hand <= supply.reorder_threshold
 }
 
+export function isOutOfStock(supply: Supply): boolean {
+  return supply.quantity_on_hand <= 0
+}
+
+export type InventoryRowVariant = '' | 'warning' | 'danger'
+
+export function inventoryRowVariant(supply: Supply): InventoryRowVariant {
+  if (isOutOfStock(supply)) return 'danger'
+  if (isLowStock(supply)) return 'warning'
+  return ''
+}
+
+export type SupplyFilterChip = 'all' | 'low' | 'out'
+
+export function groupSupplies(items: Supply[]): { attention: Supply[]; stocked: Supply[] } {
+  const attention: Supply[] = []
+  const stocked: Supply[] = []
+
+  for (const item of items) {
+    if (inventoryRowVariant(item)) {
+      attention.push(item)
+    } else {
+      stocked.push(item)
+    }
+  }
+
+  const byName = (a: Supply, b: Supply) => a.name.localeCompare(b.name)
+  attention.sort(byName)
+  stocked.sort(byName)
+
+  return { attention, stocked }
+}
+
+export function filterSuppliesList(
+  items: Supply[],
+  query: string,
+  chip: SupplyFilterChip
+): Supply[] {
+  const q = query.trim().toLowerCase()
+  return items.filter((item) => {
+    if (q && !item.name.toLowerCase().includes(q)) return false
+    if (chip === 'low') return isLowStock(item) && !isOutOfStock(item)
+    if (chip === 'out') return isOutOfStock(item)
+    if (chip === 'not_in_expenses') return true
+    return true
+  })
+}
+
 function daysInRange(start: Date, end: Date): number {
   const ms = end.getTime() - start.getTime()
   return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)) + 1)

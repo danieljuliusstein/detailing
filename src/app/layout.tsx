@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from 'next'
+import { DM_Sans, Syne } from 'next/font/google'
 import { AuthProvider } from '@/providers/AuthProvider'
 import AppShell from '@/components/AppShell'
 import './globals.css'
+
+const syne = Syne({ subsets: ['latin'], variable: '--font-syne' })
+const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' })
 
 export const metadata: Metadata = {
   title: 'Detailing',
@@ -36,7 +40,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark" style={{ colorScheme: 'dark' }} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`dark ${syne.variable} ${dmSans.variable}`}
+      style={{ colorScheme: 'dark' }}
+      suppressHydrationWarning
+    >
       <body suppressHydrationWarning>
         <AuthProvider>
           <AppShell>{children}</AppShell>

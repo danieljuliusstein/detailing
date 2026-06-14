@@ -1,0 +1,363 @@
+/* ATLAS DETAILING — Home screen (scoped tokens) */
+
+.home-screen {
+  --home-bg-page: #0d0d0d;
+  --home-bg-surface: #161616;
+  --home-bg-surface-raised: #1e1e1e;
+  --home-border-subtle: rgba(255, 255, 255, 0.08);
+  --home-border-default: rgba(255, 255, 255, 0.12);
+
+  --home-text-primary: #f5f5f4;
+  --home-text-secondary: #9b9b96;
+  --home-text-tertiary: #6b6b67;
+
+  --home-accent-green: #4ade80;
+  --home-accent-green-bg: rgba(74, 222, 128, 0.12);
+  --home-accent-green-text: #86efac;
+
+  --home-status-warning: #fbbf24;
+  --home-status-warning-bg: rgba(251, 191, 36, 0.12);
+  --home-status-warning-text: #fde68a;
+
+  --home-status-danger: #f87171;
+  --home-status-danger-bg: rgba(248, 113, 113, 0.12);
+  --home-status-danger-text: #fca5a5;
+
+  --home-status-info: #60a5fa;
+  --home-status-info-bg: rgba(96, 165, 250, 0.12);
+  --home-status-info-text: #93c5fd;
+
+  --font-display: var(--font-syne), sans-serif;
+  --font-body: var(--font-dm-sans), sans-serif;
+
+  --home-radius-md: 8px;
+  --home-radius-lg: 12px;
+
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+  font-family: var(--font-body);
+  color: var(--home-text-primary);
+}
+
+@media (min-width: 768px) {
+  .home-screen {
+    max-width: 480px;
+  }
+}
+
+.home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.home-header__greeting {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--home-text-primary);
+  margin: 0;
+}
+
+.home-header__date {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--home-text-secondary);
+  margin: 2px 0 0;
+}
+
+.home-header__settings {
+  font-size: 20px;
+  color: var(--home-text-secondary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* home-header__messages + __actions live in messages.css */
+
+.home-section-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--home-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+}
+
+.home-section-label--spaced {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.today-job-card {
+  background: var(--home-bg-surface-raised);
+  border: 1px solid var(--home-border-subtle);
+  border-radius: var(--home-radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+
+.today-job-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.today-job-card__client {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--home-text-primary);
+  margin: 0;
+}
+
+.today-job-card__details {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--home-text-secondary);
+  margin: 2px 0 0;
+}
+
+.today-job-card__time {
+  background: var(--home-status-info-bg);
+  color: var(--home-status-info-text);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--home-radius-md);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.today-job-card__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.today-job-card__row--bordered {
+  border-top: 1px solid var(--home-border-subtle);
+  padding-top: 12px;
+  margin-bottom: 4px;
+}
+
+.today-job-card__row-icon {
+  font-size: 15px;
+  color: var(--home-text-secondary);
+  flex-shrink: 0;
+}
+
+.today-job-card__row-text {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--home-text-secondary);
+  margin: 0;
+}
+
+.today-job-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.today-job-card__btn {
+  flex: 1;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  border: none;
+  border-radius: var(--home-radius-md);
+  padding: 11px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.today-job-card__btn:active {
+  opacity: 0.8;
+}
+
+.today-job-card__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.today-job-card__btn--directions {
+  background: var(--home-status-info-bg);
+  color: var(--home-status-info-text);
+}
+
+.today-job-card__btn--start {
+  background: var(--home-accent-green-bg);
+  color: var(--home-accent-green-text);
+}
+
+.today-job-card--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px;
+}
+
+.today-job-card--empty .today-job-card__empty-icon {
+  font-size: 28px;
+  color: var(--home-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.today-job-card--empty .today-job-card__empty-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--home-text-secondary);
+  margin: 0 0 12px;
+}
+
+.today-job-card--empty .today-job-card__btn {
+  flex: none;
+  padding: 10px 20px;
+}
+
+.inventory-alert-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--home-status-danger-bg);
+  border: none;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--home-radius-lg);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inventory-alert-card--warning {
+  background: var(--home-status-warning-bg);
+}
+
+.inventory-alert-card--warning .inventory-alert-card__title,
+.inventory-alert-card--warning .inventory-alert-card__subtitle,
+.inventory-alert-card--warning .inventory-alert-card__icon,
+.inventory-alert-card--warning .inventory-alert-card__chevron {
+  color: var(--home-status-warning-text);
+}
+
+.inventory-alert-card__icon {
+  font-size: 16px;
+  color: var(--home-status-danger-text);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.inventory-alert-card__body {
+  flex: 1;
+}
+
+.inventory-alert-card__title {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--home-status-danger-text);
+  margin: 0;
+}
+
+.inventory-alert-card__subtitle {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--home-status-danger-text);
+  margin: 2px 0 0;
+}
+
+.inventory-alert-card__chevron {
+  font-size: 16px;
+  color: var(--home-status-danger-text);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.coming-up-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--home-bg-surface-raised);
+  border: 1px solid var(--home-border-subtle);
+  border-radius: var(--home-radius-lg);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.coming-up-card__name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--home-text-primary);
+  margin: 0;
+}
+
+.coming-up-card__details {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--home-text-secondary);
+  margin: 2px 0 0;
+}
+
+.coming-up-card__datetime {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--home-text-secondary);
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tip-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--home-bg-surface-raised);
+  border: 1px solid var(--home-border-subtle);
+  border-radius: var(--home-radius-md);
+  padding: 10px 14px;
+  margin-bottom: 20px;
+}
+
+.tip-banner__icon {
+  font-size: 16px;
+  color: var(--home-text-secondary);
+  flex-shrink: 0;
+}
+
+.tip-banner__text {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--home-text-secondary);
+  margin: 0;
+}
+
+.dashboard-legacy {
+  padding-top: 4px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.dashboard-legacy .home-section-label {
+  color: var(--text-secondary);
+  font-family: var(--font-dm-sans), var(--font-ui), sans-serif;
+}

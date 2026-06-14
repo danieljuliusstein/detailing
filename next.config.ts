@@ -15,6 +15,8 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  // Set via npm run dev — keeps dev cache off iCloud Drive (see package.json).
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   reactStrictMode: true,
   // Hides the floating Next.js "N" badge in development (still shows on errors)
   devIndicators: false,

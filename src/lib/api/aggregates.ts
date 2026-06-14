@@ -207,12 +207,16 @@ export function computeDashboard(
         id: j.id,
         clientName: j.client?.name ?? 'Unknown',
         package: j.package?.name ?? '—',
+        packageId: j.package_id,
         vehicleType: j.vehicle_type.charAt(0).toUpperCase() + j.vehicle_type.slice(1),
         locationType: j.location_type,
         revenue: j.revenue,
         profit: netProfit(j),
         status,
         scheduledDate: status === 'scheduled' ? formatScheduledLabel(j.date, j.start_time) : undefined,
+        startTime: j.start_time,
+        clientAddress: j.client?.address,
+        jobStatus: j.status,
       }
     })
 
@@ -263,12 +267,16 @@ export function computeJobsForDate(jobs: JobWithRelations[], date: string): Rece
         id: j.id,
         clientName: j.client?.name ?? 'Unknown',
         package: j.package?.name ?? '—',
+        packageId: j.package_id,
         vehicleType: j.vehicle_type.charAt(0).toUpperCase() + j.vehicle_type.slice(1),
         locationType: j.location_type,
         revenue: j.revenue,
         profit: netProfit(j),
         status,
         scheduledDate: status === 'scheduled' ? formatScheduledLabel(j.date, j.start_time) : undefined,
+        startTime: j.start_time,
+        clientAddress: j.client?.address,
+        jobStatus: j.status,
       }
     })
 }

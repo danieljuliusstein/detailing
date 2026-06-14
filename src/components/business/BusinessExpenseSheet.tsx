@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Trash } from '@phosphor-icons/react'
+import { ArrowSquareOut, CaretDown, Trash } from '@phosphor-icons/react'
 import BottomSheet from '@/components/BottomSheet'
 import {
   createBusinessExpense,
@@ -28,12 +28,16 @@ function todayIso(): string {
 
 interface BusinessExpenseSheetProps {
   expense?: BusinessExpense | null
+  linkedEquipmentName?: string
+  onViewEquipment?: () => void
   onClose: () => void
   onSaved?: () => void
 }
 
 export default function BusinessExpenseSheet({
   expense,
+  linkedEquipmentName,
+  onViewEquipment,
   onClose,
   onSaved,
 }: BusinessExpenseSheetProps) {
@@ -114,6 +118,7 @@ export default function BusinessExpenseSheet({
       title={isEdit ? 'Edit expense' : 'Log business expense'}
       subtitle="Dated one-time payment — shows in P&L for that month only"
       ariaLabel="Business expense"
+      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
         <div className="inv-sheet-actions inv-sheet-actions--split">
@@ -124,7 +129,7 @@ export default function BusinessExpenseSheet({
               onClick={handleDelete}
               disabled={saving}
               aria-label="Delete expense"
-              style={{ gridColumn: '1 / -1', width: '100%' }}
+              style={{ gridColumn: '1 / -1' }}
             >
               <Trash size={18} color="var(--red)" />
             </button>
@@ -138,71 +143,114 @@ export default function BusinessExpenseSheet({
         </div>
       }
     >
-        <label className="inv-field-label">Date</label>
-        <input
-          type="date"
-          className="inv-field-input"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          style={{ marginBottom: 14 }}
-        />
-
-        <label className="inv-field-label">Name</label>
-        <input
-          className="inv-field-input"
-          placeholder="LLC annual renewal"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{ marginBottom: 14 }}
-        />
-
-        <label className="inv-field-label">Amount ($)</label>
-        <input
-          type="number"
-          inputMode="decimal"
-          className="inv-field-input money"
-          placeholder="85"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          style={{ marginBottom: 14 }}
-        />
-
-        <label className="inv-field-label">Category</label>
-        <select
-          className="inv-field-input"
-          value={category}
-          onChange={(e) => setCategory(e.target.value as BusinessExpenseCategory)}
-          style={{ marginBottom: 14 }}
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-
-        <label className="inv-field-label">Vendor (optional)</label>
-        <input
-          className="inv-field-input"
-          placeholder="State filing office"
-          value={vendor}
-          onChange={(e) => setVendor(e.target.value)}
-          style={{ marginBottom: 14 }}
-        />
-
-        <label className="inv-field-label">Notes (optional)</label>
-        <textarea
-          className="inv-field-input"
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          style={{ marginBottom: 20, resize: 'vertical' }}
-        />
-
-        {saved && (
-          <div style={{ fontSize: 13, color: 'var(--green-text)', marginBottom: 12 }}>Saved</div>
+      <div className="inv-sheet-body">
+        {isEdit && expense?.equipment_id && linkedEquipmentName && onViewEquipment && (
+          <div className="inv-sheet-section">
+            <div className="inv-expense-link-panel">
+              <p className="inv-expense-link-panel__title">Linked inventory item</p>
+              <p className="inv-expense-link-panel__meta">{linkedEquipmentName}</p>
+              <button type="button" className="inv-expense-link-panel__btn" onClick={onViewEquipment}>
+                <ArrowSquareOut size={14} weight="bold" aria-hidden />
+                View in inventory
+              </button>
+            </div>
+          </div>
         )}
 
+        <div className={`inv-sheet-section${isEdit && expense?.equipment_id ? '' : ''}`}>
+          <div className="inv-field-row">
+            <div className="inv-field">
+              <label className="inv-field-label" htmlFor="expense-date">Date</label>
+              <input
+                id="expense-date"
+                type="date"
+                className="inv-field-input"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="inv-field">
+              <label className="inv-field-label" htmlFor="expense-amount">Amount</label>
+              <div className="inv-input-affix inv-input-affix--pre">
+                <span className="inv-input-affix__pre">$</span>
+                <input
+                  id="expense-amount"
+                  type="number"
+                  inputMode="decimal"
+                  className="inv-field-input"
+                  placeholder="85"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="inv-field">
+            <label className="inv-field-label" htmlFor="expense-name">Name</label>
+            <input
+              id="expense-name"
+              className="inv-field-input"
+              placeholder="LLC annual renewal"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="inv-field">
+            <label className="inv-field-label" htmlFor="expense-category">Category</label>
+            <div className="inv-select-wrap">
+              <select
+                id="expense-category"
+                className="inv-field-input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as BusinessExpenseCategory)}
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <CaretDown className="inv-select-wrap__icon" size={16} weight="bold" aria-hidden />
+            </div>
+          </div>
+        </div>
+
+        <div className="inv-sheet-divider" />
+
+        <div className="inv-sheet-section">
+          <div className="inv-field">
+            <label className="inv-field-label" htmlFor="expense-vendor">
+              Vendor
+              <span className="inv-field-label-optional">(optional)</span>
+            </label>
+            <input
+              id="expense-vendor"
+              className="inv-field-input"
+              placeholder="State filing office"
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+            />
+          </div>
+
+          <div className="inv-field">
+            <label className="inv-field-label" htmlFor="expense-notes">
+              Notes
+              <span className="inv-field-label-optional">(optional)</span>
+            </label>
+            <textarea
+              id="expense-notes"
+              className="inv-field-textarea"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any extra details..."
+            />
+          </div>
+
+          {saved && <p className="inv-computed-cost">Saved</p>}
+        </div>
+      </div>
     </BottomSheet>
   )
 }

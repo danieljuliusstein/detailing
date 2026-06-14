@@ -1,33 +1,30 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import {
-  CaretDown,
-  Flask,
-  Package,
-  PencilSimple,
-  Star,
-  Warehouse,
-  Wrench,
-  type Icon as PhosphorIcon,
-} from '@phosphor-icons/react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import BusinessExpenseSheet from '@/components/business/BusinessExpenseSheet'
 import EquipmentEditSheet, { type EquipmentSheetMode } from '@/components/home/EquipmentEditSheet'
 import InventoryEditSheet from '@/components/home/InventoryEditSheet'
 import SupplyEditSheet, { type SupplySheetMode } from '@/components/home/SupplyEditSheet'
-import SwipeableRow from '@/components/SwipeableRow'
+import InventoryCategoryView from '@/components/inventory/InventoryCategoryView'
+import InventoryHome from '@/components/inventory/InventoryHome'
+import { SECTION_CONFIG, type SectionKey } from '@/components/inventory/inventory-utils'
+import { expenseByEquipmentId } from '@/lib/equipment-expense-logic'
+import { supplyIdsInExpenses } from '@/lib/inventory-expense-logic'
 import {
+  createBusinessExpense,
   createEquipment,
   createSupply,
   createSupplyPurchase,
   deleteEquipment,
   deleteSupply,
+  getBusinessExpenses,
   getEquipment,
   getSupplies,
   restockSupply,
   updateEquipment,
   updateSupply,
 } from '@/lib/api'
-import { fmtDetailed } from '@/lib/calculations'
 import {
   deleteHomeInventoryItem,
   getItemsByCategory,
@@ -36,79 +33,10 @@ import {
   upsertHomeInventoryItem,
   type HomeInventoryItem,
 } from '@/lib/home-inventory'
-import { filterSuppliesByKind, isLowStock } from '@/lib/supplies-logic'
-import type { Equipment, Supply, SupplyKind } from '@/lib/types'
+import { isLowStock } from '@/lib/supplies-logic'
+import type { BusinessExpense, Equipment, Supply, SupplyKind } from '@/lib/types'
 
-type SectionKey = 'chemicals' | 'equipment' | 'supplies' | 'wishlist'
-type OpenSections = Record<SectionKey, boolean>
-
-const SECTIONS: {
-  key: SectionKey
-  title: string
-  Icon: PhosphorIcon
-  iconBg: string
-  iconColor: string
-  addLabel: string
-  supplyKind?: SupplyKind
-  isWishlist?: boolean
-  isEquipment?: boolean
-}[] = [
-  {
-    key: 'chemicals',
-    title: 'Chemicals',
-    Icon: Flask,
-    iconBg: 'var(--green-dim)',
-    iconColor: 'var(--green-text)',
-    addLabel: 'chemical',
-    supplyKind: 'chemical',
-  },
-  {
-    key: 'equipment',
-    title: 'Equipment',
-    Icon: Wrench,
-    iconBg: 'var(--blue-dim)',
-    iconColor: 'var(--blue-text)',
-    addLabel: 'equipment',
-    isEquipment: true,
-  },
-  {
-    key: 'supplies',
-    title: 'Supplies',
-    Icon: Package,
-    iconBg: 'var(--amber-dim)',
-    iconColor: 'var(--amber-text)',
-    addLabel: 'supply',
-    supplyKind: 'consumable',
-  },
-  {
-    key: 'wishlist',
-    title: 'Wish List',
-    Icon: Star,
-    iconBg: 'var(--red-dim)',
-    iconColor: 'var(--amber-text)',
-    addLabel: 'item',
-    isWishlist: true,
-  },
-]
-
-function InventoryItemRow({ onPress, children }: { onPress: () => void; children: ReactNode }) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      className="inv-item-row"
-      onClick={onPress}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onPress()
-        }
-      }}
-    >
-      {children}
-    </div>
-  )
-}
+type InventoryView = 'home' | SectionKey
 
 function notifyLowStock(name: string) {
   if (typeof window === 'undefined' || !('Notification' in window)) return
@@ -121,16 +49,15 @@ function notifyLowStock(name: string) {
 }
 
 export default function InventoryPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [catalog, setCatalog] = useState<Supply[]>([])
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [businessExpenses, setBusinessExpenses] = useState<BusinessExpense[]>([])
   const [wishlist, setWishlist] = useState<HomeInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [openSections, setOpenSections] = useState<OpenSections>({
-    chemicals: true,
-    equipment: false,
-    supplies: false,
-    wishlist: false,
-  })
+  const [view, setView] = useState<InventoryView>('home')
   const [swipedRowId, setSwipedRowId] = useState<string | null>(null)
 
   const [editingSupply, setEditingSupply] = useState<Supply | null>(null)
@@ -141,14 +68,31 @@ export default function InventoryPage() {
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
   const [equipmentMode, setEquipmentMode] = useState<EquipmentSheetMode>('add')
   const [addingEquipment, setAddingEquipment] = useState(false)
+  const [viewingExpense, setViewingExpense] = useState<BusinessExpense | null>(null)
 
   const [editingWishlist, setEditingWishlist] = useState<HomeInventoryItem | null>(null)
   const [addingWishlist, setAddingWishlist] = useState(false)
 
+  const equipmentExpenseMap = useMemo(
+    () => expenseByEquipmentId(businessExpenses),
+    [businessExpenses]
+  )
+
+  const supplyExpenseIds = useMemo(
+    () => supplyIdsInExpenses(businessExpenses),
+    [businessExpenses]
+  )
+
   const reload = useCallback(async () => {
-    const [supplies, equip] = await Promise.all([getSupplies(), getEquipment()])
+    const [supplies, equip, expenses] = await Promise.all([
+      getSupplies(),
+      getEquipment(),
+      getBusinessExpenses(),
+    ])
     setCatalog(supplies)
+    setAllEquipment(equip)
     setEquipment(equip.filter((e) => (e.status ?? 'active') !== 'retired'))
+    setBusinessExpenses(expenses)
     setWishlist(getItemsByCategory(loadHomeInventory(), 'wishlist'))
     setLoading(false)
   }, [])
@@ -158,16 +102,25 @@ export default function InventoryPage() {
     reload()
   }, [reload])
 
+  useEffect(() => {
+    const equipmentId = searchParams.get('equipment')
+    if (!equipmentId || loading) return
+    const item = allEquipment.find((e) => e.id === equipmentId)
+    if (item) {
+      setView('equipment')
+      setAddingEquipment(false)
+      setEditingEquipment(item)
+      setEquipmentMode('edit')
+    }
+    router.replace('/inventory')
+  }, [searchParams, loading, allEquipment, router])
+
   const lowCount = useMemo(() => catalog.filter(isLowStock).length, [catalog])
   const totalItems = catalog.length + equipment.length + wishlist.length
 
-  const toggleSection = (key: SectionKey) => {
+  const openCategory = (key: SectionKey) => {
     setSwipedRowId(null)
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
-  }
-
-  const expandLowStock = () => {
-    setOpenSections({ chemicals: true, equipment: false, supplies: true, wishlist: false })
+    setView(key)
   }
 
   const openSupplyEdit = (supply: Supply, kind: SupplyKind) => {
@@ -176,6 +129,13 @@ export default function InventoryPage() {
     setEditingSupply(supply)
     setSupplyKind(kind)
     setSupplyMode('edit')
+  }
+
+  const openSupplyFromHome = (supply: Supply, section: SectionKey) => {
+    const config = SECTION_CONFIG.find((s) => s.key === section)
+    if (config?.supplyKind) {
+      openSupplyEdit(supply, config.supplyKind)
+    }
   }
 
   const openSupplyAdd = (kind: SupplyKind) => {
@@ -223,210 +183,76 @@ export default function InventoryPage() {
     setSwipedRowId(null)
   }
 
+  const handleCategoryAdd = () => {
+    setSwipedRowId(null)
+    const section = SECTION_CONFIG.find((s) => s.key === view)
+    if (!section) return
+    if (section.isWishlist) {
+      setEditingWishlist(null)
+      setAddingWishlist(true)
+    } else if (section.isEquipment) {
+      setEditingEquipment(null)
+      setAddingEquipment(true)
+      setEquipmentMode('add')
+    } else if (section.supplyKind) {
+      openSupplyAdd(section.supplyKind)
+    }
+  }
+
   const supplySheetOpen = Boolean(editingSupply || addingSupplyKind)
   const equipmentSheetOpen = Boolean(editingEquipment || addingEquipment)
   const wishlistSheetOpen = Boolean(editingWishlist || addingWishlist)
 
+  const currentSection = view !== 'home' ? SECTION_CONFIG.find((s) => s.key === view) : null
+  const linkedEquipmentExpense = editingEquipment
+    ? equipmentExpenseMap.get(editingEquipment.id) ?? null
+    : null
+
   return (
-    <div className="screen page-content inventory-page">
-      <div className="inventory-page-header">
-        <span className="inventory-page-icon">
-          <Warehouse size={22} weight="duotone" color="var(--green-text)" />
-        </span>
-        <div className="inventory-page-header-text">
-          <h1 className="inventory-page-title">Inventory</h1>
-          <p className="inventory-page-subtitle">
-            {loading ? 'Loading…' : `${totalItems} item${totalItems === 1 ? '' : 's'}`}
-            {lowCount > 0 ? ` · ${lowCount} low` : ''}
-          </p>
-        </div>
-      </div>
-
-      {lowCount > 0 && (
-        <button type="button" className="inv-alert-banner" onClick={expandLowStock}>
-          <span className="inv-alert-dot" />
-          <span className="inv-alert-text">
-            <strong>{lowCount}</strong> item{lowCount === 1 ? '' : 's'} running low — tap to view
-          </span>
-        </button>
+    <div className="screen page-content inventory-section">
+      {view === 'home' ? (
+        <InventoryHome
+          loading={loading}
+          catalog={catalog}
+          equipment={equipment}
+          wishlist={wishlist}
+          totalItems={totalItems}
+          lowCount={lowCount}
+          onOpenCategory={openCategory}
+          onOpenSupply={openSupplyFromHome}
+        />
+      ) : (
+        <InventoryCategoryView
+          sectionKey={view}
+          catalog={catalog}
+          equipment={equipment}
+          equipmentExpenseMap={equipmentExpenseMap}
+          supplyExpenseIds={supplyExpenseIds}
+          wishlist={wishlist}
+          swipedRowId={swipedRowId}
+          onSwipedRowChange={setSwipedRowId}
+          onBack={() => {
+            setSwipedRowId(null)
+            setView('home')
+          }}
+          onAdd={handleCategoryAdd}
+          onOpenSupply={(supply) => {
+            if (currentSection?.supplyKind) openSupplyEdit(supply, currentSection.supplyKind)
+          }}
+          onOpenEquipment={(item) => {
+            setAddingEquipment(false)
+            setEditingEquipment(item)
+            setEquipmentMode('edit')
+          }}
+          onOpenWishlist={(item) => {
+            setAddingWishlist(false)
+            setEditingWishlist(item)
+          }}
+          onDeleteSupply={handleSupplyDelete}
+          onDeleteEquipment={handleEquipmentDelete}
+          onDeleteWishlist={handleWishlistDelete}
+        />
       )}
-
-      <div className="inv-dropdown-card">
-        {SECTIONS.map((section) => {
-          const isOpen = openSections[section.key]
-          const { Icon } = section
-
-          const sectionItems = section.isWishlist
-            ? wishlist
-            : section.isEquipment
-              ? equipment
-              : filterSuppliesByKind(catalog, section.supplyKind!)
-
-          const low = section.supplyKind
-            ? sectionItems.filter((s) => isLowStock(s as Supply)).length
-            : 0
-
-          const subtitle = section.isWishlist
-            ? `$${wishlist.reduce((sum, i) => sum + (i.priceEstimate ?? 0), 0)} total`
-            : section.supplyKind
-              ? `${sectionItems.length} item${sectionItems.length === 1 ? '' : 's'} · ${low} low`
-              : `${sectionItems.length} item${sectionItems.length === 1 ? '' : 's'}`
-
-          return (
-            <div key={section.key} className="inv-sub-dropdown">
-              <button type="button" className="inv-sub-header" onClick={() => toggleSection(section.key)}>
-                <div className="inv-dropdown-header-left">
-                  <span className="inv-dropdown-icon inv-dropdown-icon--sm" style={{ background: section.iconBg }}>
-                    <Icon size={16} weight="duotone" color={section.iconColor} />
-                  </span>
-                  <div>
-                    <div className="inv-sub-title">{section.title}</div>
-                    <div className="inv-dropdown-subtitle">{subtitle}</div>
-                  </div>
-                </div>
-                <span className={`inv-chevron${isOpen ? ' inv-chevron--open' : ''}`}>
-                  <CaretDown size={12} weight="bold" color="var(--text-dim)" />
-                </span>
-              </button>
-
-              {isOpen && (
-                <div className="inv-sub-body">
-                  {section.isWishlist &&
-                    wishlist.map((item, index) => (
-                      <SwipeableRow
-                        key={item.id}
-                        rowId={`wishlist-${item.id}`}
-                        openRowId={swipedRowId}
-                        onOpenChange={setSwipedRowId}
-                        onEdit={() => {
-                          setAddingWishlist(false)
-                          setEditingWishlist(item)
-                        }}
-                        onDelete={() => handleWishlistDelete(item.id)}
-                        deleteConfirmMessage={`Remove "${item.name}" from your wish list?`}
-                        showDivider={index < wishlist.length - 1}
-                      >
-                        <InventoryItemRow
-                          onPress={() => {
-                            setSwipedRowId(null)
-                            setAddingWishlist(false)
-                            setEditingWishlist(item)
-                          }}
-                        >
-                          <span className="inv-item-name">{item.name}</span>
-                          <div className="inv-item-row-right">
-                            <span className="inv-item-price">${item.priceEstimate ?? 0}</span>
-                            <span className="inv-item-edit" aria-hidden>
-                              <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
-                            </span>
-                          </div>
-                        </InventoryItemRow>
-                      </SwipeableRow>
-                    ))}
-
-                  {section.isEquipment &&
-                    equipment.map((item, index) => (
-                      <SwipeableRow
-                        key={item.id}
-                        rowId={`equipment-${item.id}`}
-                        openRowId={swipedRowId}
-                        onOpenChange={setSwipedRowId}
-                        onEdit={() => {
-                          setAddingEquipment(false)
-                          setEditingEquipment(item)
-                          setEquipmentMode('edit')
-                        }}
-                        onDelete={() => handleEquipmentDelete(item.id)}
-                        deleteConfirmMessage={`Delete "${item.name}" from equipment?`}
-                        showDivider={index < equipment.length - 1}
-                      >
-                        <InventoryItemRow
-                          onPress={() => {
-                            setSwipedRowId(null)
-                            setAddingEquipment(false)
-                            setEditingEquipment(item)
-                            setEquipmentMode('edit')
-                          }}
-                        >
-                          <span className="inv-item-name">{item.name}</span>
-                          <div className="inv-item-row-right">
-                            {item.purchase_price != null && item.purchase_price > 0 && (
-                              <span className="inv-item-price">{fmtDetailed(item.purchase_price)}</span>
-                            )}
-                            <span className="inv-item-edit" aria-hidden>
-                              <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
-                            </span>
-                          </div>
-                        </InventoryItemRow>
-                      </SwipeableRow>
-                    ))}
-
-                  {section.supplyKind &&
-                    (sectionItems as Supply[]).map((item, index) => {
-                      const lowStock = isLowStock(item)
-                      return (
-                        <SwipeableRow
-                          key={item.id}
-                          rowId={`supply-${item.id}`}
-                          openRowId={swipedRowId}
-                          onOpenChange={setSwipedRowId}
-                          onEdit={() => openSupplyEdit(item, section.supplyKind!)}
-                          onDelete={() => handleSupplyDelete(item.id)}
-                          deleteConfirmMessage={`Delete "${item.name}" from inventory?`}
-                          showDivider={index < sectionItems.length - 1}
-                        >
-                          <InventoryItemRow
-                            onPress={() => {
-                              setSwipedRowId(null)
-                              openSupplyEdit(item, section.supplyKind!)
-                            }}
-                          >
-                            <span className="inv-item-name">{item.name}</span>
-                            <div className="inv-item-row-right">
-                              <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 6 }}>
-                                {item.quantity_on_hand} {item.unit}
-                                {item.cost_per_unit != null && item.cost_per_unit > 0
-                                  ? ` · ${fmtDetailed(item.cost_per_unit)}/${item.unit}`
-                                  : ''}
-                              </span>
-                              <span className={`inv-status-badge inv-status-badge--${lowStock ? 'low' : 'ok'}`}>
-                                {lowStock ? 'LOW' : 'OK'}
-                              </span>
-                              <span className="inv-item-edit" aria-hidden>
-                                <PencilSimple size={14} weight="bold" color="var(--text-dim)" />
-                              </span>
-                            </div>
-                          </InventoryItemRow>
-                        </SwipeableRow>
-                      )
-                    })}
-
-                  <button
-                    type="button"
-                    className="inv-add-row"
-                    onClick={() => {
-                      setSwipedRowId(null)
-                      if (section.isWishlist) {
-                        setEditingWishlist(null)
-                        setAddingWishlist(true)
-                      } else if (section.isEquipment) {
-                        setEditingEquipment(null)
-                        setAddingEquipment(true)
-                        setEquipmentMode('add')
-                      } else if (section.supplyKind) {
-                        openSupplyAdd(section.supplyKind)
-                      }
-                    }}
-                  >
-                    <span className="inv-add-btn">+</span>
-                    <span className="inv-add-label">Add {section.addLabel}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
 
       {supplySheetOpen && (
         <SupplyEditSheet
@@ -434,8 +260,18 @@ export default function InventoryPage() {
           kind={supplyKind}
           mode={supplyMode}
           onModeChange={setSupplyMode}
-          onSaveAdd={async (input) => {
-            await createSupply(input)
+          onSaveAdd={async (input, options) => {
+            const created = await createSupply(input)
+            if (options?.logExpense && options.totalPaid && options.totalPaid > 0) {
+              await createSupplyPurchase({
+                date: options.purchaseDate ?? new Date().toISOString().slice(0, 10),
+                name: input.name,
+                amount: options.totalPaid,
+                quantity: input.quantity_on_hand,
+                supply_id: created.id,
+                vendor: input.supplier,
+              })
+            }
             await reload()
           }}
           onSaveEdit={async (id, input) => {
@@ -475,8 +311,25 @@ export default function InventoryPage() {
         <EquipmentEditSheet
           item={editingEquipment}
           mode={equipmentMode}
-          onSaveAdd={async (input) => {
-            await createEquipment(input)
+          linkedExpense={linkedEquipmentExpense}
+          onViewExpense={
+            linkedEquipmentExpense
+              ? () => setViewingExpense(linkedEquipmentExpense)
+              : undefined
+          }
+          onSaveAdd={async (input, options) => {
+            const created = await createEquipment(input)
+            if (options?.logExpense && input.purchase_price && input.purchase_price > 0) {
+              await createBusinessExpense({
+                date: options.purchaseDate ?? input.purchase_date ?? new Date().toISOString().slice(0, 10),
+                name: input.name,
+                amount: input.purchase_price,
+                category: 'equipment',
+                vendor: input.supplier,
+                notes: input.notes,
+                equipment_id: created.id,
+              })
+            }
             await reload()
           }}
           onSaveEdit={async (id, input) => {
@@ -488,6 +341,33 @@ export default function InventoryPage() {
             setEditingEquipment(null)
             setAddingEquipment(false)
           }}
+        />
+      )}
+
+      {viewingExpense && (
+        <BusinessExpenseSheet
+          expense={viewingExpense}
+          onClose={() => setViewingExpense(null)}
+          onSaved={reload}
+          onViewEquipment={
+            viewingExpense.equipment_id
+              ? () => {
+                  const item = allEquipment.find((e) => e.id === viewingExpense.equipment_id)
+                  if (item) {
+                    setViewingExpense(null)
+                    setView('equipment')
+                    setAddingEquipment(false)
+                    setEditingEquipment(item)
+                    setEquipmentMode('edit')
+                  }
+                }
+              : undefined
+          }
+          linkedEquipmentName={
+            viewingExpense.equipment_id
+              ? allEquipment.find((e) => e.id === viewingExpense.equipment_id)?.name
+              : undefined
+          }
         />
       )}
 

@@ -17,6 +17,8 @@ import * as overheadPb from './overhead-pocketbase'
 import * as businessExpensesPb from './business-expenses-pocketbase'
 import * as supplyPurchasesPb from './supply-purchases-pocketbase'
 import * as photosPb from './photos-pocketbase'
+import * as vehiclesPb from './vehicles-pocketbase'
+import * as damagePb from './damage-docs-pocketbase'
 import * as pb from './pocketbase'
 import * as equipmentPb from './equipment-pocketbase'
 import * as suppliesPb from './supplies-pocketbase'
@@ -199,8 +201,13 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
       break
     }
     case 'createBusinessExpense': {
-      const expense = await businessExpensesPb.createBusinessExpense(op.params)
+      const params = { ...op.params }
+      if (params.equipment_id) params.equipment_id = maps.resolveEquipment(params.equipment_id)
+      const expense = await businessExpensesPb.createBusinessExpense(params)
       maps.businessExpenses.set(op.localBusinessExpenseId, expense.id)
+      if (op.localEquipmentId && expense.equipment_id) {
+        maps.equipment.set(op.localEquipmentId, expense.equipment_id)
+      }
       break
     }
     case 'updateBusinessExpense': {
@@ -246,6 +253,26 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
       const resolvedId = maps.jobs.has(op.params.jobId) ? jobId : await resolveJobId(op.params.jobId)
       maps.jobs.set(op.params.jobId, resolvedId)
       await photosPb.deleteJobPhoto(resolvedId, op.params.filename)
+      break
+    }
+    case 'createVehicle': {
+      await vehiclesPb.createVehicle(op.params)
+      break
+    }
+    case 'createDamageDoc': {
+      let photoFile: File | null = null
+      if (op.params.photo_url?.startsWith('data:')) {
+        photoFile = await damagePb.dataUrlToFile(op.params.photo_url)
+      }
+      await damagePb.createDamageDoc(op.params, photoFile)
+      break
+    }
+    case 'updateDamageDocNote': {
+      await damagePb.updateDamageDocNote(op.params.id, op.params.note)
+      break
+    }
+    case 'deleteDamageDoc': {
+      await damagePb.deleteDamageDoc(op.params.id)
       break
     }
   }

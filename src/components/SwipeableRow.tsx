@@ -194,7 +194,7 @@ export default function SwipeableRow({
   return (
     <>
       <div
-        className={`swipe-row-wrap${showDivider ? ' inv-item-row-wrap--divider' : ''}`}
+        className={`swipe-row-wrap${showDivider ? ' swipe-row-wrap--divider' : ''}`}
         data-swipe-open={isOpen || undefined}
       >
         {(isOpen || offset < 0) && (

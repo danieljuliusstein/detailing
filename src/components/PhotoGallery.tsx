@@ -1,83 +1,95 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CameraPlus, ShareNetwork, Trash, Image as ImageIcon } from '@phosphor-icons/react'
+import { ArrowRight, CameraPlus, Image as ImageIcon, ShareNetwork } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import AddJobPhotoSheet from '@/components/jobs/AddJobPhotoSheet'
+import JobPhotoLightbox from '@/components/jobs/JobPhotoLightbox'
 import ShareLinkActions from '@/components/portal/ShareLinkActions'
 import { deleteJobPhoto, getJobPhotos, uploadJobPhoto } from '@/lib/api'
 import type { JobPhoto, JobWithRelations, PhotoType } from '@/lib/types'
 
-function PhotoTile({
-  photo,
-  onDelete,
-}: {
-  photo: JobPhoto
-  onDelete: () => void
-}) {
-  return (
-    <div style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '0.5px solid var(--border)' }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      <button
-        onClick={onDelete}
-        aria-label="Delete photo"
-        style={{
-          position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)',
-          border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}
-      >
-        <Trash size={14} color="#fff" />
-      </button>
-    </div>
-  )
+function formatJobDate(date: string): string {
+  return new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
-function EmptySlot() {
+function PhotoSection({
+  type,
+  photos,
+  uploading,
+  onAdd,
+  onOpen,
+}: {
+  type: PhotoType
+  photos: JobPhoto[]
+  uploading: boolean
+  onAdd: () => void
+  onOpen: (index: number) => void
+}) {
+  const label = type === 'before' ? 'Before' : 'After'
+  const labelClass =
+    type === 'before' ? 'job-photos__section-label--before' : 'job-photos__section-label--after'
+
   return (
-    <div style={{
-      aspectRatio: '1', borderRadius: 'var(--radius-md)',
-      border: '1px dashed var(--border-strong)',
-      background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <ImageIcon size={28} weight="duotone" color="var(--text-dim)" />
-    </div>
+    <section className="job-photos__section">
+      <div className="job-photos__section-head">
+        <h2 className={`job-photos__section-label ${labelClass}`}>{label}</h2>
+        <button type="button" className="job-photos__add-chip" onClick={onAdd} disabled={uploading}>
+          <CameraPlus size={14} weight="bold" aria-hidden="true" />
+          Add
+        </button>
+      </div>
+      <div className="job-photos__grid">
+        {photos.length === 0 ? (
+          <div className="job-photos__thumb job-photos__thumb--empty" style={{ gridColumn: '1 / -1' }}>
+            <ImageIcon size={28} weight="duotone" aria-hidden="true" />
+          </div>
+        ) : (
+          photos.map((p, i) => (
+            <button key={p.filename} type="button" className="job-photos__thumb" onClick={() => onOpen(i)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt="" />
+            </button>
+          ))
+        )}
+      </div>
+    </section>
   )
 }
 
 export default function PhotoGallery({ job }: { job: JobWithRelations }) {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
   const [photos, setPhotos] = useState<JobPhoto[]>([])
-  const [uploadType, setUploadType] = useState<PhotoType>('before')
   const [uploading, setUploading] = useState(false)
+  const [addType, setAddType] = useState<PhotoType | null>(null)
+  const [lightbox, setLightbox] = useState<{ type: PhotoType; index: number } | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const loadPhotos = useCallback(async () => {
     const list = await getJobPhotos(job.id)
     setPhotos(list)
   }, [job.id])
 
-  useEffect(() => { loadPhotos() }, [loadPhotos])
+  useEffect(() => {
+    void loadPhotos()
+  }, [loadPhotos])
 
   const beforePhotos = photos.filter((p) => p.type === 'before')
   const afterPhotos = photos.filter((p) => p.type === 'after')
 
-  const handleAddClick = (type: PhotoType) => {
-    setUploadType(type)
-    fileRef.current?.click()
-  }
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleUpload = async (file: File, type: PhotoType) => {
     setUploading(true)
+    setAddType(null)
     try {
-      await uploadJobPhoto(job.id, file, uploadType)
+      await uploadJobPhoto(job.id, file, type)
       await loadPhotos()
     } finally {
       setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -86,63 +98,111 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
     await loadPhotos()
   }
 
+  const clientName = job.client?.name ?? 'Client'
+  const packageName = job.package?.name ?? 'Detail'
+
   return (
-    <div className="screen page-content">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={handleFile} />
+    <div className="job-photos screen">
+      <div className="job-photos__body">
+        <header className="job-photos__header">
+          <BackButton onClick={() => router.back()} />
+          <div className="job-photos__header-text">
+            <h1 className="job-photos__title">Photos</h1>
+            <p className="job-photos__subtitle">
+              {clientName} · {packageName}
+            </p>
+            <p className="job-photos__subtitle">{formatJobDate(job.date)}</p>
+          </div>
+          <span className="job-photos__count">{photos.length}</span>
+        </header>
 
-      <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20, gap: 12 }}>
-        <BackButton onClick={() => router.back()} />
-        <div style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>Photos</div>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{photos.length}</span>
-      </div>
+        {(beforePhotos.length > 0 || afterPhotos.length > 0) && (
+          <div className="job-photos__compare">
+            <div className="job-photos__compare-thumb">
+              {beforePhotos[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={beforePhotos[0].url} alt="" />
+              ) : (
+                <ImageIcon size={20} weight="duotone" aria-hidden="true" />
+              )}
+            </div>
+            <ArrowRight size={16} className="job-photos__compare-arrow" aria-hidden="true" />
+            <div className="job-photos__compare-thumb job-photos__compare-thumb--after">
+              {afterPhotos[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={afterPhotos[0].url} alt="" />
+              ) : (
+                <ImageIcon size={20} weight="duotone" aria-hidden="true" />
+              )}
+            </div>
+            <span className="job-photos__compare-label">
+              {beforePhotos.length} before · {afterPhotos.length} after
+            </span>
+          </div>
+        )}
 
-      <div className="section-title">Before</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-        {beforePhotos.map((p) => (
-          <PhotoTile key={p.filename} photo={p} onDelete={() => handleDelete(p.filename)} />
-        ))}
-        {beforePhotos.length === 0 && <EmptySlot />}
-      </div>
-      <button
-        className="btn-ghost"
-        onClick={() => handleAddClick('before')}
-        disabled={uploading}
-        style={{ width: '100%', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-        <CameraPlus size={18} /> Add before photo
-      </button>
+        <PhotoSection
+          type="before"
+          photos={beforePhotos}
+          uploading={uploading}
+          onAdd={() => setAddType('before')}
+          onOpen={(index) => setLightbox({ type: 'before', index })}
+        />
 
-      <div className="section-title">After</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-        {afterPhotos.map((p) => (
-          <PhotoTile key={p.filename} photo={p} onDelete={() => handleDelete(p.filename)} />
-        ))}
-        {afterPhotos.length === 0 && <EmptySlot />}
+        <PhotoSection
+          type="after"
+          photos={afterPhotos}
+          uploading={uploading}
+          onAdd={() => setAddType('after')}
+          onOpen={(index) => setLightbox({ type: 'after', index })}
+        />
       </div>
-      <button
-        className="btn-ghost"
-        onClick={() => handleAddClick('after')}
-        disabled={uploading}
-        style={{ width: '100%', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-        <CameraPlus size={18} /> {uploading ? 'Uploading…' : 'Add after photo'}
-      </button>
 
       {photos.length > 0 && job.client && (
-        <div className="card">
-          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShareNetwork size={18} /> Share before &amp; after
+        <div className="job-photos__footer">
+          <div className="job-photos__footer-inner">
+            <button
+              type="button"
+              className="job-photos__share-btn"
+              onClick={() => setShareOpen((o) => !o)}
+            >
+              <ShareNetwork size={18} weight="bold" aria-hidden="true" />
+              Share with client
+            </button>
+            {shareOpen && (
+              <div className="job-photos__share-expanded">
+                <ShareLinkActions
+                  clientId={job.client_id}
+                  clientEmail={job.client.email}
+                  clientName={job.client.name}
+                  jobId={job.id}
+                  scope="photos"
+                  emailSubject={`Your photos from ${job.client.name}`}
+                  emailMessage="View your before and after photos using the secure link below."
+                />
+              </div>
+            )}
           </div>
-          <ShareLinkActions
-            clientId={job.client_id}
-            clientEmail={job.client.email}
-            clientName={job.client.name}
-            jobId={job.id}
-            scope="photos"
-            emailSubject={`Your photos from ${job.client.name}`}
-            emailMessage="View your before and after photos using the secure link below."
-          />
         </div>
+      )}
+
+      {addType && (
+        <AddJobPhotoSheet
+          sectionLabel={addType === 'before' ? 'Before' : 'After'}
+          onPhotoSelected={(file) => void handleUpload(file, addType)}
+          onClose={() => setAddType(null)}
+        />
+      )}
+
+      {lightbox && (
+        <JobPhotoLightbox
+          photos={lightbox.type === 'before' ? beforePhotos : afterPhotos}
+          index={lightbox.index}
+          type={lightbox.type}
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox({ ...lightbox, index })}
+          onDelete={(filename) => void handleDelete(filename)}
+        />
       )}
     </div>
   )

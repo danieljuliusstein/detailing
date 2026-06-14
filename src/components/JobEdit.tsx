@@ -3,8 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  CalendarBlank, Car, Jeep, Truck, Van, Boat, DotsThree, MapPin, House, FloppyDisk,
-  type Icon as PhosphorIcon,
+  CalendarBlank, MapPin, House, FloppyDisk,
 } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
@@ -12,15 +11,9 @@ import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
 import { buildJobIcs, downloadIcs } from '@/lib/calendar-ics'
 import { isCompletingJob } from '@/lib/supplies-logic'
 import type { JobEditData, JobStatus, JobWithRelations, Package, Supply, SupplyUsage, VehicleType } from '@/lib/types'
+import { VEHICLE_TYPE_OPTIONS } from '@/lib/vehicle-type-icons'
 
-const VEHICLE_TYPES: { id: VehicleType; label: string; Icon: PhosphorIcon }[] = [
-  { id: 'sedan', label: 'Sedan', Icon: Car },
-  { id: 'suv', label: 'SUV', Icon: Jeep },
-  { id: 'truck', label: 'Truck', Icon: Truck },
-  { id: 'van', label: 'Van', Icon: Van },
-  { id: 'boat', label: 'Boat', Icon: Boat },
-  { id: 'other', label: 'Other', Icon: DotsThree },
-]
+const VEHICLE_TYPES = VEHICLE_TYPE_OPTIONS
 
 const STATUSES: { id: JobStatus; label: string; badge: string }[] = [
   { id: 'scheduled', label: 'Scheduled', badge: 'badge-scheduled' },

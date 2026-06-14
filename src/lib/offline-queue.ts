@@ -18,7 +18,7 @@ export type QueueOperation =
   | { type: 'createOverheadExpense'; params: import('./types').OverheadInput; localOverheadId: string }
   | { type: 'updateOverheadExpense'; params: { id: string; input: Partial<import('./types').OverheadInput> } }
   | { type: 'deleteOverheadExpense'; params: { id: string } }
-  | { type: 'createBusinessExpense'; params: import('./types').BusinessExpenseInput; localBusinessExpenseId: string }
+  | { type: 'createBusinessExpense'; params: import('./types').BusinessExpenseInput; localBusinessExpenseId: string; localEquipmentId?: string }
   | { type: 'updateBusinessExpense'; params: { id: string; input: Partial<import('./types').BusinessExpenseInput> } }
   | { type: 'deleteBusinessExpense'; params: { id: string } }
   | { type: 'createSupplyPurchase'; params: import('./types').SupplyPurchaseInput; localBusinessExpenseId: string; localSupplyId?: string }
@@ -26,6 +26,10 @@ export type QueueOperation =
   | { type: 'deleteSupplyPurchase'; params: { id: string } }
   | { type: 'uploadJobPhoto'; params: { jobId: string; dataUrl: string; photoType: import('./types').PhotoType; filename: string } }
   | { type: 'deleteJobPhoto'; params: { jobId: string; filename: string } }
+  | { type: 'createVehicle'; params: import('./types').VehicleInput; localVehicleId: string }
+  | { type: 'createDamageDoc'; params: import('./types').DamageRecordInput; localDamageId: string }
+  | { type: 'updateDamageDocNote'; params: { id: string; note: string } }
+  | { type: 'deleteDamageDoc'; params: { id: string } }
 
 export interface QueueItem {
   id: string

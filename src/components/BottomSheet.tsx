@@ -9,6 +9,7 @@ interface BottomSheetProps {
   title: string
   subtitle?: string
   ariaLabel?: string
+  sheetClassName?: string
   onClose: () => void
   children: React.ReactNode
   footer?: React.ReactNode
@@ -21,6 +22,7 @@ export default function BottomSheet({
   title,
   subtitle,
   ariaLabel,
+  sheetClassName,
   onClose,
   children,
   footer,
@@ -93,7 +95,7 @@ export default function BottomSheet({
         style={{ opacity: overlayOpacity, transition: dragging ? 'none' : 'opacity 0.2s ease' }}
       />
       <div
-        className="inv-sheet"
+        className={`inv-sheet${sheetClassName ? ` ${sheetClassName}` : ''}`}
         style={{
           transform: `translateY(${dragY}px)`,
           transition: dragging ? 'none' : 'transform 0.25s ease',
@@ -113,7 +115,7 @@ export default function BottomSheet({
               {subtitle ? <div className="inv-sheet-subtitle">{subtitle}</div> : null}
             </div>
             <button type="button" className="inv-sheet-close" onClick={onClose} aria-label="Close">
-              <X size={18} weight="bold" aria-hidden="true" />
+              <X size={16} weight="bold" aria-hidden="true" />
             </button>
           </div>
         </div>

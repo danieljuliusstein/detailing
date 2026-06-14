@@ -6,10 +6,11 @@ import { Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import BusinessExpenseSheet from '@/components/business/BusinessExpenseSheet'
 import SupplyPurchaseSheet from '@/components/business/SupplyPurchaseSheet'
-import { getBusinessExpenses } from '@/lib/api'
+import { getBusinessExpenses, getEquipment } from '@/lib/api'
+import { isEquipmentExpense } from '@/lib/equipment-expense-logic'
 import { isSupplyPurchase } from '@/lib/supply-purchase-logic'
 import { fmtDetailed } from '@/lib/calculations'
-import type { BusinessExpense } from '@/lib/types'
+import type { BusinessExpense, Equipment } from '@/lib/types'
 
 function monthKey(date: string): string {
   return date.slice(0, 7)
@@ -28,12 +29,20 @@ function formatRowDate(date: string): string {
 export default function BusinessExpenses() {
   const router = useRouter()
   const [expenses, setExpenses] = useState<BusinessExpense[]>([])
+  const [equipment, setEquipment] = useState<Equipment[]>([])
   const [editing, setEditing] = useState<BusinessExpense | null>(null)
   const [showAdd, setShowAdd] = useState(false)
 
+  const equipmentById = useMemo(() => {
+    const map = new Map<string, Equipment>()
+    for (const item of equipment) map.set(item.id, item)
+    return map
+  }, [equipment])
+
   const load = async () => {
-    const list = await getBusinessExpenses()
+    const [list, equip] = await Promise.all([getBusinessExpenses(), getEquipment()])
     setExpenses([...list].sort((a, b) => b.date.localeCompare(a.date)))
+    setEquipment(equip)
   }
 
   useEffect(() => {
@@ -60,6 +69,9 @@ export default function BusinessExpenses() {
   const handleSaved = async () => {
     await load()
   }
+
+  const linkedEquipmentName = (expense: BusinessExpense) =>
+    expense.equipment_id ? equipmentById.get(expense.equipment_id)?.name : undefined
 
   return (
     <div className="screen page-content">
@@ -134,10 +146,18 @@ export default function BusinessExpenses() {
           }}
         >
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{e.name}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {e.name}
+              {isEquipmentExpense(e) && (
+                <span className="inv-expense-linked-badge">In inventory</span>
+              )}
+            </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               {formatRowDate(e.date)} · {e.category ?? 'other'}
               {isSupplyPurchase(e) && e.quantity ? ` · ${e.quantity} units` : ''}
+              {isEquipmentExpense(e) && linkedEquipmentName(e)
+                ? ` · ${linkedEquipmentName(e)}`
+                : ''}
               {e.vendor ? ` · ${e.vendor}` : ''}
             </div>
           </div>
@@ -154,7 +174,20 @@ export default function BusinessExpenses() {
         <SupplyPurchaseSheet expense={editing} onClose={closeSheet} onSaved={handleSaved} />
       )}
       {editing && !isSupplyPurchase(editing) && (
-        <BusinessExpenseSheet expense={editing} onClose={closeSheet} onSaved={handleSaved} />
+        <BusinessExpenseSheet
+          expense={editing}
+          linkedEquipmentName={linkedEquipmentName(editing)}
+          onViewEquipment={
+            editing.equipment_id
+              ? () => {
+                  closeSheet()
+                  router.push(`/inventory?equipment=${editing.equipment_id}`)
+                }
+              : undefined
+          }
+          onClose={closeSheet}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   )

@@ -1,19 +1,22 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { PencilSimple, Phone, ChatText, Envelope } from '@phosphor-icons/react'
+import { CaretRight, Car, PencilSimple, Phone, ChatText, Envelope } from '@phosphor-icons/react'
+import { VehicleTypeIcon } from '@/lib/vehicle-type-icons'
 import BackButton from '@/components/BackButton'
 import { fmt, mapJobStatusForDisplay } from '@/lib/calculations'
+import { vehicleDisplayName } from '@/lib/damage-docs'
 import { JOB_STATUS_CONFIG } from '@/lib/job-status-display'
-import type { Client, JobWithRelations } from '@/lib/types'
+import type { Client, JobWithRelations, Vehicle } from '@/lib/types'
 
 interface ClientDetailProps {
   client: Client
   jobs: JobWithRelations[]
+  vehicles: Vehicle[]
   totalRevenue: number
 }
 
-export default function ClientDetail({ client, jobs, totalRevenue }: ClientDetailProps) {
+export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: ClientDetailProps) {
   const router = useRouter()
   const avgJob = jobs.length > 0 ? totalRevenue / jobs.length : 0
 
@@ -69,6 +72,99 @@ export default function ClientDetail({ client, jobs, totalRevenue }: ClientDetai
           ))}
         </div>
       </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div className="section-title" style={{ marginBottom: 0 }}>
+          Vehicles
+        </div>
+        <button
+          type="button"
+          onClick={() => router.push(`/clients/${client.id}/vehicles/new`)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--green)',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            padding: '4px 0',
+          }}
+        >
+          + Add
+        </button>
+      </div>
+      {vehicles.length === 0 ? (
+        <button
+          type="button"
+          className="card card-pressable"
+          style={{
+            textAlign: 'center',
+            padding: 24,
+            marginBottom: 20,
+            width: '100%',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'inherit',
+          }}
+          onClick={() => router.push(`/clients/${client.id}/vehicles/new`)}
+        >
+          <Car size={28} weight="duotone" color="var(--text-muted)" style={{ marginBottom: 8 }} />
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Add a vehicle</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Document pre-existing damage on each vehicle
+          </div>
+        </button>
+      ) : (
+        <div className="card" style={{ marginBottom: 20, padding: '4px 14px' }}>
+          {vehicles.map((vehicle) => (
+            <button
+              key={vehicle.id}
+              type="button"
+              className="vehicle-list-row"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 0',
+                borderBottom: vehicles.indexOf(vehicle) < vehicles.length - 1 ? '1px solid var(--border)' : 'none',
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                borderTop: 'none',
+                borderLeft: 'none',
+                borderRight: 'none',
+                textAlign: 'left',
+                cursor: 'pointer',
+                color: 'inherit',
+              }}
+              onClick={() => router.push(`/clients/${client.id}/vehicles/${vehicle.id}`)}
+            >
+              <span
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 8,
+                  background: 'var(--bg-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <VehicleTypeIcon type={vehicle.type} size={20} weight="duotone" color="var(--green)" />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{vehicleDisplayName(vehicle)}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                  {vehicle.plate ? `${vehicle.plate} · ` : ''}
+                  {vehicle.type}
+                </div>
+              </span>
+              <CaretRight size={16} color="var(--text-dim)" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="section-title">Job history</div>
       {jobs.length === 0 ? (
