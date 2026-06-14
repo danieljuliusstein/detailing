@@ -42,22 +42,22 @@ export default function HomeScreen({
 
   return (
     <div className="home-screen">
-      <header className="home-header">
+      <header className="page-header">
         <div>
-          <h1 className="home-header__greeting">{greeting()}</h1>
-          <p className="home-header__date">{todayLabel()}</p>
+          <h1 className="lg">{greeting()}</h1>
+          <p>{todayLabel()}</p>
         </div>
         <button
           type="button"
-          className="home-header__settings"
+          className="icon-btn"
           aria-label="Settings"
           onClick={() => router.push('/settings')}
         >
-          <Gear size={20} weight="regular" aria-hidden="true" />
+          <Gear size={18} weight="regular" aria-hidden="true" />
         </button>
       </header>
 
-      <p className="home-section-label">Today&apos;s job</p>
+      <p className="sec">Today&apos;s job</p>
       <TodayJobCard
         job={todayJob}
         onDirections={(address) => {
@@ -73,7 +73,7 @@ export default function HomeScreen({
 
       {comingUp && (
         <>
-          <p className="home-section-label">Coming up</p>
+          <p className="sec">Coming up</p>
           <ComingUpCard job={comingUp} onPress={() => router.push(`/jobs/${comingUp.id}`)} />
         </>
       )}

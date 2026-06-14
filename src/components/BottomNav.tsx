@@ -25,7 +25,7 @@ const LEFT_TABS: NavItem[] = [
 
 const RIGHT_TABS: NavItem[] = [
   { href: '/clients', label: 'Clients', Icon: Users },
-  { href: '/reports', label: 'Reports', Icon: ChartBar },
+  { href: '/reports', label: 'Money', Icon: ChartBar },
 ]
 
 function NavTab({ tab, active }: { tab: NavItem; active: boolean }) {
@@ -40,7 +40,7 @@ function NavTab({ tab, active }: { tab: NavItem; active: boolean }) {
         <Icon
           size={22}
           weight={active ? 'fill' : 'regular'}
-          color={active ? 'var(--green)' : 'var(--text-dim)'}
+          color={active ? 'var(--green)' : 'var(--text-hint)'}
           aria-hidden="true"
           style={{ transition: 'color 150ms ease' }}
         />

@@ -324,7 +324,7 @@ export interface RecentJobRow {
   locationType: LocationType
   revenue: number
   profit: number
-  status: 'paid' | 'invoiced' | 'scheduled' | 'completed' | 'overdue'
+  status: 'paid' | 'invoiced' | 'scheduled' | 'completed' | 'overdue' | 'in_progress'
   scheduledDate?: string
   startTime?: string
   clientAddress?: string

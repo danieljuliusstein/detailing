@@ -216,3 +216,7 @@ export function overdueClients(
     return d != null && isOverdue(c, d)
   })
 }
+
+export function topClientsByRevenue(clients: ClientWithStats[], limit = 3): ClientWithStats[] {
+  return [...clients].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, limit)
+}

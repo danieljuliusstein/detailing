@@ -33,7 +33,7 @@
   --home-radius-md: 8px;
   --home-radius-lg: 12px;
 
-  max-width: 420px;
+  max-width: 390px;
   margin: 0 auto;
   padding: 16px 16px 0;
   font-family: var(--font-body);

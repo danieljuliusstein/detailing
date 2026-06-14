@@ -9,12 +9,15 @@ interface ComingUpCardProps {
 
 export default function ComingUpCard({ job, onPress }: ComingUpCardProps) {
   return (
-    <button type="button" className="coming-up-card" onClick={onPress}>
-      <div>
-        <p className="coming-up-card__name">{job.clientName}</p>
-        <p className="coming-up-card__details">{comingUpDetailsLine(job)}</p>
+    <button type="button" className="upcoming-card" onClick={onPress}>
+      <div className="upcoming-date">
+        <div className="upcoming-month">{job.monthLabel}</div>
+        <div className="upcoming-day">{job.dayLabel}</div>
       </div>
-      <p className="coming-up-card__datetime">{job.datetimeLabel}</p>
+      <div className="upcoming-body">
+        <p className="upcoming-name">{job.clientName}</p>
+        <p className="upcoming-meta">{comingUpDetailsLine(job)}</p>
+      </div>
     </button>
   )
 }

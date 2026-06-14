@@ -4,13 +4,13 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import ClientCard from '@/components/clients/ClientCard'
-import CurrencyAmount from '@/components/ui/CurrencyAmount'
+import FollowUpClientCard from '@/components/clients/FollowUpClientCard'
 import {
   buildDerivedMap,
   filterBySegment,
   overdueClients,
-  partitionForAll,
   sortForSegment,
+  topClientsByRevenue,
   type ClientSegment,
 } from '@/lib/client-relationship-logic'
 import type { ClientWithStats } from '@/lib/types'
@@ -21,6 +21,8 @@ const SEGMENTS: { key: ClientSegment; label: string }[] = [
   { key: 'top', label: 'Top' },
   { key: 'new', label: 'New' },
 ]
+
+const CLIENTS_VISIBLE = 5
 
 function matchesSearch(client: ClientWithStats, q: string): boolean {
   const lower = q.toLowerCase()
@@ -35,15 +37,11 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [segment, setSegment] = useState<ClientSegment>('all')
+  const [showAllRest, setShowAllRest] = useState(false)
 
   const derivedMap = useMemo(() => buildDerivedMap(clients), [clients])
-
-  const lifetimeTotal = useMemo(
-    () => clients.reduce((s, c) => s + c.totalRevenue, 0),
-    [clients]
-  )
-
   const overdue = useMemo(() => overdueClients(clients, derivedMap), [clients, derivedMap])
+  const topClients = useMemo(() => topClientsByRevenue(clients, 3), [clients])
 
   const filtered = useMemo(() => {
     const q = search.trim()
@@ -53,76 +51,63 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
     return list
   }, [clients, segment, search, derivedMap])
 
-  const { needsAttention, rest } = useMemo(() => {
-    if (segment !== 'all') return { needsAttention: [], rest: filtered }
-    const q = search.trim()
-    const base = q ? clients.filter((c) => matchesSearch(c, q)) : clients
-    return partitionForAll(base, derivedMap)
-  }, [segment, filtered, search, clients, derivedMap])
+  const allRest = useMemo(() => {
+    const topIds = new Set(topClients.map((c) => c.id))
+    const overdueIds = new Set(overdue.map((c) => c.id))
+    return clients
+      .filter((c) => !topIds.has(c.id) && !overdueIds.has(c.id))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+  }, [clients, topClients, overdue])
 
-  const renderCards = (list: ClientWithStats[]) =>
-    list.map((client) => {
+  const visibleRest = showAllRest ? allRest : allRest.slice(0, CLIENTS_VISIBLE)
+  const hiddenRest = allRest.length - visibleRest.length
+
+  const renderSegmentList = () =>
+    filtered.map((client) => {
       const derived = derivedMap.get(client.id)!
       return <ClientCard key={client.id} client={client} derived={derived} />
     })
 
   return (
-    <div className="screen page-content clients-screen">
-      <div className="clients-header">
+    <div className="screen page-content body clients-screen">
+      <header className="page-header">
         <div>
-          <h1 className="clients-title">Clients</h1>
-          <p className="clients-subtitle">
-            {clients.length} client{clients.length !== 1 ? 's' : ''} ·{' '}
-            <CurrencyAmount value={lifetimeTotal} variant="revenue" /> lifetime
+          <h1>Clients</h1>
+          <p>
+            {clients.length} client{clients.length !== 1 ? 's' : ''}
+            {overdue.length > 0 && (
+              <> · {overdue.length} need follow-up</>
+            )}
           </p>
         </div>
         <button
           type="button"
-          className="clients-add-btn"
+          className="icon-btn green"
           onClick={() => router.push('/clients/new')}
           aria-label="Add client"
         >
-          <Plus size={20} weight="bold" color="#111" aria-hidden="true" />
+          <Plus size={18} weight="bold" aria-hidden="true" />
         </button>
-      </div>
+      </header>
 
-      {overdue.length > 0 && (
-        <button
-          type="button"
-          className="clients-banner"
-          onClick={() => setSegment('followup')}
-        >
-          <span className="clients-banner-dot" aria-hidden="true" />
-          <span className="clients-banner-text">
-            <strong>{overdue.length}</strong>
-            {` client${overdue.length > 1 ? 's' : ''} due for a visit — tap to follow up`}
-          </span>
-        </button>
-      )}
-
-      <div className="clients-search-wrap">
-        <MagnifyingGlass
-          size={16}
-          color="var(--text-secondary)"
-          className="clients-search-icon"
-          aria-hidden="true"
-        />
+      <div className="search">
+        <MagnifyingGlass size={16} aria-hidden="true" />
         <input
-          className="clients-search"
           placeholder="Search clients..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search clients"
         />
       </div>
 
-      <div className="clients-segments" role="tablist" aria-label="Client filters">
+      <div className="chips" role="tablist" aria-label="Client filters">
         {SEGMENTS.map((s) => (
           <button
             key={s.key}
             type="button"
             role="tab"
             aria-selected={segment === s.key}
-            className={`clients-segment${segment === s.key ? ' clients-segment--active' : ''}`}
+            className={`chip${segment === s.key ? ' active' : ''}`}
             onClick={() => setSegment(s.key)}
           >
             {s.label}
@@ -130,25 +115,51 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="clients-empty">No clients found</div>
-      )}
-
-      {segment === 'all' && filtered.length > 0 && (
+      {segment !== 'all' ? (
+        filtered.length === 0 ? (
+          <div className="empty-state"><p>No clients found</p></div>
+        ) : (
+          renderSegmentList()
+        )
+      ) : (
         <>
-          {needsAttention.length > 0 && (
+          {overdue.length > 0 && (
             <>
-              <div className="clients-section-label">Needs attention</div>
-              {renderCards(needsAttention)}
-              <div className="clients-section-divider" />
+              <p className="sec">Follow up</p>
+              {overdue.map((client) => (
+                <FollowUpClientCard key={client.id} client={client} />
+              ))}
             </>
           )}
-          <div className="clients-section-label">All clients</div>
-          {renderCards(rest)}
+
+          {topClients.length > 0 && (
+            <>
+              <p className="sec">Top clients</p>
+              {topClients.map((client) => (
+                <ClientCard key={client.id} client={client} derived={derivedMap.get(client.id)!} />
+              ))}
+            </>
+          )}
+
+          {allRest.length > 0 && (
+            <>
+              <p className="sec">All clients</p>
+              {visibleRest.map((client) => (
+                <ClientCard key={client.id} client={client} derived={derivedMap.get(client.id)!} />
+              ))}
+              {hiddenRest > 0 && (
+                <button type="button" className="more-pill" onClick={() => setShowAllRest(true)}>
+                  + {hiddenRest} more client{hiddenRest > 1 ? 's' : ''}
+                </button>
+              )}
+            </>
+          )}
+
+          {clients.length === 0 && (
+            <div className="empty-state"><p>No clients yet</p></div>
+          )}
         </>
       )}
-
-      {segment !== 'all' && filtered.length > 0 && renderCards(filtered)}
     </div>
   )
 }

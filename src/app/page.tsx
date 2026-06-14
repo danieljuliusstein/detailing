@@ -1,63 +1,46 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Dashboard from '@/components/Dashboard'
 import {
-  getClientsWithStats,
   getDashboardData,
   getJobs,
   getJobsForDate,
   getPackages,
   getSupplies,
 } from '@/lib/api'
-import { buildDerivedMap, overdueClients } from '@/lib/client-relationship-logic'
+import Dashboard from '@/components/Dashboard'
 import {
-  buildComingUpJob,
+  buildComingUpJobs,
   buildInventoryAlert,
   buildTodayJobCard,
-  pickTipInsight,
 } from '@/lib/home-dashboard'
-import type { ClientWithStats, RecentJobRow, WeekDay } from '@/lib/types'
+import type { RecentJobRow, WeekDay } from '@/lib/types'
 
 export default function HomePage() {
   const [ready, setReady] = useState(false)
   const [weekDays, setWeekDays] = useState<WeekDay[]>([])
-  const [selectedDate, setSelectedDate] = useState('')
-  const [dayJobs, setDayJobs] = useState<RecentJobRow[]>([])
-  const [dueClients, setDueClients] = useState<ClientWithStats[]>([])
-  const [insights, setInsights] = useState<string[]>([])
   const [todayJobRows, setTodayJobRows] = useState<RecentJobRow[]>([])
-  const [allJobsLoaded, setAllJobsLoaded] = useState(false)
-  const [suppliesLoaded, setSuppliesLoaded] = useState(false)
-  const [packagesLoaded, setPackagesLoaded] = useState(false)
   const [jobs, setJobs] = useState<Awaited<ReturnType<typeof getJobs>>>([])
-  const [supplies, setSupplies] = useState<Awaited<ReturnType<typeof getSupplies>>>([])
-  const [packages, setPackages] = useState<Awaited<ReturnType<typeof getPackages>>>([])
+  const [inventoryAlert, setInventoryAlert] = useState<ReturnType<typeof buildInventoryAlert>>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
-    Promise.all([getDashboardData(), getClientsWithStats(), getJobs(), getSupplies(), getPackages()])
-      .then(async ([data, clients, allJobs, supplyList, packageList]) => {
+    Promise.all([getDashboardData(), getJobs(), getSupplies(), getPackages()])
+      .then(async ([data, allJobs, supplyList, packageList]) => {
         if (cancelled) return
         setWeekDays(data.weekDays)
-        setInsights(data.insights)
         setJobs(allJobs)
-        setSupplies(supplyList)
-        setPackages(packageList)
-        setAllJobsLoaded(true)
-        setSuppliesLoaded(true)
-        setPackagesLoaded(true)
-
-        const derived = buildDerivedMap(clients)
-        setDueClients(overdueClients(clients, derived))
 
         const today = data.weekDays.find((d) => d.isToday)?.date ?? data.weekDays[0]?.date ?? ''
-        setSelectedDate(today)
         if (today) {
           const rows = await getJobsForDate(today)
-          if (!cancelled) setTodayJobRows(rows)
+          if (!cancelled) {
+            setTodayJobRows(rows)
+            const todayJob = buildTodayJobCard(rows)
+            setInventoryAlert(buildInventoryAlert(todayJob, supplyList, packageList))
+          }
         }
 
         setReady(true)
@@ -72,24 +55,11 @@ export default function HomePage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!selectedDate) return
-    getJobsForDate(selectedDate).then(setDayJobs)
-  }, [selectedDate])
-
-  const home = useMemo(() => {
-    const todayJob = buildTodayJobCard(todayJobRows)
-    const comingUp = allJobsLoaded ? buildComingUpJob(jobs) : null
-    const inventoryAlert =
-      suppliesLoaded && packagesLoaded ? buildInventoryAlert(todayJob, supplies, packages) : null
-    const tipInsight = pickTipInsight(insights)
-
-    return { todayJob, inventoryAlert, comingUp, tipInsight }
-  }, [todayJobRows, allJobsLoaded, jobs, suppliesLoaded, packagesLoaded, supplies, packages, insights])
+  const upcomingJobs = useMemo(() => buildComingUpJobs(jobs, 3), [jobs])
 
   if (loadError) {
     return (
-      <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center' }}>
+      <div className="screen page-content body" style={{ paddingTop: 40, textAlign: 'center' }}>
         <div style={{ color: 'var(--red)', marginBottom: 12 }}>{loadError}</div>
         <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
           Retry
@@ -100,7 +70,7 @@ export default function HomePage() {
 
   if (!ready) {
     return (
-      <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div className="screen page-content body" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading…
       </div>
     )
@@ -109,12 +79,10 @@ export default function HomePage() {
   return (
     <Dashboard
       weekDays={weekDays}
-      dayJobs={dayJobs}
-      dueClients={dueClients}
-      insights={insights}
-      selectedDate={selectedDate}
-      onDaySelect={setSelectedDate}
-      home={home}
+      todayJobRows={todayJobRows}
+      upcomingJobs={upcomingJobs}
+      jobs={jobs}
+      inventoryAlert={inventoryAlert}
     />
   )
 }

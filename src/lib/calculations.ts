@@ -36,7 +36,8 @@ export function jobExpensesForDisplay(job: JobWithRelations): ExpenseLine[] {
 
 export function mapJobStatusForDisplay(
   job: JobWithRelations
-): 'paid' | 'invoiced' | 'scheduled' | 'completed' | 'overdue' {
+): 'paid' | 'invoiced' | 'scheduled' | 'completed' | 'overdue' | 'in_progress' {
+  if (job.status === 'in_progress') return 'in_progress'
   if (job.status === 'paid') return 'paid'
   if (job.invoice?.status === 'overdue') return 'overdue'
   if (job.status === 'invoiced' || job.invoice?.status === 'sent' || job.invoice?.status === 'partial') return 'invoiced'

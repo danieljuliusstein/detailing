@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./app-ui.css";
 @import "./portal/portal.css";
 @import "./inventory/inventory.css";
 @import "./home/home.css";
@@ -687,6 +688,7 @@ html, body {
 }
 .badge-status--green  { background: var(--green-dim);  color: var(--green-text); }
 .badge-status--yellow { background: var(--amber-dim);  color: var(--amber-text); }
+.badge-status--amber  { background: var(--bg-amber); color: var(--amber); border: 0.5px solid var(--border-amber); }
 .badge-status--blue   { background: var(--blue-dim);   color: var(--blue-text); }
 .badge-status--gray   { background: var(--bg-surface-hover); color: var(--text-muted); border: 0.5px solid var(--border); }
 
@@ -847,7 +849,7 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 430px;
+  max-width: 390px;
   background: #111111;
   border-top: 0.5px solid var(--border);
   display: grid;
@@ -940,7 +942,7 @@ html, body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  max-width: 430px;
+  max-width: 390px;
   margin: 0 auto;
   left: 0;
   right: 0;
@@ -1412,7 +1414,7 @@ html, body {
 
 .app-shell {
   min-height: 100dvh;
-  max-width: 430px;
+  max-width: 390px;
   margin: 0 auto;
   background: var(--bg-base);
   position: relative;

@@ -16,10 +16,10 @@ const TAG_LABELS: Record<Exclude<ClientTag, null>, string> = {
 }
 
 const AVATAR_CLASS = {
-  followup: 'clients-avatar--followup',
-  new: 'clients-avatar--new',
-  vip: 'clients-avatar--vip',
-  default: 'clients-avatar--default',
+  followup: 'amber',
+  new: 'blue',
+  vip: 'green',
+  default: 'gray',
 } as const
 
 interface ClientCardProps {
@@ -29,7 +29,7 @@ interface ClientCardProps {
 
 export default function ClientCard({ client, derived }: ClientCardProps) {
   const router = useRouter()
-  const avatarClass =
+  const avatarTone =
     derived.tag === 'followup'
       ? AVATAR_CLASS.followup
       : derived.tag === 'new'
@@ -44,41 +44,34 @@ export default function ClientCard({ client, derived }: ClientCardProps) {
       ? timeAgo(client.lastJobDate)
       : 'No jobs yet'
 
-  const secondaryLine = client.phone || client.email || null
-
   const openDetail = () => router.push(`/clients/${client.id}`)
 
   return (
-    <div className="clients-card">
-      <div className="clients-card-body">
-        <button type="button" className="clients-card-main" onClick={openDetail}>
-          <div className={`clients-avatar ${avatarClass}`}>{derived.initials}</div>
-          <div className="clients-card-center">
-            <div className="clients-name-row">
-              <span className="clients-name">{client.name}</span>
-              {derived.isVip && (
-                <span className="clients-badge clients-badge--vip">VIP</span>
-              )}
+    <div className={`client-card${derived.isVip ? ' vip' : ''}`}>
+      <button type="button" className="client-card-main" onClick={openDetail}>
+        <div className={`avatar ${avatarTone}`}>{derived.initials}</div>
+        <div className="client-body">
+          <div className="client-name">{client.name}</div>
+          <div className="client-meta">{lastServiceLine}</div>
+          {(derived.isVip || derived.tag) && (
+            <div className="client-tags">
+              {derived.isVip && <span className="badge green">VIP</span>}
               {derived.tag && (
-                <span className={`clients-badge clients-badge--${derived.tag}`}>
+                <span className={`badge ${derived.tag === 'followup' ? 'amber' : 'blue'}`}>
                   {TAG_LABELS[derived.tag]}
                 </span>
               )}
             </div>
-            <div className="clients-last-service">{lastServiceLine}</div>
-            {secondaryLine && (
-              <div className="clients-contact-line">{secondaryLine}</div>
-            )}
+          )}
+        </div>
+        <div className="client-right">
+          <CurrencyAmount value={client.totalRevenue} variant="revenue" className="client-amount" />
+          <div className="client-jobs">
+            {client.jobCount} job{client.jobCount !== 1 ? 's' : ''}
           </div>
-          <div className="clients-card-right">
-            <CurrencyAmount value={client.totalRevenue} variant="revenue" className="clients-lifetime" />
-            <div className="clients-job-count">
-              {client.jobCount} job{client.jobCount !== 1 ? 's' : ''}
-            </div>
-          </div>
-        </button>
-        <ClientCardMenu client={client} />
-      </div>
+        </div>
+      </button>
+      <ClientCardMenu client={client} />
     </div>
   )
 }

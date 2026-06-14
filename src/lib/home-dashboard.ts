@@ -1,6 +1,6 @@
 import { formatScheduledLabel } from './calculations'
 import { isLowStock, isOutOfStock } from './supplies-logic'
-import type { JobWithRelations, Package, RecentJobRow, Supply } from './types'
+import type { JobWithRelations, Package, RecentJobRow, Supply, WeekDay } from './types'
 
 export interface TodayJobCardData {
   id: string
@@ -21,6 +21,16 @@ export interface ComingUpJobData {
   vehicleType: string
   locationLabel: string
   datetimeLabel: string
+  monthLabel: string
+  dayLabel: string
+  statusLabel: string
+}
+
+export interface HomeWeekStats {
+  jobsThisWeek: number
+  jobsRemaining: number
+  earnedThisWeek: number
+  earnedDeltaPct: number | null
 }
 
 export interface InventoryAlertData {
@@ -72,21 +82,8 @@ export function buildTodayJobCard(jobsToday: RecentJobRow[]): TodayJobCardData |
   }
 }
 
-export function buildComingUpJob(jobs: JobWithRelations[]): ComingUpJobData | null {
-  const todayStr = new Date().toISOString().split('T')[0]
-
-  const upcoming = jobs
-    .filter((j) => j.status === 'scheduled' && j.date > todayStr)
-    .sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date)
-      const ta = a.start_time ?? '99:99'
-      const tb = b.start_time ?? '99:99'
-      return ta.localeCompare(tb)
-    })
-
-  const job = upcoming[0]
-  if (!job) return null
-
+function mapComingUpJob(job: JobWithRelations): ComingUpJobData {
+  const date = new Date(job.date + 'T12:00:00')
   return {
     id: job.id,
     clientName: job.client?.name ?? 'Unknown',
@@ -94,7 +91,81 @@ export function buildComingUpJob(jobs: JobWithRelations[]): ComingUpJobData | nu
     vehicleType: capitalize(job.vehicle_type),
     locationLabel: locationLabel(job.location_type),
     datetimeLabel: formatScheduledLabel(job.date, job.start_time),
+    monthLabel: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+    dayLabel: String(date.getDate()),
+    statusLabel: job.start_time ? 'Confirmed' : 'Pending',
   }
+}
+
+export function buildComingUpJobs(jobs: JobWithRelations[], limit = 3): ComingUpJobData[] {
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  return jobs
+    .filter((j) => j.status === 'scheduled' && j.date > todayStr)
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date)
+      const ta = a.start_time ?? '99:99'
+      const tb = b.start_time ?? '99:99'
+      return ta.localeCompare(tb)
+    })
+    .slice(0, limit)
+    .map(mapComingUpJob)
+}
+
+export function buildComingUpJob(jobs: JobWithRelations[]): ComingUpJobData | null {
+  return buildComingUpJobs(jobs, 1)[0] ?? null
+}
+
+export function buildHomeWeekStats(jobs: JobWithRelations[], weekDays: WeekDay[]): HomeWeekStats {
+  const todayStr = new Date().toISOString().split('T')[0]
+  const weekDates = new Set(weekDays.map((d) => d.date))
+  const weekJobs = jobs.filter((j) => weekDates.has(j.date))
+  const jobsThisWeek = weekJobs.length
+  const jobsRemaining = weekJobs.filter((j) => j.status === 'scheduled' && j.date >= todayStr).length
+  const earnedThisWeek = weekJobs.reduce((s, j) => s + j.revenue + j.tip, 0)
+
+  const weekStart = weekDays[0]?.date
+    ? new Date(weekDays[0].date + 'T12:00:00')
+    : new Date()
+  const priorStart = new Date(weekStart)
+  priorStart.setDate(priorStart.getDate() - 7)
+  const priorEnd = new Date(weekStart)
+  priorEnd.setDate(priorEnd.getDate() - 1)
+
+  const priorEarned = jobs
+    .filter((j) => {
+      const d = new Date(j.date + 'T12:00:00')
+      return d >= priorStart && d <= priorEnd
+    })
+    .reduce((s, j) => s + j.revenue + j.tip, 0)
+
+  const earnedDeltaPct =
+    priorEarned > 0 ? Math.round(((earnedThisWeek - priorEarned) / priorEarned) * 100) : null
+
+  return { jobsThisWeek, jobsRemaining, earnedThisWeek, earnedDeltaPct }
+}
+
+export function homeJobStatusLabel(job: RecentJobRow): string {
+  if (job.jobStatus === 'in_progress') return 'In progress'
+  if (job.status === 'scheduled') return 'Scheduled'
+  if (job.status === 'paid') return 'Paid'
+  if (job.status === 'invoiced') return 'Invoiced'
+  if (job.status === 'overdue') return 'Awaiting payment'
+  return 'Complete'
+}
+
+export function homeJobStatusClass(job: RecentJobRow): string {
+  if (job.jobStatus === 'in_progress') return 'badge-status badge-status--blue'
+  if (job.status === 'scheduled') return 'badge-status badge-status--amber'
+  if (job.status === 'paid' || job.status === 'completed') return 'badge-status badge-status--green'
+  return 'badge-status badge-status--yellow'
+}
+
+export function homeJobIconTone(job: RecentJobRow): 'green' | 'amber' | 'blue' | 'gray' {
+  if (job.jobStatus === 'in_progress') return 'blue'
+  if (job.status === 'scheduled') return 'amber'
+  if (job.status === 'paid' || job.status === 'completed') return 'green'
+  return 'gray'
 }
 
 export function buildInventoryAlert(
@@ -143,5 +214,8 @@ export function todayJobDetailsLine(job: TodayJobCardData): string {
 }
 
 export function comingUpDetailsLine(job: ComingUpJobData): string {
-  return `${job.packageName} · ${job.vehicleType} · ${job.locationLabel}`
+  const timePart = job.datetimeLabel.includes('·')
+    ? job.datetimeLabel.split('·').pop()?.trim()
+    : job.datetimeLabel
+  return `${job.packageName} · ${timePart ?? job.locationLabel}`
 }

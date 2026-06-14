@@ -49,19 +49,21 @@ export default function JobsRevenueChart({ jobs }: JobsRevenueChartProps) {
 
   return (
     <div className="jobs-chart-block">
-      <div className="jobs-chart-header">
-        <div className="jobs-chart-title">Jobs</div>
-        <div className="jobs-chart-subtitle">
-          {filtered.length} total · {period}
+      <header className="page-header">
+        <div>
+          <h1>Jobs</h1>
+          <p>
+            {filtered.length} total · {period}
+          </p>
         </div>
-      </div>
+      </header>
 
-      <div className="jobs-filter-chips">
+      <div className="chips">
         {FILTER_CHIPS.map((chip) => (
           <button
             key={chip.key}
             type="button"
-            className={`jobs-filter-chip${range === chip.key ? ' jobs-filter-chip--active' : ''}`}
+            className={`chip${range === chip.key ? ' active' : ''}`}
             onClick={() => {
               setRange(chip.key)
               setHovered(null)
@@ -132,22 +134,23 @@ export default function JobsRevenueChart({ jobs }: JobsRevenueChartProps) {
 
         <div className="jobs-chart-divider" />
 
-        <div className="jobs-stat-grid">
-          <div className="jobs-stat-box">
-            <div className="jobs-stat-label">NET PROFIT</div>
-            <div className="jobs-stat-value jobs-stat-value--green">{fmt(stats.totalProfit)}</div>
+        <div className="stat-grid">
+          <div className="stat-card">
+            <div className="stat-label">Net profit</div>
+            <div className="stat-value">{fmt(stats.totalProfit)}</div>
           </div>
-          <div className="jobs-stat-box">
-            <div className="jobs-stat-label">JOBS</div>
-            <div className="jobs-stat-value">{stats.jobCount}</div>
+          <div className="stat-card">
+            <div className="stat-label">Jobs</div>
+            <div className="stat-value">{stats.jobCount}</div>
           </div>
-          <div className="jobs-stat-box">
-            <div className="jobs-stat-label">AVG JOB VALUE</div>
-            <div className="jobs-stat-value">{fmt(stats.avgJobValue)}</div>
+          <div className="stat-card">
+            <div className="stat-label">Avg job value</div>
+            <div className="stat-value">{fmt(stats.avgJobValue)}</div>
           </div>
-          <div className="jobs-stat-box">
-            <div className="jobs-stat-label">MARGIN</div>
-            <div className="jobs-stat-value jobs-stat-value--green">{stats.margin}%</div>
+          <div className="stat-card">
+            <div className="stat-label">Margin</div>
+            <div className="stat-value">{stats.margin}%</div>
+            <div className="stat-sub">{stats.margin >= 50 ? 'Healthy' : 'Track costs'}</div>
           </div>
         </div>
       </div>
