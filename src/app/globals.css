@@ -382,6 +382,13 @@ html, body {
   box-sizing: border-box;
 }
 
+/* Circular company badge — already has its own background */
+.business-logo-wrap--badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 50%;
+}
+
 .business-logo {
   display: block;
   width: 100%;

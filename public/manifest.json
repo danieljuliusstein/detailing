@@ -1,6 +1,6 @@
 {
-  "name": "Detailing",
-  "short_name": "Detailing",
+  "name": "Atlas Detailing",
+  "short_name": "Atlas",
   "description": "Car detailing business operations and profit tracking",
   "start_url": "/",
   "display": "standalone",

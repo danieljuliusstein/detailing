@@ -8,7 +8,7 @@ const syne = Syne({ subsets: ['latin'], variable: '--font-syne' })
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' })
 
 export const metadata: Metadata = {
-  title: 'Detailing',
+  title: 'Atlas Detailing',
   description: 'Car detailing business operations and profit tracking',
   manifest: '/manifest.json',
   icons: {
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Detailing',
+    title: 'Atlas Detailing',
   },
 }
 

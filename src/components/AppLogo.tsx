@@ -9,12 +9,12 @@ interface AppLogoProps {
 export default function AppLogo({ size = 48, className = '', priority = false }: AppLogoProps) {
   return (
     <span
-      className={`business-logo-wrap ${className}`.trim()}
+      className={`business-logo-wrap business-logo-wrap--badge ${className}`.trim()}
       style={{ width: size, height: size, position: 'relative' }}
     >
       <Image
         src="/logo.png"
-        alt="Detailing"
+        alt="Atlas Detailing"
         fill
         className="business-logo"
         priority={priority}
