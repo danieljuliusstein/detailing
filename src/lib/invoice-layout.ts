@@ -4,6 +4,15 @@ import type { Invoice, InvoiceStatus, JobWithRelations } from './types'
 
 export const INVOICE_ACCENT = '#22c55e'
 
+/** Shared status tones for web preview, PDF, and portal */
+export const INVOICE_STATUS_COLORS = {
+  paid: INVOICE_ACCENT,
+  sent: '#3b82f6',
+  overdue: '#ef4444',
+  draft: '#888888',
+  partial: '#f59e0b',
+} as const
+
 export interface InvoiceLineItem {
   description: string
   note?: string

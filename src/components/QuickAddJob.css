@@ -41,7 +41,7 @@
 
 .new-job-header-date {
   font-size: 13px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .new-job-body {
@@ -65,7 +65,7 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #555;
+  color: var(--text-muted);
   text-transform: uppercase;
   margin-bottom: 8px;
 }
@@ -81,8 +81,8 @@
 
 .new-job-input {
   width: 100%;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   padding: 13px 14px;
   font-size: 14px;
@@ -107,7 +107,7 @@
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: #555;
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -117,8 +117,8 @@
   left: 0;
   right: 0;
   z-index: 50;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   max-height: 180px;
   overflow-y: auto;
@@ -146,8 +146,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #1a3a2a;
-  color: #3dc97a;
+  background: var(--green-dim);
+  color: var(--green-text);
   font-size: 11px;
   font-weight: 700;
   display: flex;
@@ -160,7 +160,7 @@
   width: 36px;
   height: 36px;
   font-size: 12px;
-  background: #0f2d1a;
+  background: var(--green-dim);
 }
 
 .new-job-client-option-name {
@@ -172,7 +172,7 @@
 .new-job-client-option-meta {
   display: block;
   font-size: 11px;
-  color: #555;
+  color: var(--text-muted);
   margin-top: 1px;
 }
 
@@ -182,8 +182,8 @@
   gap: 12px;
   align-items: center;
   width: 100%;
-  background: #1a3a2a;
-  border: 0.5px solid #2a5a3a;
+  background: var(--green-dim);
+  border: 0.5px solid var(--green);
   border-radius: 12px;
   padding: 12px 14px;
   cursor: pointer;
@@ -205,7 +205,7 @@
 .new-job-client-selected-meta {
   display: block;
   font-size: 11px;
-  color: #555;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
@@ -222,33 +222,57 @@
 
 .new-job-datetime-box {
   position: relative;
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: center;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  display: block;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
-  padding: 13px 14px;
+  color-scheme: dark;
   cursor: pointer;
+  min-height: var(--tap-target-min);
 }
 
-.new-job-datetime-value {
-  font-size: 13px;
-  color: #fff;
-}
-
-.new-job-datetime-value--empty {
-  color: #444;
+.new-job-datetime-box > svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .new-job-datetime-native {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+  display: block;
   width: 100%;
-  height: 100%;
+  min-height: var(--tap-target-min);
+  padding: 13px 14px 13px 40px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  color-scheme: dark;
   cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.new-job-datetime-native::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.new-job-datetime-native::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  margin-left: auto;
+}
+
+.new-job-datetime-native:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+  border-radius: 12px;
 }
 
 .new-job-package-list {
@@ -262,8 +286,8 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   padding: 14px;
   cursor: pointer;
@@ -272,8 +296,8 @@
 }
 
 .new-job-package-card--selected {
-  background: #1a3a2a;
-  border-color: #2a5a3a;
+  background: var(--green-dim);
+  border-color: var(--green);
 }
 
 .new-job-package-left {
@@ -290,7 +314,7 @@
 
 .new-job-package-desc {
   font-size: 11px;
-  color: #555;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
@@ -306,7 +330,7 @@
 .new-job-package-price {
   font-size: 15px;
   font-weight: 700;
-  color: #3dc97a;
+  color: var(--green-text);
 }
 
 .new-job-add-package {
@@ -319,7 +343,7 @@
   border: none;
   cursor: pointer;
   font-size: 12px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .new-job-vehicle-grid {
@@ -333,8 +357,8 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   padding: 12px 8px;
   cursor: pointer;
@@ -344,24 +368,24 @@
 }
 
 .new-job-vehicle-btn span {
-  color: #555;
+  color: var(--text-muted);
 }
 
 .new-job-vehicle-btn--selected {
-  background: #1a3a2a;
-  border-color: #3dc97a;
-  color: #3dc97a;
+  background: var(--green-dim);
+  border-color: var(--green);
+  color: var(--green-text);
 }
 
 .new-job-vehicle-btn--selected span {
-  color: #3dc97a;
+  color: var(--green-text);
 }
 
 .new-job-location-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   padding: 3px;
@@ -377,7 +401,7 @@
   padding: 12px;
   font-size: 13px;
   font-weight: 600;
-  color: #555;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   border-radius: 10px;
@@ -385,7 +409,7 @@
 }
 
 .new-job-location-opt--selected {
-  background: #3dc97a;
+  background: var(--green);
   color: #111;
 }
 
@@ -409,8 +433,8 @@
   flex-direction: row;
   gap: 8px;
   align-items: center;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   padding: 13px 14px;
 }
@@ -418,12 +442,12 @@
 .new-job-money-sign {
   font-size: 16px;
   font-weight: 700;
-  color: #555;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .new-job-money-sign--green {
-  color: #3dc97a;
+  color: var(--green-text);
 }
 
 .new-job-money-input {
@@ -443,8 +467,8 @@
 }
 
 .new-job-notes-box {
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
   border-radius: 12px;
   padding: 13px 14px;
 }
@@ -467,11 +491,11 @@
 
 .new-job-empty-hint {
   font-size: 13px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .new-job-link {
-  color: #3dc97a;
+  color: var(--green-text);
 }
 
 .new-job-error {
@@ -488,28 +512,16 @@
   width: 100%;
   max-width: 430px;
   background: #111;
-  border-top: 0.5px solid #1e1e1e;
+  border-top: 0.5px solid var(--bg-surface);
   padding: 12px 20px calc(28px + env(safe-area-inset-bottom, 0px));
   display: flex;
   gap: 10px;
   z-index: 90;
 }
 
-.new-job-save-btn {
-  flex: 1;
-  background: #3dc97a;
-  border: none;
-  border-radius: 14px;
-  padding: 16px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #111;
-  cursor: pointer;
-}
-
 .new-job-save-btn--muted {
-  background: #1a3a2a;
-  color: #2a6a3e;
+  background: var(--green-dim) !important;
+  color: #2a6a3e !important;
 }
 
 .new-job-expenses-btn {
@@ -518,12 +530,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: #1e1e1e;
-  border: 0.5px solid #2a2a2a;
-  border-radius: 14px;
   padding: 16px 18px;
   font-size: 13px;
-  color: #888;
-  cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }

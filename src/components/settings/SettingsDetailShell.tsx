@@ -1,0 +1,28 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import BackButton from '@/components/BackButton'
+import SettingsFooter from './SettingsFooter'
+
+export default function SettingsDetailShell({
+  title,
+  children,
+  showSave = true,
+}: {
+  title: string
+  children: React.ReactNode
+  showSave?: boolean
+}) {
+  const router = useRouter()
+
+  return (
+    <div className="screen page-content settings-screen">
+      <header className="settings-header">
+        <BackButton onClick={() => router.push('/settings')} />
+        <h1 className="settings-header__title">{title}</h1>
+      </header>
+      <div className="settings-detail">{children}</div>
+      <SettingsFooter showSave={showSave} />
+    </div>
+  )
+}

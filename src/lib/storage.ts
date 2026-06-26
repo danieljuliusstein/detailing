@@ -1,5 +1,6 @@
 import { isDemoAppData } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
+import { scopedStorageKey } from './tenant'
 import type { BusinessExpense, Client, DamageRecord, Equipment, Invoice, Job, OverheadExpense, Package, Quote, Supply, Vehicle } from './types'
 
 function useDevDemoSeed(): boolean {
@@ -274,7 +275,7 @@ function defaultLocalData(): AppData {
 export function loadData(): AppData {
   if (typeof window === 'undefined') return createSeedData()
 
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = localStorage.getItem(scopedStorageKey(STORAGE_KEY))
   if (!raw) {
     const initial = defaultLocalData()
     if (useDevDemoSeed()) {
@@ -299,6 +300,7 @@ export function loadData(): AppData {
 
   // Phone may still have demo saved from an earlier visit — drop it when cloud is configured.
   if (isPocketBaseConfigured() && isDemoAppData(merged)) {
+    localStorage.removeItem(scopedStorageKey(STORAGE_KEY))
     localStorage.removeItem(STORAGE_KEY)
     return createEmptyData()
   }
@@ -308,7 +310,7 @@ export function loadData(): AppData {
 
 export function saveData(data: AppData): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(data))
 }
 
 export function newId(): string {

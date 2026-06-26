@@ -10,6 +10,7 @@ export interface PortalTokenRecord {
   job_id?: string
   quote_id?: string
   client_id: string
+  organization_id?: string
   expires_at: string
   revoked: boolean
 }
@@ -22,6 +23,16 @@ function expiresAt(days = 90): string {
   const d = new Date()
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
+}
+
+async function resolveClientOrgId(
+  pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>,
+  clientId: string,
+): Promise<string> {
+  const client = await pb.collection('clients').getOne(clientId)
+  const orgId = String(client.organization_id ?? '')
+  if (!orgId) throw new Error('Client has no organization')
+  return orgId
 }
 
 export function getAppBaseUrl(): string {
@@ -55,11 +66,13 @@ export async function createPortalToken(input: {
   const pb = await authenticateServerPocketBase()
   const token = generateToken()
   const exp = expiresAt()
+  const organizationId = await resolveClientOrgId(pb, input.clientId)
 
   const payload: Record<string, unknown> = {
     token,
     scope: input.scope,
     client_id: input.clientId,
+    organization_id: organizationId,
     expires_at: exp,
     revoked: false,
   }

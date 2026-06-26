@@ -294,6 +294,34 @@ export function deleteJob(id: string): boolean {
   return true
 }
 
+export function deleteClient(id: string): boolean {
+  const data = loadData()
+  if (!data.clients.some((c) => c.id === id)) return false
+
+  const jobIds = data.jobs.filter((j) => j.client_id === id).map((j) => j.id)
+  const jobIdSet = new Set(jobIds)
+  for (const jobId of jobIds) {
+    deleteJob(jobId)
+  }
+
+  const fresh = loadData()
+  fresh.invoices = fresh.invoices.filter((i) => i.client_id !== id && !jobIdSet.has(i.job_id))
+  if (fresh.quotes) {
+    fresh.quotes = fresh.quotes.filter((q) => q.client_id !== id)
+  }
+
+  const vehicleIds = new Set((fresh.vehicles ?? []).filter((v) => v.client_id === id).map((v) => v.id))
+  if (fresh.damage_docs) {
+    fresh.damage_docs = fresh.damage_docs.filter(
+      (d) => !vehicleIds.has(d.vehicle_id) && !(d.linked_job_id && jobIdSet.has(d.linked_job_id))
+    )
+  }
+  fresh.vehicles = (fresh.vehicles ?? []).filter((v) => v.client_id !== id)
+  fresh.clients = fresh.clients.filter((c) => c.id !== id)
+  saveData(fresh)
+  return true
+}
+
 export function getClient(id: string): Client | null {
   return loadData().clients.find((c) => c.id === id) ?? null
 }

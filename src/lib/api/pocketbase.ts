@@ -1,4 +1,6 @@
 import { normalizeInvoice } from '../invoices'
+import { rangeDateSpanLabel, rangePeriodLabel } from '../jobs-revenue'
+import { loadSettings } from '../settings'
 import {
   applySupplyExpenses,
   inventoryDeltaFromUsageChange,
@@ -50,6 +52,7 @@ import { getBusinessExpensesMerged } from './business-expenses-merge'
 import { businessExpensesTotalForDates } from '../business-expenses-logic'
 import { enrichClientWithStats } from '../client-stats'
 import { buildDashboardInsights } from '../dashboard-insights'
+import { tenantFilter, withOrganization } from './tenant-pocketbase'
 
 const JOB_EXPAND = 'client_id,package_id,invoice_id'
 
@@ -81,7 +84,7 @@ async function fetchJobsRaw(): Promise<Job[]> {
 
 export async function getPackages(): Promise<Package[]> {
   const records = await pb().collection('packages').getFullList<PbRecord>({
-    filter: 'active = true',
+    filter: tenantFilter('active = true'),
     sort: 'name',
   })
   return records.map(pbPackageToApp)
@@ -133,7 +136,7 @@ export async function createClient(input: import('../types').ClientInput): Promi
   }
   if (input.lead_source) payload.lead_source = input.lead_source
 
-  const created = await pb().collection('clients').create<PbRecord>(payload)
+  const created = await pb().collection('clients').create<PbRecord>(withOrganization(payload))
   return pbClientToApp(created)
 }
 
@@ -161,14 +164,16 @@ export async function getAllPackages(): Promise<Package[]> {
 }
 
 export async function createPackage(input: import('../types').PackageInput): Promise<Package> {
-  const created = await pb().collection('packages').create<PbRecord>({
-    name: input.name.trim(),
-    base_price: input.base_price,
-    description: input.description ?? '',
-    expected_return_days: input.expected_return_days ?? 90,
-    default_supplies: input.default_supplies ?? [],
-    active: input.active !== false,
-  })
+  const created = await pb().collection('packages').create<PbRecord>(
+    withOrganization({
+      name: input.name.trim(),
+      base_price: input.base_price,
+      description: input.description ?? '',
+      expected_return_days: input.expected_return_days ?? 90,
+      default_supplies: input.default_supplies ?? [],
+      active: input.active !== false,
+    }),
+  )
   return pbPackageToApp(created)
 }
 
@@ -200,12 +205,14 @@ export async function findOrCreateClient(name: string, existingId: string | null
 
   const escaped = escapeFilterValue(trimmed)
   const matches = await pb().collection('clients').getFullList<PbRecord>({
-    filter: `name = "${escaped}"`,
+    filter: tenantFilter(`name = "${escaped}"`),
     limit: 1,
   })
   if (matches.length > 0) return pbClientToApp(matches[0])
 
-  const created = await pb().collection('clients').create<PbRecord>({ name: trimmed })
+  const created = await pb().collection('clients').create<PbRecord>(
+    withOrganization({ name: trimmed }),
+  )
   return pbClientToApp(created)
 }
 
@@ -238,7 +245,7 @@ export async function createJob(input: QuickJobData): Promise<Job> {
   payload.supplies_used = supplies_used
   payload.expenses = expenses
 
-  const record = await pb().collection('jobs').create<PbRecord>(payload)
+  const record = await pb().collection('jobs').create<PbRecord>(withOrganization(payload))
   if (supplies_used.length > 0) {
     await deductSupplies(suppliesUsed)
   }
@@ -296,7 +303,7 @@ export async function getClientsWithStats(): Promise<ClientWithStats[]> {
 export async function getClientJobs(clientId: string): Promise<JobWithRelations[]> {
   const escaped = escapeFilterValue(clientId)
   const records = await pb().collection('jobs').getFullList<PbRecord>({
-    filter: `client_id = "${escaped}"`,
+    filter: tenantFilter(`client_id = "${escaped}"`),
     sort: '-date',
     expand: JOB_EXPAND,
   })
@@ -328,7 +335,7 @@ export async function getWeekDays(): Promise<WeekDay[]> {
 export async function getJobsForDate(date: string): Promise<RecentJobRow[]> {
   const escaped = escapeFilterValue(date)
   const records = await pb().collection('jobs').getFullList<PbRecord>({
-    filter: `date = "${escaped}"`,
+    filter: tenantFilter(`date = "${escaped}"`),
     expand: JOB_EXPAND,
   })
   return computeJobsForDate(records.map(pbJobToAppWithRelations), date)
@@ -372,13 +379,17 @@ export async function exportJobsCSV(range: DateRangeKey): Promise<string> {
   return computeJobsCSV(jobs, range, (job) => ({
     client: clients.find((c) => c.id === job.client_id)?.name ?? '',
     pkg: packages.find((p) => p.id === job.package_id)?.name ?? '',
-  }))
+  }), {
+    periodLabel: rangePeriodLabel(range),
+    periodRange: rangeDateSpanLabel(range),
+    businessName: loadSettings().business_name,
+  })
 }
 
 const DEFAULT_PACKAGES = [
   { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry' },
   { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail' },
-  { name: 'Paint Correct', base_price: 450, active: true, description: 'Single-stage paint correction' },
+  { name: 'Paint Correction', base_price: 450, active: true, description: 'Single-stage paint correction' },
   { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application' },
 ]
 
@@ -387,13 +398,15 @@ export async function seedPackagesIfEmpty(): Promise<number> {
   if (!(await ensurePocketBaseAuth())) return 0
 
   const client = pb()
-  const { totalItems } = await client.collection('packages').getList(1, 1)
+  const { totalItems } = await client.collection('packages').getList(1, 1, {
+    filter: tenantFilter(),
+  })
   if (totalItems > 0) return 0
 
   let created = 0
   for (const pkg of DEFAULT_PACKAGES) {
     try {
-      await client.collection('packages').create(pkg)
+      await client.collection('packages').create(withOrganization(pkg))
       created++
     } catch {
       // Unauthenticated or validation failure — stop rather than spam the console
@@ -414,12 +427,13 @@ export async function getCollectionCounts(): Promise<Record<string, number>> {
 }
 
 export type DeleteJobResult = { ok: boolean; error?: string }
+export type DeleteClientResult = { ok: boolean; error?: string }
 
-async function deleteRecordsByJobFilter(collection: string, jobId: string): Promise<void> {
-  const escaped = escapeFilterValue(jobId)
+async function deleteRecordsByFieldFilter(collection: string, field: string, value: string): Promise<void> {
+  const escaped = escapeFilterValue(value)
   try {
     const records = await pb().collection(collection).getFullList<PbRecord>({
-      filter: `job_id = "${escaped}"`,
+      filter: tenantFilter(`${field} = "${escaped}"`),
     })
     for (const record of records) {
       await pb().collection(collection).delete(record.id)
@@ -431,11 +445,15 @@ async function deleteRecordsByJobFilter(collection: string, jobId: string): Prom
   }
 }
 
+async function deleteRecordsByJobFilter(collection: string, jobId: string): Promise<void> {
+  return deleteRecordsByFieldFilter(collection, 'job_id', jobId)
+}
+
 async function clearQuoteJobLinks(jobId: string): Promise<void> {
   const escaped = escapeFilterValue(jobId)
   try {
     const quotes = await pb().collection('quotes').getFullList<PbRecord>({
-      filter: `job_id = "${escaped}"`,
+      filter: tenantFilter(`job_id = "${escaped}"`),
     })
     for (const quote of quotes) {
       try {
@@ -478,6 +496,44 @@ export async function deleteJob(id: string): Promise<DeleteJobResult> {
     return { ok: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to delete job'
+    return { ok: false, error: message }
+  }
+}
+
+export async function deleteClient(id: string): Promise<DeleteClientResult> {
+  if (!(await ensurePocketBaseAuth())) {
+    return { ok: false, error: 'Could not authenticate with PocketBase' }
+  }
+
+  try {
+    const escaped = escapeFilterValue(id)
+    const jobs = await pb().collection('jobs').getFullList<PbRecord>({
+      filter: tenantFilter(`client_id = "${escaped}"`),
+    })
+    for (const job of jobs) {
+      const result = await deleteJob(job.id)
+      if (!result.ok) {
+        return { ok: false, error: result.error ?? 'Failed to delete a job for this client' }
+      }
+    }
+
+    await deleteRecordsByFieldFilter('quotes', 'client_id', id)
+
+    const vehicles = await pb().collection('vehicles').getFullList<PbRecord>({
+      filter: tenantFilter(`client_id = "${escaped}"`),
+    })
+    for (const vehicle of vehicles) {
+      await deleteRecordsByFieldFilter('damage_docs', 'vehicle_id', vehicle.id)
+      await pb().collection('vehicles').delete(vehicle.id)
+    }
+
+    await deleteRecordsByFieldFilter('portal_tokens', 'client_id', id)
+    await deleteRecordsByFieldFilter('invoices', 'client_id', id)
+
+    await pb().collection('clients').delete(id)
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete client'
     return { ok: false, error: message }
   }
 }

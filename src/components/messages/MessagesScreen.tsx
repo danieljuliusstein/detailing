@@ -9,9 +9,9 @@ import MessageDetailView from '@/components/messages/MessageDetailView'
 import type { AutoMessageTemplate, SentMessage } from '@/lib/messages'
 import {
   DEFAULT_AUTO_TEMPLATES,
-  PLACEHOLDER_SENT_MESSAGES,
-  loadAutoMessageTemplates,
-  saveAutoMessageTemplates,
+  loadAutoMessageTemplatesAsync,
+  loadSentMessagesAsync,
+  saveAutoMessageTemplatesAsync,
 } from '@/lib/messages'
 
 type Tab = 'all' | 'auto'
@@ -25,15 +25,19 @@ export default function MessagesScreen() {
   const [templates, setTemplates] = useState<AutoMessageTemplate[]>(DEFAULT_AUTO_TEMPLATES)
   const [expandedId, setExpandedId] = useState('appointment_reminder')
   const [selected, setSelected] = useState<SentMessage | null>(null)
-  const [sentMessages] = useState<SentMessage[]>(PLACEHOLDER_SENT_MESSAGES)
+  const [sentMessages, setSentMessages] = useState<SentMessage[]>([])
+  const [loadingSent, setLoadingSent] = useState(true)
 
   useEffect(() => {
-    setTemplates(loadAutoMessageTemplates())
+    loadAutoMessageTemplatesAsync().then(setTemplates)
+    loadSentMessagesAsync()
+      .then(setSentMessages)
+      .finally(() => setLoadingSent(false))
   }, [])
 
   const persistTemplates = useCallback((next: AutoMessageTemplate[]) => {
     setTemplates(next)
-    saveAutoMessageTemplates(next)
+    void saveAutoMessageTemplatesAsync(next)
   }, [])
 
   const handleTemplateUpdate = useCallback(
@@ -78,7 +82,13 @@ export default function MessagesScreen() {
       </div>
 
       {tab === 'all' ? (
-        <AllMessagesTab messages={sentMessages} onSelect={setSelected} />
+        loadingSent ? (
+          <p className="messages-empty">Loading messages…</p>
+        ) : sentMessages.length === 0 ? (
+          <p className="messages-empty">No messages sent yet. Enable auto messages to start texting clients.</p>
+        ) : (
+          <AllMessagesTab messages={sentMessages} onSelect={setSelected} />
+        )
       ) : (
         <AutoMessagesTab
           templates={templates}

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import PortalView from '@/components/portal/PortalView'
 import PortalErrorScreen from '@/components/portal/PortalErrorScreen'
 import { buildPortalPayload, loadPortalBusiness } from '@/lib/server/portal-data'
@@ -12,17 +13,28 @@ export default async function PortalPage({
   const record = await validatePortalToken(token)
 
   if (!record) {
-    const baseUrl = await getRequestAppBaseUrl()
-    const business = await loadPortalBusiness(baseUrl).catch(() => undefined)
+    const business = { name: 'Detailing', phone: '', email: '', address: '' }
     return <PortalErrorScreen type="LINK_EXPIRED" business={business} />
   }
 
   const payload = await buildPortalPayload(record, await getRequestAppBaseUrl())
   if (!payload) {
     const baseUrl = await getRequestAppBaseUrl()
-    const business = await loadPortalBusiness(baseUrl).catch(() => undefined)
+    const orgId = record.organization_id ?? ''
+    const business = orgId
+      ? await loadPortalBusiness(baseUrl, orgId).catch(() => ({
+          name: 'Detailing',
+          phone: '',
+          email: '',
+          address: '',
+        }))
+      : { name: 'Detailing', phone: '', email: '', address: '' }
     return <PortalErrorScreen type="UNAVAILABLE" business={business} />
   }
 
-  return <PortalView payload={payload} token={token} />
+  return (
+    <Suspense fallback={<div className="portal-root client-light-root"><div className="portal-body">Loading…</div></div>}>
+      <PortalView payload={payload} token={token} />
+    </Suspense>
+  )
 }

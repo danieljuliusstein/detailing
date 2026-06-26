@@ -9,6 +9,8 @@ function opReferencesJob(op: QueueOperation, jobId: string): boolean {
       return op.params.id === jobId
     case 'deleteJob':
       return op.params.id === jobId
+    case 'deleteClient':
+      return false
     case 'createInvoiceForJob':
       return op.params.jobId === jobId
     case 'uploadJobPhoto':
@@ -53,6 +55,8 @@ export function describeQueueItem(item: QueueItem): string {
       return `update job ${op.params.id}`
     case 'deleteJob':
       return `delete job ${op.params.id}`
+    case 'deleteClient':
+      return `delete client ${op.params.id}`
     case 'createInvoiceForJob':
       return `invoice for job ${op.params.jobId}`
     case 'createJob':
@@ -81,6 +85,49 @@ export async function purgeQueueItemsForJob(jobId: string): Promise<number> {
   let removed = 0
   for (const item of items) {
     if (opReferencesJob(item.operation, jobId)) {
+      await removeQueueItem(item.id)
+      removed++
+    }
+  }
+  return removed
+}
+
+function opReferencesClient(
+  op: QueueOperation,
+  clientId: string,
+  jobIds: Set<string>,
+  vehicleIds: Set<string>
+): boolean {
+  switch (op.type) {
+    case 'createJob':
+      return op.params.clientId === clientId || jobIds.has(op.localJobId)
+    case 'createVehicle':
+      return op.params.client_id === clientId || vehicleIds.has(op.localVehicleId)
+    case 'createDamageDoc':
+      return vehicleIds.has(op.params.vehicle_id) || Boolean(op.params.linked_job_id && jobIds.has(op.params.linked_job_id))
+    case 'deleteClient':
+      return op.params.id === clientId
+    default:
+      return false
+  }
+}
+
+/** Remove pending sync ops for a deleted client and its related records. */
+export async function purgeQueueItemsForClient(
+  clientId: string,
+  jobIds: string[],
+  vehicleIds: string[]
+): Promise<number> {
+  const jobIdSet = new Set(jobIds)
+  const vehicleIdSet = new Set(vehicleIds)
+  const items = await getQueueItems()
+  let removed = 0
+  for (const item of items) {
+    const op = item.operation
+    if (
+      opReferencesClient(op, clientId, jobIdSet, vehicleIdSet) ||
+      jobIds.some((jobId) => opReferencesJob(op, jobId))
+    ) {
       await removeQueueItem(item.id)
       removed++
     }

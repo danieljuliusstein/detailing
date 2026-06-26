@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, FileText, PencilSimple, Link, Trash } from '@phosphor-icons/react'
+import { CalendarPlus, FileText, PencilSimple, Link, Receipt, Trash } from '@phosphor-icons/react'
 import JobPhotosEntry from '@/components/jobs/JobPhotosEntry'
 import { suggestNextServiceDate } from '@/lib/next-service'
 import { normalizeReturnDays } from '@/lib/package-cadence'
 import BackButton from '@/components/BackButton'
 import ShareLinkActions from '@/components/portal/ShareLinkActions'
-import { deleteJob } from '@/lib/api'
+import { deleteJob, getQuotes } from '@/lib/api'
 import {
   effectiveRate,
   fmtDetailed,
@@ -43,6 +43,19 @@ interface JobDetailProps {
 export default function JobDetail({ job }: JobDetailProps) {
   const router = useRouter()
   const [cancelling, setCancelling] = useState(false)
+  const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getQuotes().then((quotes) => {
+      if (cancelled) return
+      const linked = quotes.find((q) => q.job_id === job.id)
+      setLinkedQuoteId(linked?.id ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [job.id])
   const expenses = jobExpensesForDisplay(job)
   const profit = netProfit(job)
   const rate = effectiveRate(job)
@@ -218,22 +231,23 @@ export default function JobDetail({ job }: JobDetailProps) {
         </div>
       )}
 
-      <button
-        className="btn-ghost"
-        onClick={() => router.push(`/jobs/${job.id}/invoice`)}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 6,
-          padding: '14px 8px',
-          width: '100%',
-          marginBottom: 10,
-        }}
-      >
-        <FileText size={22} weight="regular" color="var(--text-secondary)" aria-hidden="true" />
-        <span style={{ fontSize: 12 }}>Invoice</span>
-      </button>
+      <div className="detail-context-links">
+        {linkedQuoteId ? (
+          <button type="button" className="detail-context-link" onClick={() => router.push(`/quotes/${linkedQuoteId}`)}>
+            <FileText size={18} aria-hidden="true" />
+            View quote
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="detail-context-link"
+          onClick={() => router.push(`/jobs/${job.id}/invoice`)}
+          style={linkedQuoteId ? undefined : { gridColumn: '1 / -1' }}
+        >
+          <Receipt size={18} aria-hidden="true" />
+          {job.invoice ? 'View invoice' : 'Invoice'}
+        </button>
+      </div>
 
       <JobPhotosEntry job={job} onPress={() => router.push(`/jobs/${job.id}/photos`)} />
 

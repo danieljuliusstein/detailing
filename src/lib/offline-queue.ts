@@ -2,10 +2,13 @@
  * IndexedDB-backed FIFO queue for PocketBase writes made while offline.
  */
 
+import { scopedDbName } from './tenant'
+
 export type QueueOperation =
   | { type: 'createJob'; params: import('./types').QuickJobData; localJobId: string }
   | { type: 'updateJob'; params: { id: string; data: import('./types').JobEditData } }
   | { type: 'deleteJob'; params: { id: string } }
+  | { type: 'deleteClient'; params: { id: string } }
   | { type: 'createInvoiceForJob'; params: { jobId: string } }
   | { type: 'markInvoiceSent'; params: { invoiceId: string } }
   | { type: 'addPayment'; params: { invoiceId: string; payment: import('./types').Payment } }
@@ -43,13 +46,17 @@ const DB_NAME = 'detailing_offline_v1'
 const STORE = 'queue'
 const DB_VERSION = 1
 
+function dbName(): string {
+  return scopedDbName(DB_NAME)
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB unavailable'))
       return
     }
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    const req = indexedDB.open(dbName(), DB_VERSION)
     req.onerror = () => reject(req.error)
     req.onsuccess = () => resolve(req.result)
     req.onupgradeneeded = () => {

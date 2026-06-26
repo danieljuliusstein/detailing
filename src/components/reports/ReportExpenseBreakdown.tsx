@@ -21,7 +21,7 @@ export default function ReportExpenseBreakdown({ report }: ReportExpenseBreakdow
 
   if (rows.length === 0) {
     return (
-      <div className="report-card report-expense-breakdown">
+      <div className="report-card report-card--empty report-expense-breakdown">
         <div className="report-card-empty">No expenses in this period</div>
       </div>
     )

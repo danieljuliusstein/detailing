@@ -1,10 +1,10 @@
 import { getPocketBase, isPocketBaseConfigured } from '../pocketbase'
 import { checkPocketBaseHealth } from '../pocketbase'
 import { authenticatePocketBase } from '../pb-auth'
+import { requireOrganizationId } from '../tenant'
 import type { AppSettings } from '../settings'
 import type { PbRecord } from './mappers'
-
-const SETTINGS_RECORD_ID_KEY = 'detailing_app_settings_id'
+import { tenantFilter, withOrganization, settingsRecordIdKey } from './tenant-pocketbase'
 
 function pb() {
   const client = getPocketBase()
@@ -56,18 +56,22 @@ export async function loadSettingsFromPocketBase(): Promise<AppSettings | null> 
   if (!(await canSyncSettings())) return null
 
   try {
-    const records = await pb().collection('app_settings').getFullList<PbRecord>({ limit: 1 })
+    const orgId = requireOrganizationId()
+    const records = await pb().collection('app_settings').getFullList<PbRecord>({
+      filter: tenantFilter(),
+      limit: 1,
+    })
     if (records.length === 0) return null
 
     const record = records[0]
     if (typeof window !== 'undefined') {
-      localStorage.setItem(SETTINGS_RECORD_ID_KEY, record.id)
+      localStorage.setItem(settingsRecordIdKey(orgId), record.id)
     }
 
     let logoUrl: string | undefined
     const logo = record.logo
     if (typeof logo === 'string' && logo) {
-      logoUrl = '/api/business-logo'
+      logoUrl = `/api/business-logo?slug=${encodeURIComponent(await resolveOrgSlug(orgId))}`
     } else {
       logoUrl = '/logo.png'
     }
@@ -78,13 +82,25 @@ export async function loadSettingsFromPocketBase(): Promise<AppSettings | null> 
   }
 }
 
+async function resolveOrgSlug(orgId: string): Promise<string> {
+  try {
+    const org = await pb().collection('organizations').getOne(orgId)
+    return String(org.slug ?? '')
+  } catch {
+    return ''
+  }
+}
+
 export async function saveSettingsToPocketBase(
   settings: AppSettings,
-  logoFile?: File | null
+  logoFile?: File | null,
+  options?: { clearLogo?: boolean }
 ): Promise<AppSettings> {
   if (!(await canSyncSettings())) throw new Error('PocketBase not available')
 
-  const storedId = typeof window !== 'undefined' ? localStorage.getItem(SETTINGS_RECORD_ID_KEY) : null
+  const orgId = requireOrganizationId()
+  const storedId =
+    typeof window !== 'undefined' ? localStorage.getItem(settingsRecordIdKey(orgId)) : null
   const notifications = { ...settings.notifications }
 
   const payload: Record<string, unknown> = {
@@ -115,26 +131,54 @@ export async function saveSettingsToPocketBase(
     if (storedId) {
       record = await pb().collection('app_settings').update<PbRecord>(storedId, formData)
     } else {
+      formData.append('organization_id', orgId)
       record = await pb().collection('app_settings').create<PbRecord>(formData)
+    }
+  } else if (options?.clearLogo) {
+    const clearPayload = { ...payload, logo: null }
+    if (storedId) {
+      record = await pb().collection('app_settings').update<PbRecord>(storedId, clearPayload)
+    } else {
+      const existing = await pb().collection('app_settings').getFullList<PbRecord>({
+        filter: tenantFilter(),
+        limit: 1,
+      })
+      if (existing.length > 0) {
+        record = await pb().collection('app_settings').update<PbRecord>(existing[0].id, clearPayload)
+      } else {
+        record = await pb().collection('app_settings').create<PbRecord>(withOrganization(clearPayload))
+      }
     }
   } else if (storedId) {
     record = await pb().collection('app_settings').update<PbRecord>(storedId, payload)
   } else {
-    const existing = await pb().collection('app_settings').getFullList<PbRecord>({ limit: 1 })
+    const existing = await pb().collection('app_settings').getFullList<PbRecord>({
+      filter: tenantFilter(),
+      limit: 1,
+    })
     if (existing.length > 0) {
       record = await pb().collection('app_settings').update<PbRecord>(existing[0].id, payload)
     } else {
-      record = await pb().collection('app_settings').create<PbRecord>(payload)
+      record = await pb().collection('app_settings').create<PbRecord>(withOrganization(payload))
     }
   }
 
   if (typeof window !== 'undefined') {
-    localStorage.setItem(SETTINGS_RECORD_ID_KEY, record.id)
+    localStorage.setItem(settingsRecordIdKey(orgId), record.id)
   }
 
-  let logoUrl: string | undefined
+  const slug = await resolveOrgSlug(orgId)
   const logo = record.logo
-  logoUrl = typeof logo === 'string' && logo ? '/api/business-logo' : '/logo.png'
+  const logoUrl = typeof logo === 'string' && logo ? `/api/business-logo?slug=${encodeURIComponent(slug)}` : '/logo.png'
+
+  const trimmedName = settings.business_name.trim()
+  if (trimmedName) {
+    try {
+      await pb().collection('organizations').update(orgId, { name: trimmedName })
+    } catch (err) {
+      console.warn('[settings] organization name sync failed:', err)
+    }
+  }
 
   return recordToSettings(record, logoUrl)
 }

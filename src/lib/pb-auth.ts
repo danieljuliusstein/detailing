@@ -9,32 +9,7 @@ export function isPocketBaseAuthenticated(): boolean {
   return pb.authStore.isValid
 }
 
-async function authWithCredentials(pb: NonNullable<ReturnType<typeof getPocketBase>>): Promise<boolean> {
-  const email = process.env.NEXT_PUBLIC_PB_EMAIL
-  const password = process.env.NEXT_PUBLIC_PB_PASSWORD
-
-  if (!email || !password) {
-    console.warn('[pb-auth] NEXT_PUBLIC_PB_EMAIL or NEXT_PUBLIC_PB_PASSWORD not set')
-    return false
-  }
-
-  try {
-    await withTimeout(
-      pb.collection('users').authWithPassword(email, password),
-      8000,
-      'PocketBase auth',
-    )
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(AUTH_FLAG_KEY, '1')
-    }
-    return true
-  } catch (err) {
-    console.warn('[pb-auth] Authentication failed:', err)
-    return false
-  }
-}
-
-/** Validate or refresh auth — unauthenticated list calls return empty 200, not errors. */
+/** Validate or refresh the current user session (per-tenant login). */
 export async function ensurePocketBaseAuth(): Promise<boolean> {
   if (!isPocketBaseConfigured()) return false
 
@@ -44,13 +19,40 @@ export async function ensurePocketBaseAuth(): Promise<boolean> {
   if (pb.authStore.isValid) {
     try {
       await withTimeout(pb.collection('users').authRefresh(), 8000, 'PocketBase auth refresh')
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(AUTH_FLAG_KEY, '1')
+      }
       return true
     } catch {
       pb.authStore.clear()
     }
   }
 
-  return authWithCredentials(pb)
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem(AUTH_FLAG_KEY)
+  }
+  return false
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<boolean> {
+  if (!isPocketBaseConfigured()) return false
+  const pb = getPocketBase()
+  if (!pb) return false
+
+  try {
+    await withTimeout(
+      pb.collection('users').authWithPassword(email.trim(), password),
+      8000,
+      'PocketBase login',
+    )
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(AUTH_FLAG_KEY, '1')
+    }
+    return true
+  } catch (err) {
+    console.warn('[pb-auth] Login failed:', err)
+    return false
+  }
 }
 
 export async function authenticatePocketBase(): Promise<boolean> {

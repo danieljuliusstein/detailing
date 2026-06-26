@@ -30,11 +30,14 @@ const RIGHT_TABS: NavItem[] = [
 
 function NavTab({ tab, active }: { tab: NavItem; active: boolean }) {
   const { Icon } = tab
+  const tourId =
+    tab.href === '/jobs' ? 'nav-jobs' : tab.href === '/clients' ? 'nav-clients' : undefined
   return (
     <Link
       href={tab.href}
       className={`bottom-nav-tab${active ? ' active' : ''}`}
       aria-current={active ? 'page' : undefined}
+      data-tour={tourId}
     >
       <span className="bottom-nav-tab-icon">
         <Icon
@@ -60,6 +63,9 @@ export default function BottomNav() {
   if (
     pathname === '/auth' ||
     pathname.startsWith('/portal') ||
+    pathname.startsWith('/book/') ||
+    pathname === '/onboarding' ||
+    pathname === '/privacy' ||
     pathname.startsWith('/jobs/new') ||
     pathname.startsWith('/settings')
   ) return null
@@ -70,7 +76,7 @@ export default function BottomNav() {
         <NavTab key={tab.href} tab={tab} active={isActive(tab.href)} />
       ))}
 
-      <div className="bottom-nav-fab">
+      <div className="bottom-nav-fab" data-tour="fab">
         <button
           type="button"
           className={`bottom-nav-fab-link${menuOpen ? ' bottom-nav-fab-link--open' : ''}`}

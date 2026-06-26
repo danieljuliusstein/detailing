@@ -5,6 +5,10 @@ import { createPortal } from 'react-dom'
 import { X } from '@phosphor-icons/react'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
 
+/**
+ * Bottom sheet shell. Footer children often use `.inv-sheet-save` — intentionally
+ * light-on-dark inverted buttons; see docs/a11y-audit-phase2.md.
+ */
 interface BottomSheetProps {
   title: string
   subtitle?: string
@@ -119,8 +123,8 @@ export default function BottomSheet({
             </button>
           </div>
         </div>
-        {children}
-        {footer}
+        <div className="inv-sheet-body">{children}</div>
+        {footer ? <div className="inv-sheet-footer">{footer}</div> : null}
       </div>
     </div>,
     document.body

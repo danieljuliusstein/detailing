@@ -1,3 +1,5 @@
+import { getCurrentOrganizationId } from './tenant'
+
 const PUSH_ENABLED_KEY = 'push_notifications_enabled'
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -50,10 +52,15 @@ export async function subscribeToPush(): Promise<{ ok: boolean; error?: string }
     applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
   })
 
+  const organizationId = getCurrentOrganizationId()
+  if (!organizationId) {
+    return { ok: false, error: 'Not signed in' }
+  }
+
   const res = await fetch('/api/push/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subscription: subscription.toJSON() }),
+    body: JSON.stringify({ subscription: subscription.toJSON(), organizationId }),
   })
 
   if (!res.ok) {
@@ -72,10 +79,11 @@ export async function unsubscribeFromPush(): Promise<void> {
   const subscription = await registration.pushManager.getSubscription()
 
   if (subscription) {
+    const organizationId = getCurrentOrganizationId()
     await fetch('/api/push/subscribe', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: subscription.endpoint }),
+      body: JSON.stringify({ endpoint: subscription.endpoint, organizationId }),
     })
     await subscription.unsubscribe()
   }

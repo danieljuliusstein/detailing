@@ -1,15 +1,16 @@
 import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
+import { scopedStorageKey } from '../tenant'
 
 const CATALOG_OK_KEY = 'pb_catalog_ready_v1'
 
 export function isCatalogMarkedReady(): boolean {
-  return typeof window !== 'undefined' && localStorage.getItem(CATALOG_OK_KEY) === '1'
+  return typeof window !== 'undefined' && localStorage.getItem(scopedStorageKey(CATALOG_OK_KEY)) === '1'
 }
 
 export function markCatalogReady(): void {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(CATALOG_OK_KEY, '1')
+    localStorage.setItem(scopedStorageKey(CATALOG_OK_KEY), '1')
   }
 }
 

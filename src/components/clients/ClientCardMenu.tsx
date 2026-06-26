@@ -2,16 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, ChatCircle, DotsThreeVertical, Phone } from '@phosphor-icons/react'
+import { CalendarPlus, ChatCircle, DotsThreeVertical, Phone, Trash } from '@phosphor-icons/react'
+import { deleteClient } from '@/lib/api'
 import type { ClientWithStats } from '@/lib/types'
 
 interface ClientCardMenuProps {
   client: ClientWithStats
+  onClientRemoved?: (id: string) => void
 }
 
-export default function ClientCardMenu({ client }: ClientCardMenuProps) {
+export default function ClientCardMenu({ client, onClientRemoved }: ClientCardMenuProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -33,6 +36,25 @@ export default function ClientCardMenu({ client }: ClientCardMenuProps) {
       window.removeEventListener('keydown', onKey)
     }
   }, [open])
+
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setOpen(false)
+    const confirmed = window.confirm(
+      `Remove ${client.name} from your client list? This will permanently delete all of their jobs, vehicles, and related records. This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setRemoving(true)
+    void deleteClient(client.id).then((result) => {
+      if (result.ok) {
+        onClientRemoved?.(client.id)
+        return
+      }
+      setRemoving(false)
+      window.alert(result.error ?? 'Could not remove this client. Try again.')
+    })
+  }
 
   return (
     <div className="client-card-menu" ref={rootRef}>
@@ -90,6 +112,16 @@ export default function ClientCardMenu({ client }: ClientCardMenuProps) {
           >
             <CalendarPlus size={16} aria-hidden="true" />
             Book job
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="client-card-menu-item client-card-menu-item--danger"
+            disabled={removing}
+            onClick={handleRemove}
+          >
+            <Trash size={16} aria-hidden="true" />
+            {removing ? 'Removing…' : 'Remove client'}
           </button>
         </div>
       )}

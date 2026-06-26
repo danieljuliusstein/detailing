@@ -206,6 +206,29 @@ export async function updateClient(id: string, input: Partial<ClientInput>): Pro
   return (await resolveBackend()) === 'pocketbase' ? pb.updateClient(id, input) : local.updateClient(id, input)
 }
 
+export async function deleteClient(id: string): Promise<{ ok: boolean; error?: string }> {
+  const [jobs, vehicles] = await Promise.all([getClientJobs(id), getVehiclesForClient(id)])
+  const jobIds = jobs.map((j) => j.id)
+  const vehicleIds = vehicles.map((v) => v.id)
+
+  const resolved = await resolveBackend()
+  const result = await executeWrite({
+    resolvedBackend: resolved,
+    local: () => ({ ok: local.deleteClient(id) }),
+    pocketbase: () => pb.deleteClient(id),
+    buildQueue: (r) => (r.ok ? { type: 'deleteClient', params: { id } } : null),
+  })
+  if (result.ok) {
+    const { purgeQueueItemsForClient, purgeQueueItemsForJob } = await import('./queue-utils')
+    for (const jobId of jobIds) {
+      await purgeQueueItemsForJob(jobId)
+    }
+    await purgeQueueItemsForClient(id, jobIds, vehicleIds)
+    notifyFinancialDataChanged()
+  }
+  return result
+}
+
 export async function getClientJobs(clientId: string): Promise<JobWithRelations[]> {
   return (await resolveBackend()) === 'pocketbase' ? pb.getClientJobs(clientId) : local.getClientJobs(clientId)
 }

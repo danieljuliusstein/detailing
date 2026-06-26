@@ -140,6 +140,17 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
       }
       break
     }
+    case 'deleteClient': {
+      const localId = op.params.id
+      try {
+        const resolvedId = await resolveClientId(localId)
+        const result = await pb.deleteClient(resolvedId)
+        if (!result.ok) throw new Error(result.error ?? 'Failed to delete client')
+      } catch {
+        // Client never synced to server — nothing to delete remotely.
+      }
+      break
+    }
     case 'createInvoiceForJob': {
       const jobId = maps.resolveJob(op.params.jobId)
       const resolvedId = maps.jobs.has(op.params.jobId) ? jobId : await resolveJobId(op.params.jobId)

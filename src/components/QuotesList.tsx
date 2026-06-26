@@ -3,8 +3,14 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileText, Plus } from '@phosphor-icons/react'
-import { fmt } from '@/lib/calculations'
+import CurrencyAmount from '@/components/ui/CurrencyAmount'
 import type { QuoteWithRelations } from '@/lib/types'
+
+const FILTER_CHIPS: { key: 'all' | 'open' | 'accepted'; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'open', label: 'Open' },
+  { key: 'accepted', label: 'Accepted' },
+]
 
 const statusBadge: Record<string, string> = {
   draft: 'badge-draft',
@@ -12,6 +18,10 @@ const statusBadge: Record<string, string> = {
   accepted: 'badge-paid',
   declined: 'badge-overdue',
   expired: 'badge-overdue',
+}
+
+function statusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
 export default function QuotesList({ quotes }: { quotes: QuoteWithRelations[] }) {
@@ -24,56 +34,80 @@ export default function QuotesList({ quotes }: { quotes: QuoteWithRelations[] })
     return quotes
   }, [quotes, filter])
 
-  return (
-    <div className="screen page-content">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 16, paddingBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Quotes</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{quotes.length} total</div>
-        </div>
-        <button type="button" className="btn-primary" onClick={() => router.push('/quotes/new')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plus size={16} /> New
-        </button>
-      </div>
+  const openCount = useMemo(
+    () => quotes.filter((q) => q.status === 'draft' || q.status === 'sent').length,
+    [quotes]
+  )
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {(['all', 'open', 'accepted'] as const).map((f) => (
+  return (
+    <div className="screen page-content body quotes-screen">
+      <header className="page-header">
+        <div>
+          <h1>Quotes</h1>
+          <p>
+            {quotes.length} total
+            {openCount > 0 && <> · {openCount} open</>}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="icon-btn green"
+          aria-label="New quote"
+          onClick={() => router.push('/quotes/new')}
+        >
+          <Plus size={18} weight="bold" aria-hidden="true" />
+        </button>
+      </header>
+
+      <div className="chips" role="tablist" aria-label="Quote filters">
+        {FILTER_CHIPS.map((chip) => (
           <button
-            key={f}
-            className={filter === f ? 'btn-primary' : 'btn-ghost'}
-            onClick={() => setFilter(f)}
-            style={{ flex: 1, fontSize: 13, padding: '8px 0' }}
+            key={chip.key}
+            type="button"
+            role="tab"
+            aria-selected={filter === chip.key}
+            className={`chip${filter === chip.key ? ' active' : ''}`}
+            onClick={() => setFilter(chip.key)}
           >
-            {f === 'all' ? 'All' : f === 'open' ? 'Open' : 'Accepted'}
+            {chip.label}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-          <FileText size={40} weight="duotone" color="var(--text-dim)" style={{ marginBottom: 12 }} />
-          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>No quotes yet</div>
+        <div className="empty-state">
+          <FileText size={40} weight="duotone" aria-hidden="true" />
+          <p>{quotes.length === 0 ? 'No quotes yet' : 'No quotes match this filter'}</p>
+          <button type="button" className="empty-cta" onClick={() => router.push('/quotes/new')}>
+            Create a quote
+          </button>
         </div>
       ) : (
-        filtered.map((q) => (
-          <div
-            key={q.id}
-            className="card-pressable"
-            style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            onClick={() => router.push(`/quotes/${q.id}`)}
-          >
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{q.quote_number}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                {q.client?.name ?? 'Unknown'} · {q.package?.name ?? '—'}
+        <div className="doc-list">
+          {filtered.map((q) => (
+            <div
+              key={q.id}
+              className="doc-list-row card-pressable"
+              onClick={() => router.push(`/quotes/${q.id}`)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && router.push(`/quotes/${q.id}`)}
+            >
+              <div className="doc-list-row__main">
+                <div className="doc-list-row__title">{q.quote_number}</div>
+                <div className="doc-list-row__meta">
+                  {q.client?.name ?? 'Unknown'} · {q.package?.name ?? '—'}
+                </div>
+                <span className={`badge ${statusBadge[q.status] ?? 'badge-draft'}`}>
+                  {statusLabel(q.status)}
+                </span>
               </div>
-              <span className={`badge ${statusBadge[q.status] ?? 'badge-draft'}`} style={{ marginTop: 6 }}>
-                {q.status}
-              </span>
+              <div className="doc-list-row__amount">
+                <CurrencyAmount value={q.subtotal} variant="revenue" className="doc-list-row__value" />
+              </div>
             </div>
-            <div className="money money-positive" style={{ fontSize: 15, fontWeight: 700 }}>{fmt(q.subtotal)}</div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   )

@@ -33,7 +33,13 @@ function matchesSearch(client: ClientWithStats, q: string): boolean {
   )
 }
 
-export default function ClientsList({ clients }: { clients: ClientWithStats[] }) {
+export default function ClientsList({
+  clients,
+  onClientRemoved,
+}: {
+  clients: ClientWithStats[]
+  onClientRemoved?: (id: string) => void
+}) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [segment, setSegment] = useState<ClientSegment>('all')
@@ -65,7 +71,7 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
   const renderSegmentList = () =>
     filtered.map((client) => {
       const derived = derivedMap.get(client.id)!
-      return <ClientCard key={client.id} client={client} derived={derived} />
+      return <ClientCard key={client.id} client={client} derived={derived} onClientRemoved={onClientRemoved} />
     })
 
   return (
@@ -136,7 +142,7 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
             <>
               <p className="sec">Top clients</p>
               {topClients.map((client) => (
-                <ClientCard key={client.id} client={client} derived={derivedMap.get(client.id)!} />
+                <ClientCard key={client.id} client={client} derived={derivedMap.get(client.id)!} onClientRemoved={onClientRemoved} />
               ))}
             </>
           )}
@@ -145,7 +151,7 @@ export default function ClientsList({ clients }: { clients: ClientWithStats[] })
             <>
               <p className="sec">All clients</p>
               {visibleRest.map((client) => (
-                <ClientCard key={client.id} client={client} derived={derivedMap.get(client.id)!} />
+                <ClientCard key={client.id} client={client} derived={derivedMap.get(client.id)!} onClientRemoved={onClientRemoved} />
               ))}
               {hiddenRest > 0 && (
                 <button type="button" className="more-pill" onClick={() => setShowAllRest(true)}>

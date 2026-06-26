@@ -70,6 +70,7 @@ export default function InventoryEditSheet({
     <BottomSheet
       title={isNew ? `Add ${categoryLabel(category).toLowerCase()}` : name || 'Edit item'}
       subtitle={subtitle}
+      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
         <div className="inv-sheet-actions inv-sheet-actions--split">
@@ -93,18 +94,23 @@ export default function InventoryEditSheet({
         </div>
       }
     >
-      <div className="inv-sheet-body">
-        <label className="inv-field-label">NAME</label>
-        <input
-          className="inv-field-input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Item name"
-        />
+      <div className="inv-sheet-section">
+        <div className="inv-field">
+          <label className="inv-field-label" htmlFor="inv-edit-name">
+            Name
+          </label>
+          <input
+            id="inv-edit-name"
+            className="inv-field-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Item name"
+          />
+        </div>
 
         {hasStatus && (
-          <>
-            <label className="inv-field-label">STATUS</label>
+          <div className="inv-field">
+            <span className="inv-field-label">Status</span>
             <div className="inv-status-toggle">
               <button
                 type="button"
@@ -121,13 +127,16 @@ export default function InventoryEditSheet({
                 ⚠ LOW
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {isWishlist && (
-          <>
-            <label className="inv-field-label">PRICE</label>
+          <div className="inv-field">
+            <label className="inv-field-label" htmlFor="inv-edit-price">
+              Price
+            </label>
             <input
+              id="inv-edit-price"
               className="inv-field-input"
               type="number"
               min={0}
@@ -135,16 +144,21 @@ export default function InventoryEditSheet({
               onChange={(e) => setPriceEstimate(e.target.value)}
               placeholder="e.g. 300"
             />
-          </>
+          </div>
         )}
 
-        <label className="inv-field-label">NOTES (optional)</label>
-        <textarea
-          className="inv-field-textarea"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. almost out, need 1 gallon jug..."
-        />
+        <div className="inv-field">
+          <label className="inv-field-label" htmlFor="inv-edit-notes">
+            Notes <span className="inv-field-label-optional">(optional)</span>
+          </label>
+          <textarea
+            id="inv-edit-notes"
+            className="inv-field-textarea"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. almost out, need 1 gallon jug..."
+          />
+        </div>
       </div>
     </BottomSheet>
   )

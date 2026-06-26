@@ -143,7 +143,6 @@ export default function BusinessExpenseSheet({
         </div>
       }
     >
-      <div className="inv-sheet-body">
         {isEdit && expense?.equipment_id && linkedEquipmentName && onViewEquipment && (
           <div className="inv-sheet-section">
             <div className="inv-expense-link-panel">
@@ -250,7 +249,6 @@ export default function BusinessExpenseSheet({
 
           {saved && <p className="inv-computed-cost">Saved</p>}
         </div>
-      </div>
     </BottomSheet>
   )
 }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Syne } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/providers/AuthProvider'
 import AppShell from '@/components/AppShell'
 import './globals.css'
@@ -50,6 +51,7 @@ export default function RootLayout({
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   )

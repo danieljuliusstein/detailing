@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import type { PortalPayload } from '@/lib/server/portal-data'
 import type { PortalScope } from '@/lib/portal-client'
 import PortalFooter from './PortalFooter'
@@ -36,6 +37,9 @@ function showQuote(scope: PortalScope, quote?: PortalPayload['quote']) {
 }
 
 export default function PortalView({ payload, token }: PortalViewProps) {
+  const searchParams = useSearchParams()
+  const paymentReceived = searchParams.get('paid') === '1'
+  const payError = searchParams.get('pay_error')
   const { scope, business, client, job, invoice, quote, photos } = payload
   const isPhotosScope = scope === 'photos'
   usePortalTheme(isPhotosScope)
@@ -51,7 +55,7 @@ export default function PortalView({ payload, token }: PortalViewProps) {
         : undefined
 
   return (
-    <div className={`portal-root${isPhotosScope ? ' portal-root--photos' : ''}`}>
+    <div className={`portal-root client-light-root${isPhotosScope ? ' portal-root--photos' : ''}`}>
       <PortalHeader business={business} />
 
       <div className="portal-body">
@@ -72,6 +76,21 @@ export default function PortalView({ payload, token }: PortalViewProps) {
           <PortalGreetingCard clientName={client.name} subtitle={greetingSub} />
         )}
 
+        {paymentReceived && (
+          <div className="portal-success-banner" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="portal-success-banner__title">Payment received</div>
+              <div className="portal-success-banner__sub">Thank you — your payment is being processed.</div>
+            </div>
+          </div>
+        )}
+
+        {payError && (
+          <p className="portal-inline-error" style={{ marginBottom: 12 }}>
+            {payError}
+          </p>
+        )}
+
         {showQuote(scope, quote) && quote && <PortalQuoteCard quote={quote} />}
 
         {showQuote(scope, quote) && quote && (
@@ -88,7 +107,8 @@ export default function PortalView({ payload, token }: PortalViewProps) {
           <PortalInvoiceCard
             invoice={invoice}
             job={job}
-            showPayPlaceholder={scope === 'invoice'}
+            token={token}
+            showPayOnline={scope === 'invoice' || scope === 'full'}
             businessPhone={business.phone}
           />
         )}

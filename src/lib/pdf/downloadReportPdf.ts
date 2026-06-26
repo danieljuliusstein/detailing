@@ -5,12 +5,13 @@ import { triggerDownload } from '@/lib/pdf/triggerDownload'
 export async function downloadReportPdf(
   report: PLReport,
   range: DateRangeKey,
-  businessName: string
+  businessName: string,
+  logoUrl?: string | null
 ): Promise<void> {
   const res = await fetch('/api/pdf/report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ report, range, businessName }),
+    body: JSON.stringify({ report, range, businessName, logoUrl }),
   })
 
   if (!res.ok) {

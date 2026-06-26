@@ -1,3 +1,4 @@
+import { rangeDateSpanLabel, rangePeriodLabel } from '../jobs-revenue'
 import {
   computeJobsCSV,
   computePLReport,
@@ -10,6 +11,7 @@ import { getBusinessExpenses } from './business-expenses-local'
 import { getOverheadExpenses } from './overhead-local'
 import { businessExpensesTotalForDates } from '../business-expenses-logic'
 import { overheadAmountForDates } from '../supplies-logic'
+import { loadSettings } from '../settings'
 import { loadData } from '../storage'
 import type { Job } from '../types'
 
@@ -50,7 +52,11 @@ export function exportJobsCSVFromJobs(jobs: Job[], range: DateRangeKey): string 
   return computeJobsCSV(jobs, range, (job) => ({
     client: data.clients.find((c) => c.id === job.client_id)?.name ?? '',
     pkg: data.packages.find((p) => p.id === job.package_id)?.name ?? '',
-  }))
+  }), {
+    periodLabel: rangePeriodLabel(range),
+    periodRange: rangeDateSpanLabel(range),
+    businessName: loadSettings().business_name,
+  })
 }
 
 /** @deprecated Use getPLReport from api/index — kept for local fallback */
@@ -65,5 +71,9 @@ export function exportJobsCSV(range: DateRangeKey): string {
   return computeJobsCSV(data.jobs, range, (job) => ({
     client: data.clients.find((c) => c.id === job.client_id)?.name ?? '',
     pkg: data.packages.find((p) => p.id === job.package_id)?.name ?? '',
-  }))
+  }), {
+    periodLabel: rangePeriodLabel(range),
+    periodRange: rangeDateSpanLabel(range),
+    businessName: loadSettings().business_name,
+  })
 }

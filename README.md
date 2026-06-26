@@ -97,11 +97,13 @@ HTTPS is required for PWA install on iOS and Web Push.
 ```bash
 npm run dev
 npm run build
-npm run seed:packages
-npm run seed:supplies
-npm run generate:vapid
+npm run seed:packages   # optional: ORG_SLUG=your-slug npm run seed:packages
+npm run backfill:package-names
+npm run verify:cron
 npm run verify:backend
 ```
+
+Production deploy: see **[docs/PRODUCTION.md](docs/PRODUCTION.md)**.
 
 ## Project structure
 

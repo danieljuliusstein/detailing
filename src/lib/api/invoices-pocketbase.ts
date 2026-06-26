@@ -1,6 +1,7 @@
 import { getPocketBase } from '../pocketbase'
 import { buildInvoiceFromJob, normalizeInvoice } from '../invoices'
 import { pbInvoiceToApp, escapeFilterValue, type PbRecord } from './mappers'
+import { tenantFilter, withOrganization } from './tenant-pocketbase'
 import type { Invoice, Payment } from '../types'
 
 function pb() {
@@ -26,7 +27,7 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 export async function getInvoiceByJobId(jobId: string): Promise<Invoice | null> {
   const escaped = escapeFilterValue(jobId)
   const records = await pb().collection('invoices').getFullList<PbRecord>({
-    filter: `job_id = "${escaped}"`,
+    filter: tenantFilter(`job_id = "${escaped}"`),
     limit: 1,
   })
   if (records.length === 0) return null
@@ -46,19 +47,21 @@ export async function createInvoiceForJob(jobId: string): Promise<Invoice> {
     invoiceNumber: 'PENDING',
   })
 
-  const created = await pb().collection('invoices').create<PbRecord>({
-    invoice_number: 'PENDING',
-    job_id: jobId,
-    client_id: draft.client_id,
-    subtotal: draft.subtotal,
-    tip: draft.tip,
-    total: draft.total,
-    status: draft.status,
-    payments: draft.payments,
-    amount_paid: draft.amount_paid,
-    balance_due: draft.balance_due,
-    terms: draft.terms,
-  })
+  const created = await pb().collection('invoices').create<PbRecord>(
+    withOrganization({
+      invoice_number: 'PENDING',
+      job_id: jobId,
+      client_id: draft.client_id,
+      subtotal: draft.subtotal,
+      tip: draft.tip,
+      total: draft.total,
+      status: draft.status,
+      payments: draft.payments,
+      amount_paid: draft.amount_paid,
+      balance_due: draft.balance_due,
+      terms: draft.terms,
+    }),
+  )
 
   await pb().collection('jobs').update(jobId, {
     invoice_id: created.id,

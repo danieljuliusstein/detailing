@@ -4,8 +4,8 @@ import type { DateRangeKey } from './api/reports'
 import type { JobWithRelations } from './types'
 
 export const SERVICE_COLORS: Record<string, string> = {
-  'Paint Correct': '#5b9cf6',
-  'Ceramic Coat': '#3dc97a',
+  'Paint Correction': '#5b9cf6',
+  'Ceramic Coat': '#22c55e',
   'Full Detail': '#f5a623',
   'Basic Wash': '#a78bfa',
 }
@@ -88,6 +88,21 @@ export function rangePeriodLabel(range: DateRangeKey, now = new Date()): string 
       return `${startStr} – ${endStr}`
     }
   }
+}
+
+/** Compact span for dashboard export badge, e.g. "Jun 1 – Jun 25, 2026". */
+export function rangeDateSpanLabel(range: DateRangeKey, now = new Date()): string {
+  const { start, end } = rangeFor(range, now)
+  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const endStr = end.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  if (range === 'this_year') {
+    return `Jan 1 – ${endStr}`
+  }
+  return `${startStr} – ${endStr}`
 }
 
 export const FILTER_CHIPS: { key: DateRangeKey; label: string }[] = [

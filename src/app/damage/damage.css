@@ -185,8 +185,14 @@
   inset: 0;
   z-index: 200;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: center;
+  max-width: 390px;
+  margin: 0 auto;
+  left: 0;
+  right: 0;
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .damage-sheet-overlay {
@@ -199,9 +205,10 @@
 
 .damage-sheet {
   position: relative;
+  width: 100%;
   background: var(--dmg-s1, #161616);
   border-radius: 20px 20px 0 0;
-  padding: 0 14px calc(28px + env(safe-area-inset-bottom, 0px));
+  padding: 0 20px calc(20px + env(safe-area-inset-bottom, 0px));
   z-index: 1;
   border-top: 1px solid var(--dmg-bdr, rgba(255, 255, 255, 0.08));
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);

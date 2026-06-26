@@ -13,7 +13,11 @@ export default function QuotesPage() {
   }, [])
 
   if (!quotes) {
-    return <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+    return (
+      <div className="screen page-content body" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+        Loading…
+      </div>
+    )
   }
 
   return <QuotesList quotes={quotes} />

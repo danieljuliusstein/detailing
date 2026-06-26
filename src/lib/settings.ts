@@ -18,12 +18,14 @@ export interface AppSettings {
   pb_record_id?: string
 }
 
+export const DEFAULT_INVOICE_TERMS = 'Due on receipt. Thank you for your business.'
+
 const DEFAULTS: AppSettings = {
   business_name: 'Your Detailing Co.',
   business_phone: '',
   business_email: '',
   business_address: '',
-  invoice_terms_footer: 'Due on receipt. Thank you for your business.',
+  invoice_terms_footer: DEFAULT_INVOICE_TERMS,
   notifications: {
     job_reminder: true,
     morning_reminder: true,
@@ -63,13 +65,17 @@ export async function loadSettingsAsync(): Promise<AppSettings> {
   return local
 }
 
-export async function saveSettingsAsync(settings: AppSettings, logoFile?: File | null): Promise<AppSettings> {
+export async function saveSettingsAsync(
+  settings: AppSettings,
+  logoFile?: File | null,
+  options?: { clearLogo?: boolean }
+): Promise<AppSettings> {
   saveSettings(settings)
   if (typeof window === 'undefined') return settings
 
   try {
     const { saveSettingsToPocketBase } = await import('./api/settings-pocketbase')
-    const saved = await saveSettingsToPocketBase(settings, logoFile)
+    const saved = await saveSettingsToPocketBase(settings, logoFile, options)
     saveSettings(saved)
     return saved
   } catch (err) {

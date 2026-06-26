@@ -1,12 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CaretRight, Car, PencilSimple, Phone, ChatText, Envelope } from '@phosphor-icons/react'
+import { CaretRight, Car, FileText, PencilSimple, Phone, ChatText, Envelope, Trash } from '@phosphor-icons/react'
 import { VehicleTypeIcon } from '@/lib/vehicle-type-icons'
 import BackButton from '@/components/BackButton'
 import { fmt, mapJobStatusForDisplay } from '@/lib/calculations'
 import { vehicleDisplayName } from '@/lib/damage-docs'
 import { JOB_STATUS_CONFIG } from '@/lib/job-status-display'
+import { deleteClient } from '@/lib/api'
 import type { Client, JobWithRelations, Vehicle } from '@/lib/types'
 
 interface ClientDetailProps {
@@ -18,7 +20,30 @@ interface ClientDetailProps {
 
 export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: ClientDetailProps) {
   const router = useRouter()
+  const [removing, setRemoving] = useState(false)
   const avgJob = jobs.length > 0 ? totalRevenue / jobs.length : 0
+
+  const handleRemove = () => {
+    const parts = [
+      jobs.length > 0 ? `${jobs.length} job${jobs.length === 1 ? '' : 's'}` : null,
+      vehicles.length > 0 ? `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}` : null,
+    ].filter(Boolean)
+    const detail = parts.length > 0 ? ` This will permanently delete ${parts.join(' and ')}.` : ''
+    const confirmed = window.confirm(
+      `Remove ${client.name} from your client list?${detail} This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setRemoving(true)
+    void deleteClient(client.id).then((result) => {
+      if (result.ok) {
+        router.replace('/clients')
+        return
+      }
+      setRemoving(false)
+      window.alert(result.error ?? 'Could not remove this client. Try again.')
+    })
+  }
 
   return (
     <div className="screen page-content">
@@ -56,6 +81,16 @@ export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: C
           </a>
         )}
       </div>
+
+      <button
+        type="button"
+        className="btn-ghost detail-context-link detail-context-link--block"
+        onClick={() => router.push('/quotes')}
+        style={{ width: '100%', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      >
+        <FileText size={18} aria-hidden="true" />
+        View quotes
+      </button>
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -188,6 +223,17 @@ export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: C
           )
         })
       )}
+
+      <button
+        type="button"
+        className="btn-danger"
+        disabled={removing}
+        onClick={handleRemove}
+        style={{ width: '100%', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      >
+        <Trash size={16} weight="regular" aria-hidden="true" />
+        {removing ? 'Removing…' : 'Remove client'}
+      </button>
     </div>
   )
 }

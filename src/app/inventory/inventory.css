@@ -1,19 +1,19 @@
 /* ATLAS DETAILING — Inventory section (scoped tokens) */
 
 .inventory-section {
-  --inv-bg-page: #0d0d0d;
-  --inv-bg-surface: #161616;
-  --inv-bg-surface-raised: #1e1e1e;
+  --inv-bg-page: var(--bg-base);
+  --inv-bg-surface: var(--bg-surface);
+  --inv-bg-surface-raised: var(--bg-surface-active);
   --inv-border-subtle: rgba(255, 255, 255, 0.08);
-  --inv-border-default: rgba(255, 255, 255, 0.12);
+  --inv-border-default: var(--border);
 
-  --inv-text-primary: #f5f5f4;
-  --inv-text-secondary: #9b9b96;
-  --inv-text-tertiary: #6b6b67;
+  --inv-text-primary: var(--text-primary);
+  --inv-text-secondary: var(--text-muted);
+  --inv-text-tertiary: var(--text-dim);
 
-  --inv-accent-green: #4ade80;
-  --inv-accent-green-bg: rgba(74, 222, 128, 0.12);
-  --inv-accent-green-text: #86efac;
+  --inv-accent-green: var(--green);
+  --inv-accent-green-bg: var(--green-dim);
+  --inv-accent-green-text: var(--green-text);
 
   --inv-status-warning: #fbbf24;
   --inv-status-warning-bg: rgba(251, 191, 36, 0.12);
@@ -30,10 +30,10 @@
   --font-display: var(--font-syne), sans-serif;
   --font-body: var(--font-dm-sans), sans-serif;
 
-  --inv-radius-md: 8px;
-  --inv-radius-lg: 12px;
+  --inv-radius-md: var(--radius-sm);
+  --inv-radius-lg: var(--radius-lg);
 
-  max-width: 420px;
+  max-width: 390px;
   margin: 0 auto;
   padding-bottom: 24px;
   font-family: var(--font-body);
@@ -42,7 +42,7 @@
 
 @media (min-width: 768px) {
   .inventory-section {
-    max-width: 480px;
+    max-width: 390px;
   }
 }
 
@@ -743,6 +743,18 @@
   color: var(--inv-text-tertiary);
 }
 
+.category-grid__badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: 99px;
+  background: var(--inv-status-warning-bg);
+  color: var(--inv-status-warning-text);
+  flex-shrink: 0;
+}
+
 .category-grid__name {
   font-family: var(--font-body);
   font-size: 14px;
@@ -1204,22 +1216,22 @@
 
 .inv-sheet--form .inv-sheet-actions,
 .inv-sheet--equipment .inv-sheet-actions {
-  padding: 24px 20px;
+  padding-top: 20px;
 }
 
 .inv-sheet--form .inv-sheet-section,
 .inv-sheet--equipment .inv-sheet-section {
-  padding: 28px 20px 0;
+  padding: 20px 0 0;
 }
 
 .inv-sheet--form .inv-sheet-section:first-child,
 .inv-sheet--equipment .inv-sheet-section:first-child {
-  padding-top: 20px;
+  padding-top: 4px;
 }
 
 .inv-sheet--form .inv-sheet-divider,
 .inv-sheet--equipment .inv-sheet-divider {
-  margin: 28px 20px 0;
+  margin: 20px 0 0;
 }
 
 .inv-sheet--form .inv-supply-picker,

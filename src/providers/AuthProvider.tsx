@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { resetBackend, syncOnReconnect } from '@/lib/api'
+import { clearLocalDeviceDataSync } from '@/lib/clear-local-data'
 import {
   hasPinSet,
   isUnlocked,
@@ -12,7 +13,11 @@ import {
   unlock,
   verifyPin,
 } from '@/lib/auth'
-import { authenticatePocketBase, clearPocketBaseAuth } from '@/lib/pb-auth'
+import {
+  authenticatePocketBase,
+  clearPocketBaseAuth,
+  isPocketBaseAuthenticated,
+} from '@/lib/pb-auth'
 
 interface AuthContextValue {
   isAuthenticated: boolean
@@ -23,6 +28,18 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+function isPublicPath(pathname: string): boolean {
+  return (
+    pathname === '/auth' ||
+    pathname.startsWith('/portal') ||
+    pathname.startsWith('/book/')
+  )
+}
+
+function isOnboardingPath(pathname: string): boolean {
+  return pathname === '/onboarding'
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authTick, setAuthTick] = useState(0)
@@ -35,10 +52,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const bumpAuth = useCallback(() => setAuthTick((t) => t + 1), [])
 
   const ready = mounted
-  // authTick forces re-read of localStorage pin state after login/logout
   void authTick
-  const needsSetup = mounted && !hasPinSet()
-  const authenticated = mounted && hasPinSet() && isUnlocked()
+
+  const hasAccount = mounted && isPocketBaseAuthenticated()
+  const needsSetup = mounted && hasAccount && !hasPinSet()
+  const authenticated = mounted && hasAccount && hasPinSet() && isUnlocked()
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+
+  useEffect(() => {
+    if (!mounted || !authenticated || isOnboardingPath(pathname)) return
+    void (async () => {
+      try {
+        const { loadSettingsFromPocketBase } = await import('@/lib/api/settings-pocketbase')
+        const settings = await loadSettingsFromPocketBase()
+        if (settings && !settings.business_phone?.trim()) {
+          setNeedsOnboarding(true)
+          router.replace('/onboarding')
+        } else {
+          setNeedsOnboarding(false)
+        }
+      } catch {
+        setNeedsOnboarding(false)
+      }
+    })()
+  }, [mounted, authenticated, pathname, router])
 
   useEffect(() => {
     if (!ready) return
@@ -51,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
 
     const interval = setInterval(() => {
-      if (!hasPinSet()) return
+      if (!hasPinSet() || !hasAccount) return
       if (!isUnlocked()) {
         bumpAuth()
         router.replace('/auth')
@@ -62,23 +99,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       events.forEach((e) => window.removeEventListener(e, onActivity))
       clearInterval(interval)
     }
-  }, [ready, authenticated, router, bumpAuth])
+  }, [ready, authenticated, hasAccount, router, bumpAuth])
 
-  const isPublicRoute = pathname === '/auth' || pathname.startsWith('/portal')
+  const isPublicRoute = isPublicPath(pathname)
+  const isOnboardingRoute = isOnboardingPath(pathname)
 
   useEffect(() => {
-    if (!ready) return
-    if (isPublicRoute) return
+    if (!ready || isPublicRoute) return
 
-    if (needsSetup) {
-      router.replace('/auth')
+    if (isOnboardingRoute) {
+      if (!hasAccount || needsSetup || !isUnlocked()) {
+        router.replace('/auth')
+      }
       return
     }
 
-    if (!authenticated) {
+    if (!hasAccount || needsSetup || !isUnlocked()) {
       router.replace('/auth')
     }
-  }, [ready, authenticated, needsSetup, pathname, router, isPublicRoute])
+  }, [ready, hasAccount, needsSetup, pathname, router, isPublicRoute, isOnboardingRoute, authTick])
 
   const syncPocketBaseInBackground = useCallback(() => {
     void (async () => {
@@ -86,14 +125,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await authenticatePocketBase()
         await syncOnReconnect()
       } catch {
-        // fall back to local data — initBackend handles this on next request
+        // fall back to local data
       } finally {
         resetBackend()
       }
     })()
   }, [])
 
-  // Re-auth PocketBase on refresh when PIN session is already unlocked
   useEffect(() => {
     if (!ready || !authenticated) return
     syncPocketBaseInBackground()
@@ -101,8 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready || !authenticated || pathname !== '/auth') return
+    if (needsOnboarding) {
+      router.replace('/onboarding')
+      return
+    }
     router.replace('/')
-  }, [ready, authenticated, pathname, router])
+  }, [ready, authenticated, needsOnboarding, pathname, router])
 
   const setupPinFn = useCallback(async (pin: string) => {
     await setPin(pin)
@@ -126,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     lock()
     clearPocketBaseAuth()
+    void clearLocalDeviceDataSync()
     resetBackend()
     bumpAuth()
     router.replace('/auth')
@@ -139,8 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
   }
 
-  // Public routes (portal links) must render SSR content immediately — never block on client mount.
-  if (!ready && isPublicRoute) {
+  if (!ready && (isPublicRoute || isOnboardingRoute)) {
     return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   }
 
@@ -156,10 +198,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   }
 
-  if (!authenticated && !needsSetup) {
+  if (isOnboardingRoute) {
+    if (!hasAccount || needsSetup || !isUnlocked()) {
+      return (
+        <div className="auth-loading-screen">
+          <div className="auth-loading-text">Redirecting…</div>
+        </div>
+      )
+    }
+    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  }
+
+  if (!authenticated && !needsSetup && hasAccount) {
     return (
       <div className="auth-loading-screen">
         <div className="auth-loading-text">Locked</div>
+      </div>
+    )
+  }
+
+  if (!hasAccount || needsSetup || !isUnlocked()) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-text">Redirecting…</div>
+      </div>
+    )
+  }
+
+  if (needsOnboarding) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-text">Redirecting…</div>
       </div>
     )
   }

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { streamBusinessLogo } from '@/lib/server/portal-data'
 
-/** Public business logo — used by portal, invoices, and settings preview. */
-export async function GET() {
-  const result = await streamBusinessLogo()
+/** Public business logo — optional ?slug= for multi-tenant */
+export async function GET(request: Request) {
+  const slug = new URL(request.url).searchParams.get('slug')?.trim() ?? undefined
+  const result = await streamBusinessLogo(slug)
   if (!result) {
     return NextResponse.json({ error: 'Logo not found' }, { status: 404 })
   }

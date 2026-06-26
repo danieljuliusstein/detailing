@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Car, Gear } from '@phosphor-icons/react'
+import { Car, ChatCircle, Funnel, Gear } from '@phosphor-icons/react'
 import InventoryAlertCard from '@/components/home/InventoryAlertCard'
 import { fmt } from '@/lib/calculations'
 import {
@@ -83,6 +83,7 @@ export interface DashboardProps {
   upcomingJobs: ComingUpJobData[]
   jobs: JobWithRelations[]
   inventoryAlert: InventoryAlertData | null
+  clientCount: number
 }
 
 export default function Dashboard({
@@ -91,6 +92,7 @@ export default function Dashboard({
   upcomingJobs,
   jobs,
   inventoryAlert,
+  clientCount,
 }: DashboardProps) {
   const router = useRouter()
   const weekStats = buildHomeWeekStats(jobs, weekDays)
@@ -98,22 +100,41 @@ export default function Dashboard({
 
   return (
     <div className="screen page-content body">
-      <header className="page-header">
+      <header className="page-header" data-tour="home">
         <div>
           <h1 className="lg">{greeting()}</h1>
           <p>{todayLabel()}</p>
         </div>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Settings"
-          onClick={() => router.push('/settings')}
-        >
-          <Gear size={18} weight="regular" aria-hidden="true" />
-        </button>
+        <div className="page-header-actions">
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Lead pipeline"
+            onClick={() => router.push('/pipeline')}
+          >
+            <Funnel size={18} weight="regular" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Messages"
+            onClick={() => router.push('/messages')}
+          >
+            <ChatCircle size={18} weight="regular" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Settings"
+            data-tour="settings"
+            onClick={() => router.push('/settings')}
+          >
+            <Gear size={18} weight="regular" aria-hidden="true" />
+          </button>
+        </div>
       </header>
 
-      <div className="stat-grid">
+      <div className="stat-grid stat-grid--dashboard">
         <div className="stat-card">
           <div className="stat-label">This week</div>
           <div className="stat-value">{weekStats.jobsThisWeek} jobs</div>
@@ -128,6 +149,11 @@ export default function Dashboard({
               {weekStats.earnedDeltaPct}% vs last wk
             </div>
           )}
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Clients</div>
+          <div className="stat-value">{clientCount}</div>
+          <div className="stat-sub">on file</div>
         </div>
       </div>
 

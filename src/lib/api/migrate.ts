@@ -1,25 +1,28 @@
 import { ensurePocketBaseAuth } from '../pb-auth'
+import { scopedStorageKey } from '../tenant'
 import { ensureDefaultCatalog, isCatalogMarkedReady, syncCatalogReadyFlag } from './catalog-ready'
 import { getPocketBase } from '../pocketbase'
 import { loadData } from '../storage'
 import { saveIdMapEntry } from './id-resolve'
 import * as pb from './pocketbase'
 import { appOverheadToPb, appSupplyToPb, escapeFilterValue } from './mappers'
+import { withOrganization } from './tenant-pocketbase'
 
 const MIGRATED_KEY = 'migrated_to_pb_v1'
 
 export function isMigrated(): boolean {
   if (typeof window === 'undefined') return true
-  return localStorage.getItem(MIGRATED_KEY) === '1'
+  return localStorage.getItem(scopedStorageKey(MIGRATED_KEY)) === '1'
 }
 
 export function markMigrated(): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(MIGRATED_KEY, '1')
+  localStorage.setItem(scopedStorageKey(MIGRATED_KEY), '1')
 }
 
 export function clearMigratedFlag(): void {
   if (typeof window === 'undefined') return
+  localStorage.removeItem(scopedStorageKey(MIGRATED_KEY))
   localStorage.removeItem(MIGRATED_KEY)
 }
 
@@ -117,7 +120,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       continue
     }
 
-    const created = await pocketBase.collection('supplies').create(appSupplyToPb(supply))
+    const created = await pocketBase.collection('supplies').create(withOrganization(appSupplyToPb(supply)))
     supplyIdMap.set(supply.id, created.id)
     suppliesCreated++
   }
@@ -130,7 +133,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     })
     if (existing.length > 0) continue
 
-    await pocketBase.collection('overhead_expenses').create(appOverheadToPb(expense))
+    await pocketBase.collection('overhead_expenses').create(withOrganization(appOverheadToPb(expense)))
     overheadCreated++
   }
 
@@ -157,7 +160,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     }
     if (client.lead_source) clientPayload.lead_source = client.lead_source
 
-    const created = await pocketBase.collection('clients').create(clientPayload)
+    const created = await pocketBase.collection('clients').create(withOrganization(clientPayload))
     clientIdMap.set(client.id, created.id)
     saveIdMapEntry(client.id, created.id, 'client')
     clientsCreated++
@@ -185,7 +188,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       quantity_used: u.quantity_used,
     }))
 
-    const created = await pocketBase.collection('jobs').create({
+    const created = await pocketBase.collection('jobs').create(withOrganization({
       date: job.date,
       start_time: job.start_time ?? '',
       hours_worked: job.hours_worked,
@@ -203,7 +206,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       equipment_depreciation: job.equipment_depreciation,
       notes: job.notes ?? '',
       photo_meta: job.photo_meta ?? [],
-    })
+    }))
     jobIdMap.set(job.id, created.id)
     saveIdMapEntry(job.id, created.id, 'job')
     jobsCreated++
@@ -214,7 +217,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
     const clientId = clientIdMap.get(inv.client_id)
     if (!jobId || !clientId) continue
 
-    const created = await pocketBase.collection('invoices').create({
+    const created = await pocketBase.collection('invoices').create(withOrganization({
       invoice_number: inv.invoice_number,
       job_id: jobId,
       client_id: clientId,
@@ -229,7 +232,7 @@ export async function migrateLocalToPocketBase(): Promise<MigrationResult> {
       paid_at: inv.paid_at ?? '',
       terms: inv.terms ?? 'Due on receipt',
       notes: inv.notes ?? '',
-    })
+    }))
 
     await pocketBase.collection('jobs').update(jobId, { invoice_id: created.id })
     saveIdMapEntry(inv.id, created.id, 'invoice')

@@ -1,0 +1,158 @@
+# Production deployment checklist
+
+Use this when taking Atlas Detailing from local dev to a live operator + customer setup.
+
+## 1. Deploy PocketBase (Fly.io)
+
+PocketBase should already be on Fly at your `NEXT_PUBLIC_PB_URL`. If not, follow [`pocketbase/DEPLOY.md`](../pocketbase/DEPLOY.md).
+
+After deploy:
+
+1. Open PocketBase admin (`https://your-pb.fly.dev/_/`)
+2. **Settings → Application** → add CORS allowed origins:
+   - `https://your-app.vercel.app`
+   - `http://localhost:3000`
+3. Run migrations: `cd pocketbase && ./pocketbase migrate up`
+
+## 2. Deploy Next.js (Vercel)
+
+Connect the repo and set these environment variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_PB_URL` | Public PocketBase URL |
+| `PB_URL` | Same as above (server routes) |
+| `PB_EMAIL` | PocketBase app user email |
+| `PB_PASSWORD` | PocketBase app user password |
+| `RESEND_API_KEY` | Invoice + portal email |
+| `RESEND_FROM_EMAIL` | Verified sender domain |
+| `VAPID_PUBLIC_KEY` | Web push (`npm run generate:vapid`) |
+| `VAPID_PRIVATE_KEY` | Web push |
+| `CRON_SECRET` | Protects `/api/cron/notifications` |
+| `INTERNAL_API_SECRET` | Same value as `CRON_SECRET` (backup routes) |
+
+Optional (client manual cron fallback):
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_INTERNAL_API_SECRET` | Same secret for Settings → run notifications |
+
+Deploy. Note your production URL, e.g. `https://detailing-app.vercel.app`.
+
+## 3. Wire notification cron
+
+Two triggers call `/api/cron/notifications` daily at 08:00 UTC:
+
+- **Vercel Cron** — [`vercel.json`](../vercel.json) (sends `Authorization: Bearer $CRON_SECRET` when `CRON_SECRET` is set in Vercel)
+- **PocketBase hook** — [`pocketbase/pb_hooks/cron_notifications.pb.js`](../pocketbase/pb_hooks/cron_notifications.pb.js)
+
+On Fly, set secrets:
+
+```bash
+fly secrets set \
+  APP_CRON_URL=https://your-app.vercel.app \
+  CRON_SECRET=your-long-random-secret
+```
+
+Use the **same** `CRON_SECRET` in Vercel env vars.
+
+Verify:
+
+```bash
+APP_URL=https://your-app.vercel.app \
+CRON_SECRET=your-long-random-secret \
+node scripts/verify-cron.mjs
+```
+
+Or run the full walkthrough:
+
+```bash
+APP_URL=https://your-app.vercel.app node scripts/qa-walkthrough.mjs
+```
+
+## 4. Seed packages (per org)
+
+Default packages: Basic Wash $80, Full Detail $320, Paint Correction $450, Ceramic Coat $800.
+
+```bash
+ORG_SLUG=atlas-detailing \
+PB_URL=https://your-pb.fly.dev \
+PB_EMAIL=... PB_PASSWORD=... \
+npm run seed:packages
+```
+
+Rename legacy `Paint Correct` if needed:
+
+```bash
+ORG_SLUG=atlas-detailing node scripts/backfill-package-names.mjs
+```
+
+Confirm prices in the app: **Settings → Service packages**.
+
+## 5. Operator go-live setup
+
+In **Settings**:
+
+1. Upload **logo** and set **business name**
+2. Fill **phone**, **email**, **address**
+3. Set **invoice terms footer** (default: “Due on receipt. Thank you for your business.”)
+4. Enable **push notifications** on your phone
+5. Copy **booking link** and share it
+
+## 6. Manual QA (15 minutes)
+
+| Step | Check |
+|------|-------|
+| 1 | Settings → Save logo + business name |
+| 2 | Open a **client portal** link → logo, name, terms in footer |
+| 3 | Open `/book/{your-slug}` → logo + business name in header |
+| 4 | Send a test **invoice PDF** → logo + terms appear |
+| 5 | Book a test appointment → job shows on Home |
+| 6 | Settings → Advanced → **Run notifications** (or wait for 08:00 UTC cron) → push received |
+| 7 | `npm run test:isolation` against production PB |
+
+## 7. Post-launch
+
+- Monitor Vercel function logs for cron 401s (wrong `CRON_SECRET`)
+- Monitor Resend dashboard for invoice email delivery
+- Re-run `npm run verify:backend` after schema changes
+
+## Phase 2 features
+
+### Stripe (portal pay online)
+
+| Variable | Purpose |
+|----------|---------|
+| `STRIPE_SECRET_KEY` | Server-side Checkout sessions |
+| `STRIPE_WEBHOOK_SECRET` | Verifies `POST /api/stripe/webhook` |
+
+Webhook endpoint: `https://your-app.vercel.app/api/stripe/webhook` — subscribe to `checkout.session.completed`.
+
+Clients open the portal invoice link and click **Pay online** to complete Checkout; payments are recorded on the invoice automatically.
+
+### Twilio (auto-messages SMS)
+
+| Variable | Purpose |
+|----------|---------|
+| `TWILIO_ACCOUNT_SID` | Twilio account |
+| `TWILIO_AUTH_TOKEN` | Twilio auth |
+| `TWILIO_FROM_NUMBER` | E.164 sender (e.g. `+15551234567`) |
+
+Templates are stored in PocketBase `app_settings.auto_messages`. Sent messages log to `sent_messages`. The daily cron (`/api/cron/notifications`) runs appointment reminders, completion texts, review requests, and 30-day follow-ups.
+
+Optional: `NEXT_PUBLIC_REVIEW_URL` for review-request template links.
+
+### Lead pipeline
+
+Operators open **Lead pipeline** from the home header (funnel icon) at `/pipeline`. Website bookings (`lead_source: website`) and upcoming scheduled jobs appear in New / Scheduled / Completed columns.
+
+### Marketing website → booking
+
+The marketing site (`detailing-website`) links to the operator app:
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_APP_API_URL` | Operator app URL (e.g. `https://detailing-app.vercel.app`) |
+| `NEXT_PUBLIC_BOOKING_SLUG` | Org slug for `/book/{slug}` |
+
+`/book` on the marketing site redirects to `{APP_URL}/book/{slug}`.

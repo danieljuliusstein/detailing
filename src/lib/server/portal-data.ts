@@ -29,6 +29,7 @@ export interface PortalPayload {
     status: string
   }
   invoice?: {
+    id: string
     invoiceNumber: string
     subtotal: number
     tip: number
@@ -51,18 +52,25 @@ export interface PortalPayload {
   photos: PortalPhoto[]
 }
 
-export async function loadPortalBusiness(appBaseUrl: string): Promise<PortalPayload['business']> {
+export async function loadPortalBusiness(appBaseUrl: string, organizationId: string, slug?: string): Promise<PortalPayload['business']> {
   const pb = await authenticateServerPocketBase()
-  return loadSettings(pb, appBaseUrl)
+  return loadSettingsForOrg(pb, appBaseUrl, organizationId, slug)
 }
 
-async function loadSettings(
+async function loadSettingsForOrg(
   pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>,
-  appBaseUrl: string
+  appBaseUrl: string,
+  organizationId: string,
+  slug?: string
 ) {
-  const records = await pb.collection('app_settings').getFullList({ limit: 1 })
+  const orgEsc = organizationId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  const records = await pb.collection('app_settings').getFullList({
+    filter: `organization_id = "${orgEsc}"`,
+    limit: 1,
+  })
   const s = records[0]
   const base = appBaseUrl.replace(/\/$/, '')
+  const logoQuery = slug ? `?slug=${encodeURIComponent(slug)}` : ''
 
   if (!s) {
     return {
@@ -70,12 +78,12 @@ async function loadSettings(
       phone: '',
       email: '',
       address: '',
-      logoUrl: `${base}/api/business-logo`,
+      logoUrl: `${base}/api/business-logo${logoQuery}`,
       termsFooter: undefined as string | undefined,
     }
   }
 
-  const logoUrl = `${base}/api/business-logo`
+  const logoUrl = `${base}/api/business-logo${logoQuery}`
 
   return {
     name: String(s.business_name ?? 'Detailing'),
@@ -92,16 +100,29 @@ export async function buildPortalPayload(
   appBaseUrl: string
 ): Promise<PortalPayload | null> {
   const pb = await authenticateServerPocketBase()
-  const business = await loadSettings(pb, appBaseUrl)
-  const scope = tokenRecord.scope
 
   let clientName = 'Client'
+  let organizationId = ''
+  let orgSlug = ''
   try {
     const client = await pb.collection('clients').getOne(tokenRecord.client_id)
     clientName = String(client.name ?? 'Client')
+    organizationId = String(client.organization_id ?? '')
+    if (organizationId) {
+      try {
+        const org = await pb.collection('organizations').getOne(organizationId)
+        orgSlug = String(org.slug ?? '')
+      } catch {
+        // ignore
+      }
+    }
   } catch {
     return null
   }
+
+  if (!organizationId) return null
+  const business = await loadSettingsForOrg(pb, appBaseUrl, organizationId, orgSlug)
+  const scope = tokenRecord.scope
 
   const payload: PortalPayload = {
     scope,
@@ -155,6 +176,7 @@ export async function buildPortalPayload(
       if ((scope === 'invoice' || scope === 'full' || scope === 'job') && job.expand?.invoice_id) {
         const inv = job.expand.invoice_id
         payload.invoice = {
+          id: String(inv.id),
           invoiceNumber: String(inv.invoice_number),
           subtotal: Number(inv.subtotal),
           tip: Number(inv.tip ?? 0),
@@ -166,6 +188,7 @@ export async function buildPortalPayload(
       } else if (job.invoice_id && (scope === 'invoice' || scope === 'full')) {
         const inv = await pb.collection('invoices').getOne(String(job.invoice_id))
         payload.invoice = {
+          id: String(inv.id),
           invoiceNumber: String(inv.invoice_number),
           subtotal: Number(inv.subtotal),
           tip: Number(inv.tip ?? 0),
@@ -220,10 +243,25 @@ export async function streamPortalPhoto(
   return { bytes, contentType }
 }
 
-export async function streamBusinessLogo(): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+export async function streamBusinessLogo(slug?: string): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
   try {
     const pb = await authenticateServerPocketBase()
-    const records = await pb.collection('app_settings').getFullList({ limit: 1 })
+    let records: Record<string, unknown>[] = []
+
+    if (slug) {
+      const { getOrganizationBySlug } = await import('./organization')
+      const org = await getOrganizationBySlug(slug)
+      if (org) {
+        const orgEsc = org.id.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        records = await pb.collection('app_settings').getFullList({
+          filter: `organization_id = "${orgEsc}"`,
+          limit: 1,
+        })
+      }
+    } else {
+      records = await pb.collection('app_settings').getFullList({ limit: 1 })
+    }
+
     const s = records[0]
     const logo = s?.logo
 

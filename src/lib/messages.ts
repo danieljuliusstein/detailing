@@ -1,3 +1,5 @@
+import { scopedStorageKey } from './tenant'
+
 export type MessageChannel = 'auto' | 'sms' | 'email'
 export type SentMessageStatus = 'sent' | 'failed'
 export type SentMessageChannel = 'sms' | 'email'
@@ -108,7 +110,7 @@ export const PLACEHOLDER_SENT_MESSAGES: SentMessage[] = [
 
 export function loadAutoMessageTemplates(): AutoMessageTemplate[] {
   if (typeof window === 'undefined') return DEFAULT_AUTO_TEMPLATES.map((t) => ({ ...t }))
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = localStorage.getItem(scopedStorageKey(STORAGE_KEY))
   if (!raw) return DEFAULT_AUTO_TEMPLATES.map((t) => ({ ...t }))
   try {
     const parsed = JSON.parse(raw) as AutoMessageTemplate[]
@@ -124,7 +126,45 @@ export function loadAutoMessageTemplates(): AutoMessageTemplate[] {
 export function saveAutoMessageTemplates(templates: AutoMessageTemplate[]): void {
   if (typeof window === 'undefined') return
   const payload = templates.map(({ id, enabled, channel }) => ({ id, enabled, channel }))
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(payload))
+}
+
+export async function loadAutoMessageTemplatesAsync(): Promise<AutoMessageTemplate[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const { loadAutoMessageTemplatesFromPocketBase } = await import('./api/messages-pocketbase')
+      const remote = await loadAutoMessageTemplatesFromPocketBase()
+      if (remote) return remote
+    } catch {
+      // fall through to local storage
+    }
+  }
+  return loadAutoMessageTemplates()
+}
+
+export async function saveAutoMessageTemplatesAsync(templates: AutoMessageTemplate[]): Promise<void> {
+  saveAutoMessageTemplates(templates)
+  if (typeof window !== 'undefined') {
+    try {
+      const { saveAutoMessageTemplatesToPocketBase } = await import('./api/messages-pocketbase')
+      await saveAutoMessageTemplatesToPocketBase(templates)
+    } catch {
+      // local copy already saved
+    }
+  }
+}
+
+export async function loadSentMessagesAsync(): Promise<SentMessage[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const { loadSentMessagesFromPocketBase } = await import('./api/messages-pocketbase')
+      const remote = await loadSentMessagesFromPocketBase()
+      if (remote) return remote
+    } catch {
+      // fall through
+    }
+  }
+  return []
 }
 
 export function mergeTemplateBody(template: string): string {

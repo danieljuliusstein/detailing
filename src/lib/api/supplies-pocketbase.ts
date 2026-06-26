@@ -2,6 +2,7 @@ import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
 import { isLowStock } from '../supplies-logic'
 import { appSupplyToPb, pbSupplyToApp, type PbRecord } from './mappers'
+import { tenantFilter, withOrganization } from './tenant-pocketbase'
 import { weightedAverageCostPerUnit } from '../supplies-logic'
 import type { RestockInput, Supply, SupplyInput } from '../types'
 
@@ -31,7 +32,7 @@ export async function getLowInventorySupplies(): Promise<Supply[]> {
 }
 
 export async function createSupply(input: SupplyInput): Promise<Supply> {
-  const record = await pb().collection('supplies').create<PbRecord>(appSupplyToPb(input))
+  const record = await pb().collection('supplies').create<PbRecord>(withOrganization(appSupplyToPb(input)))
   return pbSupplyToApp(record)
 }
 
@@ -106,13 +107,13 @@ export async function seedSuppliesIfEmpty(): Promise<number> {
   if (!(await ensurePocketBaseAuth())) return 0
 
   const client = pb()
-  const { totalItems } = await client.collection('supplies').getList(1, 1)
+  const { totalItems } = await client.collection('supplies').getList(1, 1, { filter: tenantFilter() })
   if (totalItems > 0) return 0
 
   let created = 0
   for (const item of DEFAULT_SUPPLIES) {
     try {
-      await client.collection('supplies').create(appSupplyToPb(item))
+      await client.collection('supplies').create(withOrganization(appSupplyToPb(item)))
       created++
     } catch {
       break

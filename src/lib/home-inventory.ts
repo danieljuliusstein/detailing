@@ -1,5 +1,6 @@
 import { isDemoHomeInventory } from './demo-data'
 import { isPocketBaseConfigured } from './pocketbase'
+import { scopedStorageKey } from './tenant'
 
 export type InventoryCategory = 'chemicals' | 'equipment' | 'supplies' | 'wishlist'
 export type InventoryStatus = 'ok' | 'low'
@@ -36,12 +37,12 @@ export function loadHomeInventory(): HomeInventoryItem[] {
   if (typeof window === 'undefined') return []
 
   const useDevSeed = process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = localStorage.getItem(scopedStorageKey(STORAGE_KEY))
 
   if (!raw) {
     if (useDevSeed) {
       const seed = createSeedInventory()
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+      localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(seed))
       return seed
     }
     return []
@@ -50,11 +51,13 @@ export function loadHomeInventory(): HomeInventoryItem[] {
   try {
     const items = JSON.parse(raw) as HomeInventoryItem[]
     if (isPocketBaseConfigured() && isDemoHomeInventory(items)) {
+      localStorage.removeItem(scopedStorageKey(STORAGE_KEY))
       localStorage.removeItem(STORAGE_KEY)
       return []
     }
     return items
   } catch {
+    localStorage.removeItem(scopedStorageKey(STORAGE_KEY))
     localStorage.removeItem(STORAGE_KEY)
     return useDevSeed ? createSeedInventory() : []
   }
@@ -62,7 +65,7 @@ export function loadHomeInventory(): HomeInventoryItem[] {
 
 export function saveHomeInventory(items: HomeInventoryItem[]): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+  localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(items))
 }
 
 export function getItemsByCategory(items: HomeInventoryItem[], category: InventoryCategory): HomeInventoryItem[] {

@@ -239,6 +239,13 @@
   margin-top: 8px;
 }
 
+.messages-empty {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--msg-t2);
+}
+
 /* All messages list */
 .all-messages-empty {
   text-align: center;

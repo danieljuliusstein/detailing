@@ -212,7 +212,6 @@ export default function SupplyEditSheet({
         </div>
       }
     >
-      <div className="inv-sheet-body">
         {mode !== 'restock' && (
           <div className="inv-sheet-section">
             <InventoryImagePicker imageUrl={imageUrl} onChange={setImageUrl} />
@@ -549,7 +548,6 @@ export default function SupplyEditSheet({
             </div>
           </>
         )}
-      </div>
     </BottomSheet>
   )
 }

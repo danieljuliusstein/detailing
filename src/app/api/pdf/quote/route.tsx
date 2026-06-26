@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import QuotePdfDocument from '@/components/pdf/QuotePdfDocument'
+import { resolveInvoiceLogoDataUri } from '@/lib/invoice-logo-server'
 import type { AppSettings } from '@/lib/settings'
 import type { QuoteWithRelations } from '@/lib/types'
 
@@ -14,7 +15,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing quote data' }, { status: 400 })
     }
 
-    const buffer = await renderToBuffer(<QuotePdfDocument quote={quote} settings={settings} />)
+    const logoDataUri = await resolveInvoiceLogoDataUri(settings.logo_url)
+    const buffer = await renderToBuffer(
+      <QuotePdfDocument quote={quote} settings={settings} logoDataUri={logoDataUri} />
+    )
     const filename = `${quote.quote_number}.pdf`.replace(/[^\w.-]/g, '_')
 
     return new NextResponse(new Uint8Array(buffer), {

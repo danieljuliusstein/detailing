@@ -49,36 +49,36 @@ export default function JobSuppliesConfirmSheet({
       title="Log supplies used"
       subtitle="Confirm or adjust supplies for this job before saving"
       ariaLabel="Confirm supplies used"
+      sheetClassName="inv-sheet--form"
       onClose={onClose}
+      footer={
+        <div className="inv-sheet-actions inv-sheet-actions--stacked">
+          <button type="button" className="inv-sheet-save" onClick={() => onConfirm(value)}>
+            Confirm &amp; save
+          </button>
+          <button type="button" className="inv-sheet-cancel" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      }
     >
-      <JobSuppliesPicker supplies={supplies} value={value} onChange={setValue} />
+      <div className="inv-sheet-section">
+        <JobSuppliesPicker supplies={supplies} value={value} onChange={setValue} />
 
-      {lowWarnings.length > 0 && (
-        <div className="usage-projection-banner">
-          <Warning className="usage-projection-banner__icon" size={16} weight="fill" />
-          <p className="usage-projection-banner__text">
-            {lowWarnings.join(' · ')}
-          </p>
-        </div>
-      )}
+        {lowWarnings.length > 0 && (
+          <div className="usage-projection-banner">
+            <Warning className="usage-projection-banner__icon" size={16} weight="fill" />
+            <p className="usage-projection-banner__text">{lowWarnings.join(' · ')}</p>
+          </div>
+        )}
 
-      {totalCost > 0 && (
-        <div className="usage-cost-row">
-          <p className="usage-cost-row__label">Estimated supply cost</p>
-          <p className="usage-cost-row__value">{fmtDetailed(totalCost)}</p>
-        </div>
-      )}
-
-      <button
-        type="button"
-        className="usage-modal__submit"
-        onClick={() => onConfirm(value)}
-      >
-        Confirm &amp; save
-      </button>
-      <button type="button" className="btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={onClose}>
-        Cancel
-      </button>
+        {totalCost > 0 && (
+          <div className="usage-cost-row">
+            <p className="usage-cost-row__label">Estimated supply cost</p>
+            <p className="usage-cost-row__value">{fmtDetailed(totalCost)}</p>
+          </div>
+        )}
+      </div>
     </BottomSheet>
   )
 }

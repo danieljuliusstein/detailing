@@ -1,7 +1,7 @@
 'use client'
 
-import Settings from '@/components/Settings'
+import SettingsHub from '@/components/settings/SettingsHub'
 
 export default function SettingsPage() {
-  return <Settings />
+  return <SettingsHub />
 }

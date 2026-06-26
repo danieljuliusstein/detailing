@@ -4,20 +4,24 @@ import {
   portalInvoiceBadgeClass,
   portalMoney,
 } from '@/lib/portal-display'
+import PortalPayButton from './PortalPayButton'
 
 export default function PortalInvoiceCard({
   invoice,
   job,
-  showPayPlaceholder = false,
+  token,
+  showPayOnline = false,
   businessPhone,
 }: {
   invoice: NonNullable<PortalPayload['invoice']>
   job?: PortalPayload['job']
-  showPayPlaceholder?: boolean
+  token?: string
+  showPayOnline?: boolean
   businessPhone?: string
 }) {
   const balanceVariant = portalBalancePanelClass(invoice.status, invoice.balanceDue)
   const lineDesc = job?.packageName ?? 'Detailing service'
+  const canPay = showPayOnline && invoice.balanceDue > 0 && token
 
   return (
     <div className="portal-card">
@@ -33,6 +37,12 @@ export default function PortalInvoiceCard({
         <div className="portal-inv-number">{invoice.invoiceNumber}</div>
 
         <table className="portal-invoice-table">
+          <thead>
+            <tr>
+              <th className="portal-invoice-table__head">Description</th>
+              <th className="portal-invoice-table__head portal-invoice-table__head--amt">Amount</th>
+            </tr>
+          </thead>
           <tbody>
             <tr>
               <td className="portal-line-desc">{lineDesc}</td>
@@ -79,14 +89,13 @@ export default function PortalInvoiceCard({
           </div>
         )}
 
-        {showPayPlaceholder && invoice.balanceDue > 0 && (
-          <div className="portal-pay-placeholder">
-            <div className="portal-pay-placeholder__label">Pay online — coming soon</div>
-            <div className="portal-pay-placeholder__hint">
-              {businessPhone ? `Contact us to pay: ${businessPhone}` : 'Contact us to pay'}
-            </div>
-          </div>
-        )}
+        {canPay ? (
+          <PortalPayButton
+            token={token}
+            balanceDue={invoice.balanceDue}
+            businessPhone={businessPhone}
+          />
+        ) : null}
       </div>
     </div>
   )

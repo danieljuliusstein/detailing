@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { PLReport } from '@/lib/api/aggregates'
+import type { DateRangeKey } from '@/lib/api/reports'
 import { fmtDetailed } from '@/lib/calculations'
 import { aggregateJobsRevenue, filterJobsByRange } from '@/lib/jobs-revenue'
-import type { DateRangeKey } from '@/lib/api/reports'
 import type { JobWithRelations } from '@/lib/types'
 
 interface ReportRevenueByServiceProps {
@@ -23,28 +22,32 @@ export default function ReportRevenueByService({ jobs, range }: ReportRevenueByS
   }, [stats])
 
   if (stats.services.length === 0) {
-    return <div className="money-empty">No revenue in this period</div>
+    return (
+      <div className="report-card report-card--empty report-revenue-breakdown">
+        <div className="report-card-empty">No revenue in this period</div>
+      </div>
+    )
   }
 
   const max = stats.services[0]?.amount ?? 1
 
   return (
-    <div className="money-breakdown">
+    <div className="report-card report-revenue-breakdown">
       {stats.services.map((service) => {
         const pct = stats.totalRevenue > 0 ? Math.round((service.amount / stats.totalRevenue) * 100) : 0
         const barPct = max > 0 ? Math.round((service.amount / max) * 100) : 0
         return (
-          <div key={service.label} className="money-row">
-            <div className="money-row-head">
-              <span className="money-row-label">{service.label}</span>
-              <div className="money-row-right">
-                <span className="money-row-amount">{fmtDetailed(service.amount)}</span>
-                <span className="money-row-pct">{pct}%</span>
+          <div key={service.label} className="report-revenue-row">
+            <div className="report-revenue-row-meta">
+              <span className="report-revenue-row-label">{service.label}</span>
+              <div className="report-revenue-row-right">
+                <span className="report-revenue-row-amount">{fmtDetailed(service.amount)}</span>
+                <span className="report-revenue-row-pct">{pct}%</span>
               </div>
             </div>
-            <div className="money-track">
+            <div className="report-revenue-track">
               <div
-                className="money-fill money-fill--green"
+                className="report-revenue-fill"
                 style={{ width: animate ? `${barPct}%` : '0%' }}
               />
             </div>

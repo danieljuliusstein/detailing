@@ -1,5 +1,6 @@
 import { getPocketBase } from '../pocketbase'
 import { appEquipmentToPb, pbEquipmentToApp, type PbRecord } from './mappers'
+import { withOrganization } from './tenant-pocketbase'
 import type { Equipment, EquipmentInput } from '../types'
 
 function pb() {
@@ -23,7 +24,9 @@ export async function getEquipmentItem(id: string): Promise<Equipment | null> {
 }
 
 export async function createEquipment(input: EquipmentInput): Promise<Equipment> {
-  const record = await pb().collection('equipment').create<PbRecord>(appEquipmentToPb(input))
+  const record = await pb().collection('equipment').create<PbRecord>(
+    withOrganization(appEquipmentToPb(input)),
+  )
   return pbEquipmentToApp(record)
 }
 

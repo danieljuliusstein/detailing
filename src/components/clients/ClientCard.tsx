@@ -25,9 +25,10 @@ const AVATAR_CLASS = {
 interface ClientCardProps {
   client: ClientWithStats
   derived: ClientDerived
+  onClientRemoved?: (id: string) => void
 }
 
-export default function ClientCard({ client, derived }: ClientCardProps) {
+export default function ClientCard({ client, derived, onClientRemoved }: ClientCardProps) {
   const router = useRouter()
   const avatarTone =
     derived.tag === 'followup'
@@ -71,7 +72,7 @@ export default function ClientCard({ client, derived }: ClientCardProps) {
           </div>
         </div>
       </button>
-      <ClientCardMenu client={client} />
+      <ClientCardMenu client={client} onClientRemoved={onClientRemoved} />
     </div>
   )
 }

@@ -1,0 +1,20 @@
+/* Shared client-facing light theme tokens (booking, portal) */
+
+.client-light-root {
+  --cl-bg: #fafafa;
+  --cl-surface: #ffffff;
+  --cl-raised: #f7f7f5;
+  --cl-border: #e5e5e5;
+  --cl-text: #111111;
+  --cl-muted: #737373;
+  --cl-hint: #9a9a94;
+  --cl-accent: #22c55e;
+  --cl-accent-bg: rgba(34, 197, 94, 0.09);
+  --cl-accent-bdr: rgba(34, 197, 94, 0.3);
+  --cl-red: #dc2626;
+  --cl-radius-card: 16px;
+  --cl-radius-control: 12px;
+  --cl-max-width: 430px;
+
+  /* Phase 4: per-org branding hooks — override --cl-accent, --cl-bg, etc. */
+}

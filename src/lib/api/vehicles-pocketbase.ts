@@ -1,6 +1,7 @@
 import { getPocketBase } from '../pocketbase'
 import { isMissingCollectionError } from './pb-errors'
 import { appVehicleToPb, escapeFilterValue, pbVehicleToApp, type PbRecord } from './mappers'
+import { tenantFilter, withOrganization } from './tenant-pocketbase'
 import type { Vehicle, VehicleInput } from '../types'
 
 function pb() {
@@ -21,7 +22,7 @@ export async function getVehiclesForClient(clientId: string): Promise<Vehicle[]>
     const records = await pb()
       .collection('vehicles')
       .getFullList<PbRecord>({
-        filter: `client_id = "${escapeFilterValue(clientId)}"`,
+        filter: tenantFilter(`client_id = "${escapeFilterValue(clientId)}"`),
         sort: '-id',
       })
     return records.map((r) => pbVehicleToApp(r, vehiclePhotoUrl(r)))
@@ -49,7 +50,7 @@ export async function getVehicle(id: string): Promise<Vehicle | null> {
 
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   try {
-    const record = await pb().collection('vehicles').create<PbRecord>(appVehicleToPb(input))
+    const record = await pb().collection('vehicles').create<PbRecord>(withOrganization(appVehicleToPb(input)))
     return pbVehicleToApp(record, vehiclePhotoUrl(record))
   } catch (err) {
     if (isMissingCollectionError(err)) {

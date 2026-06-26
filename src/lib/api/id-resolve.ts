@@ -1,5 +1,6 @@
 import { isDemoJobId } from '../demo-data'
 import { getPocketBase } from '../pocketbase'
+import { scopedStorageKey } from '../tenant'
 import { loadData } from '../storage'
 import { escapeFilterValue } from './mappers'
 import * as pb from './pocketbase'
@@ -15,7 +16,7 @@ function mapKey(kind: IdKind, localId: string): string {
 export function loadIdMap(): Record<string, string> {
   if (typeof window === 'undefined') return {}
   try {
-    return JSON.parse(localStorage.getItem(ID_MAP_KEY) ?? '{}') as Record<string, string>
+    return JSON.parse(localStorage.getItem(scopedStorageKey(ID_MAP_KEY)) ?? '{}') as Record<string, string>
   } catch {
     return {}
   }
@@ -25,7 +26,7 @@ export function saveIdMapEntry(localId: string, pbId: string, kind: IdKind): voi
   if (typeof window === 'undefined') return
   const map = loadIdMap()
   map[mapKey(kind, localId)] = pbId
-  localStorage.setItem(ID_MAP_KEY, JSON.stringify(map))
+  localStorage.setItem(scopedStorageKey(ID_MAP_KEY), JSON.stringify(map))
 }
 
 export function lookupIdMap(localId: string, kind: IdKind): string | undefined {

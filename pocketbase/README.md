@@ -66,13 +66,33 @@ node scripts/seed-packages.mjs
 
 ## How the app connects
 
-1. User unlocks app with PIN
-2. App authenticates to PocketBase with `NEXT_PUBLIC_PB_EMAIL` / `PASSWORD`
-3. On first connect, localStorage data migrates to PocketBase (clients, jobs, invoices, supplies, overhead)
+1. Operator signs up or logs in at `/auth` (email + password → PocketBase user)
+2. Sets a device PIN for quick unlock
+3. Each user belongs to one `organizations` record; all data is scoped by `organization_id`
 4. Offline writes queue in IndexedDB and flush to PocketBase on reconnect
-5. Default packages seed if collection is empty
-6. All API calls route through `src/lib/api/index.ts` → `pocketbase.ts`
-7. If PB is down or env vars missing → falls back to localStorage + offline queue
+5. Public booking: `/book/{slug}` and `/api/public/{slug}/*`
+
+### Multi-tenant migration (existing Atlas data)
+
+```bash
+cd pocketbase && ./pocketbase migrate up
+
+PB_URL=http://127.0.0.1:8090 \
+PB_EMAIL=your-admin-user \
+PB_PASSWORD=your-password \
+npm run migrate:multi-tenant
+```
+
+Backfills existing records into org slug `atlas-detailing`. Then run isolation check:
+
+```bash
+npm run test:isolation
+```
+
+## How the app connected (legacy single-tenant)
+
+1. User unlocks app with PIN
+2. App authenticated with shared `NEXT_PUBLIC_PB_EMAIL` / `PASSWORD` (removed — use per-user signup)
 
 ## Verify it's working
 

@@ -186,7 +186,7 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
         <span className={`badge ${invoiceStatusBadge[status] ?? 'badge-draft'}`}>{status}</span>
       </div>
 
-      <div className="card invoice-doc-card" style={{ marginBottom: 16 }}>
+      <div className="card invoice-doc-card invoice-doc-card-wrap">
         <InvoiceDocumentBody job={job} invoice={invoice} settings={settings} portalUrl={portalUrl} />
       </div>
 

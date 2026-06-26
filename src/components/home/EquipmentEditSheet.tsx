@@ -123,7 +123,6 @@ export default function EquipmentEditSheet({
         </div>
       }
     >
-      <div className="inv-sheet-body equipment-sheet">
         <div className="inv-sheet-section">
           <InventoryImagePicker imageUrl={imageUrl} onChange={setImageUrl} />
         </div>
@@ -234,7 +233,6 @@ export default function EquipmentEditSheet({
             />
           </div>
         </div>
-      </div>
     </BottomSheet>
   )
 }

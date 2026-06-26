@@ -4,6 +4,7 @@ import {
   netProfit,
   totalExpenses,
 } from '../calculations'
+import { formatJobsDashboardCSV, type JobExportRow, type JobExportSummary } from '../jobs-dashboard-csv'
 import type {
   DashboardKpis,
   Invoice,
@@ -155,15 +156,77 @@ export function computePLReport(
   return computePLReportForDates(jobs, start, end, overhead, businessExpenses)
 }
 
-export function computeJobsCSV(jobs: Job[], range: DateRangeKey, labelResolver: (job: Job) => { client: string; pkg: string }): string {
+export function computeJobsExportData(
+  jobs: Job[],
+  range: DateRangeKey,
+  labelResolver: (job: Job) => { client: string; pkg: string }
+): { rows: JobExportRow[]; summary: JobExportSummary } {
   const { start, end } = rangeFor(range)
   const filtered = jobs.filter((j) => jobInRange(j, start, end))
-  const headers = ['Date', 'Client', 'Package', 'Revenue', 'Tip', 'Expenses', 'Net Profit', 'Status']
-  const rows = filtered.map((j) => {
-    const { client, pkg } = labelResolver(j)
-    return [j.date, client, pkg, j.revenue, j.tip, totalExpenses(j), netProfit(j), j.status].join(',')
+  const rows = filtered
+    .map((j) => {
+      const { client, pkg } = labelResolver(j)
+      return {
+        date: j.date,
+        client,
+        pkg,
+        revenue: j.revenue,
+        tip: j.tip,
+        expenses: totalExpenses(j),
+        netProfit: netProfit(j),
+        status: j.status,
+      }
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const totalRevenue = rows.reduce((s, r) => s + r.revenue + r.tip, 0)
+  const totalExpensesSum = rows.reduce((s, r) => s + r.expenses, 0)
+  const netProfitSum = rows.reduce((s, r) => s + r.netProfit, 0)
+  return {
+    rows,
+    summary: {
+      totalRevenue,
+      totalExpenses: totalExpensesSum,
+      netProfit: netProfitSum,
+      jobCount: rows.length,
+    },
+  }
+}
+
+export type { JobExportRow, JobExportSummary }
+
+export interface JobsCSVOptions {
+  periodLabel?: string
+  periodRange?: string
+  businessName?: string
+  priorRevenue?: number
+}
+
+export function formatJobsExportCSV(
+  rows: JobExportRow[],
+  summary: JobExportSummary,
+  options: JobsCSVOptions = {}
+): string {
+  return formatJobsDashboardCSV(rows, summary, {
+    businessName: options.businessName,
+    periodLabel: options.periodLabel,
+    periodRange: options.periodRange,
+    priorRevenue: options.priorRevenue,
   })
-  return [headers.join(','), ...rows].join('\n')
+}
+
+export function computeJobsCSV(
+  jobs: Job[],
+  range: DateRangeKey,
+  labelResolver: (job: Job) => { client: string; pkg: string },
+  options: JobsCSVOptions = {}
+): string {
+  const { rows, summary } = computeJobsExportData(jobs, range, labelResolver)
+  return formatJobsExportCSV(rows, summary, {
+    periodLabel: options.periodLabel ?? range,
+    periodRange: options.periodRange,
+    businessName: options.businessName,
+    priorRevenue: options.priorRevenue,
+  })
 }
 
 export function computeDashboard(

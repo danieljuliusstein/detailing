@@ -30,6 +30,22 @@ export async function authenticateServerPocketBase(): Promise<PocketBase> {
   return pb
 }
 
+/** Superuser auth — required for creating organizations and cross-tenant admin tasks. */
+export async function authenticateServerAdmin(): Promise<PocketBase> {
+  const pb = getServerPocketBase()
+  if (!pb) throw new Error('PocketBase URL not configured')
+
+  const adminEmail = process.env.PB_ADMIN_EMAIL
+  const adminPassword = process.env.PB_ADMIN_PASSWORD
+
+  if (!adminEmail || !adminPassword) {
+    throw new Error('PocketBase admin not configured (PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD)')
+  }
+
+  await pb.collection('_superusers').authWithPassword(adminEmail, adminPassword)
+  return pb
+}
+
 export async function fetchCollection<T = Record<string, unknown>>(
   name: string
 ): Promise<T[]> {

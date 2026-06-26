@@ -16,8 +16,8 @@ export default function PinAuth() {
     if (needsSetup) {
       if (pin.length < 4) setPinValue((p) => p + digit)
       else if (confirmPin.length < 4) setConfirmPin((p) => p + digit)
-    } else {
-      if (pin.length < 4) setPinValue((p) => p + digit)
+    } else if (pin.length < 4) {
+      setPinValue((p) => p + digit)
     }
   }
 
@@ -58,76 +58,45 @@ export default function PinAuth() {
   }
 
   const activePin = needsSetup && pin.length === 4 ? confirmPin : pin
-  const canSubmit = needsSetup
-    ? pin.length === 4 && confirmPin.length === 4
-    : pin.length === 4
+  const canSubmit = needsSetup ? pin.length === 4 && confirmPin.length === 4 : pin.length === 4
 
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        background: 'var(--bg-base)',
-      }}
-    >
-      <div style={{ marginBottom: 16 }}>
+    <div className="auth-screen">
+      <div className="auth-screen__logo">
         <AppLogo size={56} priority />
       </div>
-      <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 6, color: 'var(--text-primary)' }}>
-        {needsSetup ? 'Set your PIN' : 'Enter PIN'}
-      </h1>
-      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 32, textAlign: 'center' }}>
+      <h1 className="auth-screen__title">{needsSetup ? 'Set your PIN' : 'Unlock with PIN'}</h1>
+      <p className="auth-screen__subtitle">
         {needsSetup
           ? 'Choose a 4-digit PIN to secure your business data'
           : 'Enter your PIN to open the app'}
       </p>
 
-      <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+      <div className="pin-dots" aria-hidden>
         {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: '50%',
-              background: activePin.length > i ? 'var(--green)' : 'var(--bg-surface)',
-              border: `0.5px solid ${activePin.length > i ? 'var(--green)' : 'var(--border)'}`,
-              transition: 'all 150ms ease',
-            }}
-          />
+          <div key={i} className={`pin-dot${activePin.length > i ? ' filled' : ''}`} />
         ))}
       </div>
 
-      {needsSetup && pin.length === 4 && (
-        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 20 }}>Confirm PIN</p>
-      )}
+      {needsSetup && pin.length === 4 ? (
+        <p className="auth-screen__subtitle" style={{ marginBottom: 16, marginTop: -8 }}>
+          Confirm PIN
+        </p>
+      ) : null}
 
-      {error && (
-        <p style={{ fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>{error}</p>
-      )}
+      {error ? <p className="auth-error" style={{ marginBottom: 16 }}>{error}</p> : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, width: '100%', maxWidth: 280, marginBottom: 20 }}>
+      <div className="pin-pad">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((key, idx) => {
           if (key === '') return <div key={idx} />
           const isBack = key === '⌫'
           return (
             <button
               key={idx}
+              type="button"
+              className={`pin-key${isBack ? ' pin-key--back' : ''}`}
               onClick={() => (isBack ? handleBackspace() : handleDigit(key))}
-              style={{
-                height: 64,
-                background: 'var(--bg-surface)',
-                border: '0.5px solid var(--border)',
-                borderRadius: 'var(--radius-lg)',
-                fontSize: isBack ? 20 : 24,
-                fontWeight: 500,
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
+              aria-label={isBack ? 'Delete' : key}
             >
               {key}
             </button>
@@ -135,11 +104,11 @@ export default function PinAuth() {
         })}
       </div>
 
-      {canSubmit && (
-        <button className="btn-primary" onClick={handleSubmit} disabled={loading} style={{ maxWidth: 280 }}>
+      {canSubmit ? (
+        <button type="button" className="btn-primary" onClick={() => void handleSubmit()} disabled={loading} style={{ maxWidth: 280, width: '100%' }}>
           {loading ? '…' : needsSetup ? 'Save PIN' : 'Unlock'}
         </button>
-      )}
+      ) : null}
     </div>
   )
 }

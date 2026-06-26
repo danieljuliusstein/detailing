@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
+  getClients,
   getDashboardData,
   getJobs,
   getJobsForDate,
@@ -22,16 +23,18 @@ export default function HomePage() {
   const [todayJobRows, setTodayJobRows] = useState<RecentJobRow[]>([])
   const [jobs, setJobs] = useState<Awaited<ReturnType<typeof getJobs>>>([])
   const [inventoryAlert, setInventoryAlert] = useState<ReturnType<typeof buildInventoryAlert>>(null)
+  const [clientCount, setClientCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
-    Promise.all([getDashboardData(), getJobs(), getSupplies(), getPackages()])
-      .then(async ([data, allJobs, supplyList, packageList]) => {
+    Promise.all([getDashboardData(), getJobs(), getSupplies(), getPackages(), getClients()])
+      .then(async ([data, allJobs, supplyList, packageList, clients]) => {
         if (cancelled) return
         setWeekDays(data.weekDays)
         setJobs(allJobs)
+        setClientCount(clients.length)
 
         const today = data.weekDays.find((d) => d.isToday)?.date ?? data.weekDays[0]?.date ?? ''
         if (today) {
@@ -83,6 +86,7 @@ export default function HomePage() {
       upcomingJobs={upcomingJobs}
       jobs={jobs}
       inventoryAlert={inventoryAlert}
+      clientCount={clientCount}
     />
   )
 }

@@ -119,7 +119,7 @@ export default function PLProgressBarCard({ report, range }: PLProgressBarCardPr
   const revenueBar: PLProgressBar = {
     name: 'Revenue',
     value: revenue,
-    color: '#3dc97a',
+    color: 'var(--green-text)',
     highlight: true,
     isExpense: false,
   }

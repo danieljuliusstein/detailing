@@ -1,17 +1,9 @@
-'use client'
-
 import { Suspense } from 'react'
 import MessagesScreen from '@/components/messages/MessagesScreen'
 
 export default function MessagesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          Loading…
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="messages-screen"><p className="messages-empty">Loading…</p></div>}>
       <MessagesScreen />
     </Suspense>
   )

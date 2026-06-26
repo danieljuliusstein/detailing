@@ -1,6 +1,7 @@
 import { businessExpensesTotalForDates } from '../business-expenses-logic'
 import { getPocketBase } from '../pocketbase'
 import { appBusinessExpenseToPb, pbBusinessExpenseToApp, type PbRecord } from './mappers'
+import { withOrganization } from './tenant-pocketbase'
 import type { BusinessExpense, BusinessExpenseInput } from '../types'
 
 function pb() {
@@ -24,7 +25,9 @@ export async function getBusinessExpense(id: string): Promise<BusinessExpense | 
 }
 
 export async function createBusinessExpense(input: BusinessExpenseInput): Promise<BusinessExpense> {
-  const record = await pb().collection('business_expenses').create<PbRecord>(appBusinessExpenseToPb(input))
+  const record = await pb().collection('business_expenses').create<PbRecord>(
+    withOrganization(appBusinessExpenseToPb(input)),
+  )
   return pbBusinessExpenseToApp(record)
 }
 

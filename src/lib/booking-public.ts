@@ -23,6 +23,7 @@ export interface PublicBusinessInfo {
   phone: string
   email: string
   address: string
+  logoUrl: string
 }
 
 export interface PublicBookingInput {
@@ -62,6 +63,7 @@ export async function getPublicBusinessInfo(): Promise<PublicBusinessInfo | null
       phone: String(record.business_phone ?? ''),
       email: String(record.business_email ?? ''),
       address: String(record.business_address ?? ''),
+      logoUrl: '/logo.png',
     }
   } catch {
     return null

@@ -68,9 +68,41 @@ export default function InventoryHome({
         </div>
       </header>
 
+      <p className="inventory-section-label">Categories</p>
+
+      <div className="category-grid">
+        {SECTION_CONFIG.map((section) => {
+          const Icon = CATEGORY_ICONS[section.key]
+          const meta = categoryMeta(section.key, catalog, equipment, wishlist)
+          const showLowBadge = section.key === 'supplies' && lowCount > 0
+
+          return (
+            <button
+              key={section.key}
+              type="button"
+              className="category-grid__cell"
+              onClick={() => onOpenCategory(section.key)}
+            >
+              <div className="category-grid__top">
+                <Icon className="category-grid__icon" size={20} weight="duotone" />
+                {showLowBadge ? (
+                  <span className="category-grid__badge">{lowCount} low</span>
+                ) : (
+                  <CaretRight className="category-grid__chevron" size={14} weight="bold" />
+                )}
+              </div>
+              <p className="category-grid__name">{section.title}</p>
+              <p className={`category-grid__meta${meta.metaClass ? ` ${meta.metaClass}` : ''}`}>
+                {meta.subtitle}
+              </p>
+            </button>
+          )
+        })}
+      </div>
+
       {attention.length > 0 && (
         <>
-          <p className="inventory-section-label">Needs attention</p>
+          <p className="inventory-section-label inventory-section-label--spaced">Needs attention</p>
           <div className="inventory-card">
             {attention.map((supply) => (
               <SupplyInventoryRow
@@ -82,35 +114,6 @@ export default function InventoryHome({
           </div>
         </>
       )}
-
-      <p className={`inventory-section-label${attention.length > 0 ? ' inventory-section-label--spaced' : ''}`}>
-        Categories
-      </p>
-
-      <div className="category-grid">
-        {SECTION_CONFIG.map((section) => {
-          const Icon = CATEGORY_ICONS[section.key]
-          const meta = categoryMeta(section.key, catalog, equipment, wishlist)
-
-          return (
-            <button
-              key={section.key}
-              type="button"
-              className="category-grid__cell"
-              onClick={() => onOpenCategory(section.key)}
-            >
-              <div className="category-grid__top">
-                <Icon className="category-grid__icon" size={20} weight="duotone" />
-                <CaretRight className="category-grid__chevron" size={14} weight="bold" />
-              </div>
-              <p className="category-grid__name">{section.title}</p>
-              <p className={`category-grid__meta${meta.metaClass ? ` ${meta.metaClass}` : ''}`}>
-                {meta.subtitle}
-              </p>
-            </button>
-          )
-        })}
-      </div>
 
       {products.length > 0 && (
         <>

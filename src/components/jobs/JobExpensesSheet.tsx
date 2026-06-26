@@ -34,6 +34,7 @@ export default function JobExpensesSheet({ value, onSave, onClose }: JobExpenses
       title="Job expenses"
       subtitle="Travel, marketing, and equipment for this job"
       ariaLabel="Job expenses"
+      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
         <div className="inv-sheet-actions inv-sheet-actions--split">
@@ -46,36 +47,49 @@ export default function JobExpensesSheet({ value, onSave, onClose }: JobExpenses
         </div>
       }
     >
-        <label className="inv-field-label">Travel / gas</label>
-        <input
-          type="number"
-          inputMode="decimal"
-          className="inv-field-input money"
-          value={travel}
-          onChange={(e) => setTravel(e.target.value)}
-          style={{ marginBottom: 14 }}
-        />
+      <div className="inv-sheet-section">
+        <div className="inv-field">
+          <label className="inv-field-label" htmlFor="job-exp-travel">
+            Travel / gas
+          </label>
+          <input
+            id="job-exp-travel"
+            type="number"
+            inputMode="decimal"
+            className="inv-field-input money"
+            value={travel}
+            onChange={(e) => setTravel(e.target.value)}
+          />
+        </div>
 
-        <label className="inv-field-label">Marketing</label>
-        <input
-          type="number"
-          inputMode="decimal"
-          className="inv-field-input money"
-          value={marketing}
-          onChange={(e) => setMarketing(e.target.value)}
-          style={{ marginBottom: 14 }}
-        />
+        <div className="inv-field">
+          <label className="inv-field-label" htmlFor="job-exp-marketing">
+            Marketing
+          </label>
+          <input
+            id="job-exp-marketing"
+            type="number"
+            inputMode="decimal"
+            className="inv-field-input money"
+            value={marketing}
+            onChange={(e) => setMarketing(e.target.value)}
+          />
+        </div>
 
-        <label className="inv-field-label">Equipment depreciation</label>
-        <input
-          type="number"
-          inputMode="decimal"
-          className="inv-field-input money"
-          value={equipment}
-          onChange={(e) => setEquipment(e.target.value)}
-          style={{ marginBottom: 20 }}
-        />
-
+        <div className="inv-field">
+          <label className="inv-field-label" htmlFor="job-exp-equipment">
+            Equipment depreciation
+          </label>
+          <input
+            id="job-exp-equipment"
+            type="number"
+            inputMode="decimal"
+            className="inv-field-input money"
+            value={equipment}
+            onChange={(e) => setEquipment(e.target.value)}
+          />
+        </div>
+      </div>
     </BottomSheet>
   )
 }

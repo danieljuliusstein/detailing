@@ -1,6 +1,7 @@
 import { getPocketBase } from '../pocketbase'
 import { isMissingCollectionError } from './pb-errors'
 import { appDamageToPb, escapeFilterValue, pbDamageToApp, type PbRecord } from './mappers'
+import { tenantFilter, withOrganization } from './tenant-pocketbase'
 import type { DamageRecord, DamageRecordInput } from '../types'
 
 function pb() {
@@ -21,7 +22,7 @@ export async function getDamageDocsForVehicle(vehicleId: string): Promise<Damage
     const records = await pb()
       .collection('damage_docs')
       .getFullList<PbRecord>({
-        filter: `vehicle_id = "${escapeFilterValue(vehicleId)}"`,
+        filter: tenantFilter(`vehicle_id = "${escapeFilterValue(vehicleId)}"`),
         sort: '-date',
       })
     return records.map((r) => pbDamageToApp(r, damagePhotoUrl(r)))
@@ -46,7 +47,7 @@ export async function createDamageDoc(
   photoFile?: File | null
 ): Promise<DamageRecord> {
   const formData = new FormData()
-  const payload = appDamageToPb(input)
+  const payload = withOrganization(appDamageToPb(input))
   for (const [key, value] of Object.entries(payload)) {
     if (value !== '' && value != null) formData.append(key, String(value))
   }

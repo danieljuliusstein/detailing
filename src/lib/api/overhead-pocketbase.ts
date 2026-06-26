@@ -1,6 +1,7 @@
 import { overheadAmountForRange } from '../supplies-logic'
 import { getPocketBase } from '../pocketbase'
 import { appOverheadToPb, pbOverheadToApp, type PbRecord } from './mappers'
+import { withOrganization } from './tenant-pocketbase'
 import type { DateRangeKey } from './reports'
 import type { OverheadExpense, OverheadInput } from '../types'
 
@@ -25,7 +26,9 @@ export async function getOverheadExpense(id: string): Promise<OverheadExpense | 
 }
 
 export async function createOverheadExpense(input: OverheadInput): Promise<OverheadExpense> {
-  const record = await pb().collection('overhead_expenses').create<PbRecord>(appOverheadToPb(input))
+  const record = await pb().collection('overhead_expenses').create<PbRecord>(
+    withOrganization(appOverheadToPb(input)),
+  )
   return pbOverheadToApp(record)
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, FilePdf, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
@@ -13,7 +13,7 @@ import {
 } from '@/lib/api'
 import { fmtDetailed } from '@/lib/calculations'
 import { downloadQuotePdf } from '@/lib/pdf/downloadQuotePdf'
-import { loadSettings } from '@/lib/settings'
+import { loadSettingsAsync, type AppSettings } from '@/lib/settings'
 import type { QuoteWithRelations } from '@/lib/types'
 
 const statusBadge: Record<string, string> = {
@@ -26,10 +26,14 @@ const statusBadge: Record<string, string> = {
 
 export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelations }) {
   const router = useRouter()
-  const settings = loadSettings()
   const [quote, setQuote] = useState(initial)
+  const [settings, setSettings] = useState<AppSettings | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    void loadSettingsAsync().then(setSettings)
+  }, [])
 
   const refresh = useCallback(async () => {
     const updated = await getQuote(quote.id)
@@ -78,6 +82,7 @@ export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelati
   const handlePdf = async () => {
     setBusy(true)
     try {
+      const settings = await loadSettingsAsync()
       await downloadQuotePdf(quote, settings)
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'PDF failed')
@@ -120,7 +125,7 @@ export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelati
             clientName={quote.client.name}
             quoteId={quote.id}
             scope="quote"
-            emailSubject={`Estimate ${quote.quote_number} from ${settings.business_name}`}
+            emailSubject={`Estimate ${quote.quote_number} from ${settings?.business_name ?? 'your detailer'}`}
             emailMessage="Review and accept your estimate using the secure link below."
           />
         </div>

@@ -6,7 +6,9 @@ export async function POST(request: Request) {
   if (!verifyApiSecret(request)) return apiUnauthorized()
 
   try {
-    const backup = await createPocketBaseBackup()
+    const { searchParams } = new URL(request.url)
+    const organizationId = searchParams.get('organizationId') ?? undefined
+    const backup = await createPocketBaseBackup(organizationId)
     const filename = `detailing-backup-${backup.exported_at.slice(0, 10)}.json`
 
     return new NextResponse(JSON.stringify(backup, null, 2), {
@@ -29,7 +31,9 @@ export async function GET(request: Request) {
   if (!verifyApiSecret(request)) return apiUnauthorized()
 
   try {
-    const backup = await createPocketBaseBackup()
+    const { searchParams } = new URL(request.url)
+    const organizationId = searchParams.get('organizationId') ?? undefined
+    const backup = await createPocketBaseBackup(organizationId)
     const counts = Object.fromEntries(
       Object.entries(backup.collections).map(([k, v]) => [k, v.length])
     )

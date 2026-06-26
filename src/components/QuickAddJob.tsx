@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CalendarBlank,
-  CaretLeft,
   CheckCircle,
   Circle,
   Clock,
@@ -13,6 +12,7 @@ import {
   MapPin,
   Plus,
 } from '@phosphor-icons/react'
+import BackButton from '@/components/BackButton'
 import JobExpensesSheet, { type JobExpenseDraft } from '@/components/jobs/JobExpensesSheet'
 import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
 import { getSupplies } from '@/lib/api'
@@ -35,22 +35,6 @@ const VEHICLE_TYPES = VEHICLE_TYPE_OPTIONS
 
 function formatHeaderDate(d: Date): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-function formatDateBox(iso: string): string {
-  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-function formatTimeDisplay(time: string): string {
-  if (!time) return ''
-  const [h, m] = time.split(':').map(Number)
-  const dt = new Date()
-  dt.setHours(h, m)
-  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
 export default function QuickAddJob({
@@ -172,9 +156,7 @@ export default function QuickAddJob({
     <div className="new-job">
       <header className="new-job-header">
         <div className="new-job-header-left">
-          <button type="button" className="new-job-back" onClick={() => router.back()} aria-label="Back">
-            <CaretLeft size={18} weight="bold" aria-hidden="true" />
-          </button>
+          <BackButton onClick={() => router.back()} />
           <h1 className="new-job-title">New job</h1>
         </div>
         <span className="new-job-header-date">{headerDate}</span>
@@ -204,7 +186,7 @@ export default function QuickAddJob({
                   {fmt(selectedClient.totalRevenue)} lifetime
                 </span>
               </span>
-              <CheckCircle size={18} weight="fill" color="#3dc97a" className="new-job-client-check" />
+              <CheckCircle size={18} weight="fill" color="var(--green-text)" className="new-job-client-check" />
             </button>
           ) : (
             <div className="new-job-client-search-wrap">
@@ -250,24 +232,20 @@ export default function QuickAddJob({
         <section id="nj-datetime" className="new-job-section">
           <div className="new-job-label">Date &amp; Time</div>
           <div className="new-job-datetime-grid">
-            <label className="new-job-datetime-box">
-              <CalendarBlank size={16} color="#555" aria-hidden="true" />
-              <span className="new-job-datetime-value">{formatDateBox(jobDate)}</span>
+            <label className="new-job-datetime-box" htmlFor="nj-date">
+              <CalendarBlank size={16} color="var(--text-muted)" aria-hidden="true" />
               <input
+                id="nj-date"
                 type="date"
                 className="new-job-datetime-native"
                 value={jobDate}
                 onChange={(e) => setJobDate(e.target.value)}
               />
             </label>
-            <label className="new-job-datetime-box">
-              <Clock size={16} color="#555" aria-hidden="true" />
-              <span
-                className={`new-job-datetime-value${startTime ? '' : ' new-job-datetime-value--empty'}`}
-              >
-                {startTime ? formatTimeDisplay(startTime) : 'Set time'}
-              </span>
+            <label className="new-job-datetime-box" htmlFor="nj-time">
+              <Clock size={16} color="var(--text-muted)" aria-hidden="true" />
               <input
+                id="nj-time"
                 type="time"
                 className="new-job-datetime-native"
                 value={startTime}
@@ -307,7 +285,7 @@ export default function QuickAddJob({
                     <span className="new-job-package-right">
                       <span className="new-job-package-price">{fmt(pkg.base_price)}</span>
                       {selected ? (
-                        <CheckCircle size={18} weight="fill" color="#3dc97a" />
+                        <CheckCircle size={18} weight="fill" color="var(--green-text)" />
                       ) : (
                         <Circle size={18} color="#2a2a2a" />
                       )}
@@ -419,13 +397,14 @@ export default function QuickAddJob({
           </div>
         </section>
 
-        {saveError && <p className="new-job-error">{saveError}</p>}
+        {saveError && <p className="new-job-error" role="alert" aria-live="assertive">{saveError}</p>}
       </div>
 
-      <div className="new-job-footer">
+      <footer className="new-job-footer">
         <button
           type="button"
-          className={`new-job-save-btn${!isValid ? ' new-job-save-btn--muted' : ''}`}
+          className={`btn-primary${!isValid ? ' new-job-save-btn--muted' : ''}`}
+          style={{ flex: 1 }}
           onClick={handleSave}
           disabled={saving}
         >
@@ -433,13 +412,13 @@ export default function QuickAddJob({
         </button>
         <button
           type="button"
-          className="new-job-expenses-btn"
+          className="btn-ghost new-job-expenses-btn"
           onClick={() => setExpenseSheetOpen(true)}
         >
           <Plus size={14} aria-hidden="true" />
           Expenses
         </button>
-      </div>
+      </footer>
 
       {expenseSheetOpen && (
         <JobExpensesSheet

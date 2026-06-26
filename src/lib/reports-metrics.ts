@@ -164,7 +164,7 @@ export function buildComparisonBars(report: PLReport): ComparisonBarRow[] {
       label: 'Revenue',
       amount: revenue,
       widthPct: (revenue / max) * 100,
-      color: '#3dc97a',
+      color: '#22c55e',
     },
     {
       label: 'Expenses',
@@ -215,7 +215,7 @@ export function buildPLProgressBars(report: PLReport): {
     profitBar: {
       name: 'Net profit',
       value: netProfit,
-      color: loss ? '#e06060' : '#3dc97a',
+      color: loss ? '#e06060' : '#22c55e',
       highlight: true,
       isExpense: false,
       isProfit: true,
@@ -340,7 +340,7 @@ export function buildWaterfallData(report: PLReport): WaterfallData {
   const ranges: [number, number][] = [[0, revenue]]
   const starts: number[] = [0]
   const vals: number[] = [revenue]
-  const colors: string[] = ['#3dc97a']
+  const colors: string[] = ['#22c55e']
   const labels: string[] = ['Revenue']
 
   const otherExpenses = WATERFALL_OTHER_KEYS.reduce((sum, key) => sum + expenses[key], 0)
@@ -383,7 +383,7 @@ export function buildWaterfallData(report: PLReport): WaterfallData {
   starts.push(0)
   vals.push(profit)
   ranges.push([0, profit])
-  colors.push('#3dc97a')
+  colors.push('#22c55e')
   labels.push('Profit')
 
   const peak = Math.max(revenue, ...ranges.map(([, top]) => top))

@@ -312,7 +312,6 @@ export default function SupplyPurchaseSheet({
         </div>
       }
     >
-      <div className="inv-sheet-body">
         <div className="inv-sheet-section">
           <div className="inv-field">
             <label className="inv-field-label" htmlFor="purchase-date">Date</label>
@@ -462,7 +461,6 @@ export default function SupplyPurchaseSheet({
           {error && <p className="inv-field-hint" style={{ color: '#fca5a5' }}>{error}</p>}
           {saved && <p className="inv-computed-cost">Saved</p>}
         </div>
-      </div>
     </BottomSheet>
   )
 }

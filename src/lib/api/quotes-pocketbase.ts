@@ -1,5 +1,6 @@
 import { getPocketBase } from '../pocketbase'
 import { pbQuoteToApp, pbQuoteToAppWithRelations, escapeFilterValue, type PbRecord } from './mappers'
+import { withOrganization } from './tenant-pocketbase'
 import type { Quote, QuoteInput, QuoteWithRelations } from '../types'
 
 const QUOTE_EXPAND = 'client_id,package_id'
@@ -28,18 +29,20 @@ export async function getQuote(id: string): Promise<QuoteWithRelations | null> {
 }
 
 export async function createQuote(input: QuoteInput): Promise<Quote> {
-  const created = await pb().collection('quotes').create<PbRecord>({
-    quote_number: 'PENDING',
-    client_id: input.client_id,
-    package_id: input.package_id,
-    vehicle_type: input.vehicle_type,
-    location_type: input.location_type,
-    date: input.date,
-    subtotal: input.subtotal,
-    notes: input.notes ?? '',
-    status: 'draft',
-    valid_until: input.valid_until ?? '',
-  })
+  const created = await pb().collection('quotes').create<PbRecord>(
+    withOrganization({
+      quote_number: 'PENDING',
+      client_id: input.client_id,
+      package_id: input.package_id,
+      vehicle_type: input.vehicle_type,
+      location_type: input.location_type,
+      date: input.date,
+      subtotal: input.subtotal,
+      notes: input.notes ?? '',
+      status: 'draft',
+      valid_until: input.valid_until ?? '',
+    }),
+  )
   return pbQuoteToApp(created)
 }
 
@@ -60,18 +63,20 @@ export async function acceptQuote(quoteId: string): Promise<{ quote: Quote; jobI
   if (quote.job_id) return { quote, jobId: quote.job_id }
   if (quote.status === 'declined' || quote.status === 'expired') return null
 
-  const job = await pb().collection('jobs').create<PbRecord>({
-    date: quote.date,
-    client_id: quote.client_id,
-    package_id: quote.package_id,
-    vehicle_type: quote.vehicle_type,
-    location_type: quote.location_type,
-    status: 'scheduled',
-    revenue: quote.subtotal,
-    tip: 0,
-    hours_worked: 0,
-    notes: quote.notes ?? '',
-  })
+  const job = await pb().collection('jobs').create<PbRecord>(
+    withOrganization({
+      date: quote.date,
+      client_id: quote.client_id,
+      package_id: quote.package_id,
+      vehicle_type: quote.vehicle_type,
+      location_type: quote.location_type,
+      status: 'scheduled',
+      revenue: quote.subtotal,
+      tip: 0,
+      hours_worked: 0,
+      notes: quote.notes ?? '',
+    }),
+  )
 
   const updated = await pb().collection('quotes').update<PbRecord>(quoteId, {
     status: 'accepted',

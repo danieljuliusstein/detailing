@@ -23,6 +23,7 @@ const APP_URL = process.env.APP_URL || 'http://127.0.0.1:3000'
 const EMAIL = process.env.PB_EMAIL || process.env.NEXT_PUBLIC_PB_EMAIL
 const PASSWORD = process.env.PB_PASSWORD || process.env.NEXT_PUBLIC_PB_PASSWORD
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || process.env.NEXT_PUBLIC_INTERNAL_API_SECRET
+const CRON_SECRET = process.env.CRON_SECRET || INTERNAL_SECRET
 
 const COLLECTIONS = [
   'packages', 'clients', 'supplies', 'equipment', 'overhead_expenses',
@@ -345,7 +346,25 @@ try {
   record('Integrations', 'K1 VAPID key endpoint', false, e.message)
 }
 
-if (INTERNAL_SECRET) {
+if (CRON_SECRET) {
+  try {
+    const cron = await fetch(`${APP_URL}/api/cron/notifications`, {
+      headers: { 'x-api-secret': CRON_SECRET },
+    })
+    record('Integrations', 'K2 Notification cron (x-api-secret)', cron.ok, `HTTP ${cron.status}`)
+  } catch (e) {
+    record('Integrations', 'K2 Notification cron (x-api-secret)', false, e.message)
+  }
+
+  try {
+    const cronBearer = await fetch(`${APP_URL}/api/cron/notifications`, {
+      headers: { Authorization: `Bearer ${CRON_SECRET}` },
+    })
+    record('Integrations', 'K2 Notification cron (Bearer)', cronBearer.ok, `HTTP ${cronBearer.status}`)
+  } catch (e) {
+    record('Integrations', 'K2 Notification cron (Bearer)', false, e.message)
+  }
+} else if (INTERNAL_SECRET) {
   try {
     const cron = await fetch(`${APP_URL}/api/cron/notifications`, {
       headers: { 'x-api-secret': INTERNAL_SECRET },
@@ -354,7 +373,9 @@ if (INTERNAL_SECRET) {
   } catch (e) {
     record('Integrations', 'K2 Notification cron', false, e.message)
   }
+}
 
+if (INTERNAL_SECRET) {
   try {
     const backup = await fetch(`${APP_URL}/api/backups/trigger`, {
       method: 'GET',

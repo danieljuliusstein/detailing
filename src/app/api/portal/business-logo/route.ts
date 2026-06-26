@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
-import { streamBusinessLogo } from '@/lib/server/portal-data'
 
-export async function GET() {
-  const result = await streamBusinessLogo()
-  if (!result) {
-    return NextResponse.json({ error: 'Logo not found' }, { status: 404 })
+/** @deprecated Use /api/business-logo?slug=... */
+export async function GET(request: Request) {
+  const slug = new URL(request.url).searchParams.get('slug')?.trim()
+  if (!slug) {
+    return NextResponse.json(
+      { error: 'slug query param required — use /api/business-logo?slug=your-org' },
+      { status: 400 }
+    )
   }
-
-  return new NextResponse(result.bytes, {
-    status: 200,
-    headers: {
-      'Content-Type': result.contentType,
-      'Cache-Control': 'public, max-age=86400',
-    },
-  })
+  const target = new URL('/api/business-logo', request.url)
+  target.searchParams.set('slug', slug)
+  return NextResponse.redirect(target)
 }

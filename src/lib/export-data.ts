@@ -1,5 +1,6 @@
 import { loadSettings } from './settings'
 import { loadData } from './storage'
+import { getCurrentOrganizationId } from './tenant'
 
 export interface LocalExportBundle {
   exported_at: string
@@ -39,7 +40,12 @@ export async function triggerServerBackup(): Promise<{ ok: boolean; error?: stri
     return { ok: false, error: 'Server backup requires NEXT_PUBLIC_INTERNAL_API_SECRET' }
   }
 
-  const res = await fetch('/api/backups/trigger', {
+  const organizationId = getCurrentOrganizationId()
+  const endpoint = organizationId
+    ? `/api/backups/trigger?organizationId=${encodeURIComponent(organizationId)}`
+    : '/api/backups/trigger'
+
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'x-api-secret': secret },
   })

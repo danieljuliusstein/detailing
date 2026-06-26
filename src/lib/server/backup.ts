@@ -9,21 +9,31 @@ const COLLECTIONS = [
   'overhead_expenses',
   'app_settings',
   'notifications_log',
+  'vehicles',
+  'damage_docs',
+  'quotes',
+  'business_expenses',
+  'equipment',
 ] as const
 
 export interface BackupPayload {
   exported_at: string
   version: 1
+  organization_id?: string
   collections: Record<string, unknown[]>
 }
 
-export async function createPocketBaseBackup(): Promise<BackupPayload> {
+export async function createPocketBaseBackup(organizationId?: string): Promise<BackupPayload> {
   const pb = await authenticateServerPocketBase()
   const collections: Record<string, unknown[]> = {}
+  const orgFilter = organizationId ? `organization_id = "${organizationId}"` : undefined
 
   for (const name of COLLECTIONS) {
     try {
-      collections[name] = await pb.collection(name).getFullList({ sort: '-id' })
+      collections[name] = await pb.collection(name).getFullList({
+        sort: '-id',
+        ...(orgFilter ? { filter: orgFilter } : {}),
+      })
     } catch {
       collections[name] = []
     }
@@ -32,26 +42,29 @@ export async function createPocketBaseBackup(): Promise<BackupPayload> {
   const payload: BackupPayload = {
     exported_at: new Date().toISOString(),
     version: 1,
+    organization_id: organizationId,
     collections,
   }
 
-  await updateLastBackupAt(pb)
+  if (organizationId) {
+    await updateLastBackupAt(pb, organizationId)
+  }
 
   return payload
 }
 
-async function updateLastBackupAt(pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>) {
+async function updateLastBackupAt(
+  pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>,
+  organizationId: string,
+) {
   try {
-    const records = await pb.collection('app_settings').getFullList({ limit: 1 })
+    const records = await pb.collection('app_settings').getFullList({
+      filter: `organization_id = "${organizationId}"`,
+      limit: 1,
+    })
     const now = new Date().toISOString().slice(0, 10)
     if (records.length > 0) {
       await pb.collection('app_settings').update(records[0].id, { last_backup_at: now })
-    } else {
-      await pb.collection('app_settings').create({
-        business_name: 'Detailing',
-        last_backup_at: now,
-        notifications: {},
-      })
     }
   } catch {
     // app_settings may not exist yet

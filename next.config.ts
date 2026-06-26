@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   // Set via npm run dev — keeps dev cache off iCloud Drive (see package.json).
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   reactStrictMode: true,
+  // Allow 127.0.0.1 in dev (portal links often use it; Next 16 blocks cross-origin dev assets otherwise)
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // Hides the floating Next.js "N" badge in development (still shows on errors)
   devIndicators: false,
   serverExternalPackages: ['@react-pdf/renderer'],
