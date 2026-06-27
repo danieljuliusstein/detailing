@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarPlus, ChatCircle, DotsThreeVertical, Phone, Trash } from '@phosphor-icons/react'
 import { deleteClient } from '@/lib/api'
+import { useConfirm } from '@/providers/ConfirmProvider'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { ClientWithStats } from '@/lib/types'
 
 interface ClientCardMenuProps {
@@ -13,6 +15,8 @@ interface ClientCardMenuProps {
 
 export default function ClientCardMenu({ client, onClientRemoved }: ClientCardMenuProps) {
   const router = useRouter()
+  const confirm = useConfirm()
+  const { showMessage } = useActionToast()
   const [open, setOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -37,13 +41,17 @@ export default function ClientCardMenu({ client, onClientRemoved }: ClientCardMe
     }
   }, [open])
 
-  const handleRemove = (e: React.MouseEvent) => {
+  const handleRemove = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setOpen(false)
-    const confirmed = window.confirm(
-      `Remove ${client.name} from your client list? This will permanently delete all of their jobs, vehicles, and related records. This cannot be undone.`
-    )
-    if (!confirmed) return
+    const ok = await confirm({
+      title: 'Remove client?',
+      message: `Remove ${client.name} from your client list? This will permanently delete all of their jobs, vehicles, and related records. This cannot be undone.`,
+      confirmLabel: 'Remove client',
+      cancelLabel: 'Keep client',
+      destructive: true,
+    })
+    if (!ok) return
 
     setRemoving(true)
     void deleteClient(client.id).then((result) => {
@@ -52,7 +60,7 @@ export default function ClientCardMenu({ client, onClientRemoved }: ClientCardMe
         return
       }
       setRemoving(false)
-      window.alert(result.error ?? 'Could not remove this client. Try again.')
+      showMessage(result.error ?? 'Could not remove this client. Try again.')
     })
   }
 

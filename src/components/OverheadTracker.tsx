@@ -6,6 +6,7 @@ import BackButton from '@/components/BackButton'
 import { FloatingAffixField, FloatingField, SheetSubmitButton } from '@/components/forms'
 import { useSettingsBack } from '@/hooks/useSettingsBack'
 import { createOverheadExpense, deleteOverheadExpense, getMonthlyOverheadTotal, getOverheadExpenses } from '@/lib/api'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import { fmtDetailed } from '@/lib/calculations'
 import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
 import type { BillingCycle, OverheadCategory, OverheadExpense } from '@/lib/types'
@@ -21,6 +22,7 @@ const cycleLabel: Record<BillingCycle, string> = {
 
 export default function OverheadTracker() {
   const goBack = useSettingsBack()
+  const confirm = useConfirm()
   const formRef = useRef<HTMLDivElement>(null)
   const categoryRef = useRef<HTMLSelectElement>(null)
   const cycleRef = useRef<HTMLSelectElement>(null)
@@ -56,7 +58,14 @@ export default function OverheadTracker() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this expense?')) return
+    const ok = await confirm({
+      title: 'Delete expense?',
+      message: 'Delete this overhead expense?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteOverheadExpense(id)
     await load()
   }

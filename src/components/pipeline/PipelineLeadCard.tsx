@@ -14,6 +14,8 @@ import {
   updateLeadStage,
 } from '@/lib/api'
 import { leadSourceBadgeClass, leadSourceLabel, leadStageLabel } from '@/lib/lead-sources'
+import { useConfirm } from '@/providers/ConfirmProvider'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { LeadStage, LeadWithRelations } from '@/lib/types'
 
 function serviceLabel(lead: LeadWithRelations): string {
@@ -125,6 +127,8 @@ interface Props {
 
 export default function PipelineLeadCard({ lead, onEdit, onRefresh }: Props) {
   const router = useRouter()
+  const confirm = useConfirm()
+  const { showMessage } = useActionToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -136,7 +140,7 @@ export default function PipelineLeadCard({ lead, onEdit, onRefresh }: Props) {
       onRefresh()
       router.push(`/quotes/${quote.id}`)
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Could not create quote')
+      showMessage(e instanceof Error ? e.message : 'Could not create quote')
     } finally {
       setActionLoading(false)
       setConfirmOpen(false)
@@ -149,7 +153,7 @@ export default function PipelineLeadCard({ lead, onEdit, onRefresh }: Props) {
       return
     }
     if (!lead.package_id) {
-      window.alert('Select a service package on this lead before sending a quote.')
+      showMessage('Select a service package on this lead before sending a quote.')
       onEdit()
       return
     }
@@ -172,7 +176,7 @@ export default function PipelineLeadCard({ lead, onEdit, onRefresh }: Props) {
       setScheduleOpen(false)
       router.push(`/jobs/${jobId}`)
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Could not create job')
+      showMessage(e instanceof Error ? e.message : 'Could not create job')
     } finally {
       setActionLoading(false)
     }
@@ -192,7 +196,13 @@ export default function PipelineLeadCard({ lead, onEdit, onRefresh }: Props) {
   }
 
   const handleDelete = async () => {
-    const ok = window.confirm(`Remove ${lead.name} from the pipeline?`)
+    const ok = await confirm({
+      title: 'Remove lead?',
+      message: `Remove ${lead.name} from the pipeline?`,
+      confirmLabel: 'Remove lead',
+      cancelLabel: 'Keep lead',
+      destructive: true,
+    })
     if (!ok) return
     await deleteLead(lead.id)
     onRefresh()

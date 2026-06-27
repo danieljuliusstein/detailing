@@ -22,6 +22,7 @@ import {
 import { buildLocalExport, downloadJson, runNotificationsCheck, triggerServerBackup } from '@/lib/export-data'
 import { getPocketBaseAuthToken } from '@/lib/pb-auth'
 import { saveSettingsAsync } from '@/lib/settings'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import SettingsDetailShell from './SettingsDetailShell'
 import { useSettingsDraft } from './SettingsDraftProvider'
 
@@ -137,6 +138,7 @@ function DeveloperToolsPanel({
 
 export default function SettingsAccessPage() {
   const router = useRouter()
+  const confirm = useConfirm()
   const { settings, ready, reload } = useSettingsDraft()
   const [backupMsg, setBackupMsg] = useState<string | null>(null)
   const [backingUp, setBackingUp] = useState(false)
@@ -188,7 +190,13 @@ export default function SettingsAccessPage() {
   }
 
   const handleMigrate = async () => {
-    if (!confirm('Migrate local data to PocketBase? Only run this once when moving off demo storage.')) return
+    const ok = await confirm({
+      title: 'Migrate to cloud?',
+      message: 'Migrate local data to PocketBase? Only run this once when moving off demo storage.',
+      confirmLabel: 'Migrate',
+      cancelLabel: 'Cancel',
+    })
+    if (!ok) return
     setMigrating(true)
     setMigrationMsg(null)
     try {
@@ -223,7 +231,14 @@ export default function SettingsAccessPage() {
   }
 
   const handleClearQueue = async () => {
-    if (!confirm('Clear all pending offline writes? Unsynced changes will be lost.')) return
+    const ok = await confirm({
+      title: 'Clear offline queue?',
+      message: 'Clear all pending offline writes? Unsynced changes will be lost.',
+      confirmLabel: 'Clear queue',
+      cancelLabel: 'Keep pending',
+      destructive: true,
+    })
+    if (!ok) return
     await clearOfflineQueue()
     setSyncErrors([])
     await refreshSync()
@@ -247,7 +262,14 @@ export default function SettingsAccessPage() {
   }
 
   const handleClearLocal = async () => {
-    if (!confirm('Clear demo and cached data on this device? Cloud data on PocketBase is not deleted.')) return
+    const ok = await confirm({
+      title: 'Clear local data?',
+      message: 'Clear demo and cached data on this device? Cloud data on PocketBase is not deleted.',
+      confirmLabel: 'Clear local data',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     await clearLocalDeviceData()
     resetBackend()
     window.location.reload()

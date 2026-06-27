@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Trash } from '@phosphor-icons/react'
 import RowContextMenu from './RowContextMenu'
+import { useConfirm } from '@/providers/ConfirmProvider'
 
 const SWIPE_OPEN_OFFSET = -72
 const SWIPE_THRESHOLD = 48
@@ -30,6 +31,7 @@ export default function SwipeableRow({
   deleteConfirmMessage,
   showDivider = false,
 }: SwipeableRowProps) {
+  const confirm = useConfirm()
   const [offset, setOffset] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -78,11 +80,18 @@ export default function SwipeableRow({
     if (openRowIdRef.current === rowId) onOpenChangeRef.current(null)
   }, [rowId, setRowOffset])
 
-  const confirmDelete = useCallback(() => {
-    if (!confirm(deleteConfirmMessage)) return
+  const confirmDelete = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Delete?',
+      message: deleteConfirmMessage,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     onDelete()
     resetSwipe()
-  }, [deleteConfirmMessage, onDelete, resetSwipe])
+  }, [confirm, deleteConfirmMessage, onDelete, resetSwipe])
 
   useEffect(() => {
     const el = contentRef.current

@@ -18,6 +18,7 @@ import {
 import { computeFormProgress } from '@/lib/form-progress'
 import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import { useActionToast } from '@/providers/ActionToastProvider'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import type { BusinessExpense, BusinessExpenseCategory, BusinessExpenseInput } from '@/lib/types'
 
 const CATEGORY_PILLS: { value: BusinessExpenseCategory; label: string }[] = [
@@ -63,6 +64,7 @@ export default function BusinessExpenseSheet({
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const { handleWriteError } = useActionToast()
+  const confirm = useConfirm()
 
   const progress = computeFormProgress([date, name, amount, vendor, notes], 1, 1)
 
@@ -125,7 +127,15 @@ export default function BusinessExpenseSheet({
   }
 
   const handleDelete = async () => {
-    if (!expense || !confirm('Delete this business expense?')) return
+    if (!expense) return
+    const ok = await confirm({
+      title: 'Delete expense?',
+      message: 'Delete this business expense?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     setSaving(true)
     setError('')
     try {

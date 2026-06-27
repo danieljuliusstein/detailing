@@ -4,11 +4,13 @@ import { FloppyDisk } from '@phosphor-icons/react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/providers/AuthProvider'
 import { useActionToast } from '@/providers/ActionToastProvider'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import { useSettingsDraft } from './SettingsDraftProvider'
 
 export default function SettingsFooter({ showSave = true }: { showSave?: boolean }) {
   const { logout, isLoggedIn } = useAuth()
   const { handleWriteError } = useActionToast()
+  const confirm = useConfirm()
   const { dirty, savedFlash, save } = useSettingsDraft()
   const router = useRouter()
 
@@ -38,8 +40,18 @@ export default function SettingsFooter({ showSave = true }: { showSave?: boolean
           type="button"
           className="settings-footer__logout"
           onClick={() => {
-            if (!confirm('Log out on this device? You can keep browsing, but your data will not load until you sign in again.')) return
-            logout()
+            void (async () => {
+              const ok = await confirm({
+                title: 'Log out?',
+                message:
+                  'Log out on this device? You can keep browsing, but your data will not load until you sign in again.',
+                confirmLabel: 'Log out',
+                cancelLabel: 'Stay signed in',
+                destructive: true,
+              })
+              if (!ok) return
+              logout()
+            })()
           }}
         >
           Log out

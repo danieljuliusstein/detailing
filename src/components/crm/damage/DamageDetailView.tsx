@@ -6,6 +6,7 @@ import { Image as ImageIcon } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import { FloatingField, SheetSubmitButton } from '@/components/forms'
 import { deleteDamageDoc, updateDamageDocNote } from '@/lib/api'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import { formatCapturedAt, formatDamageDate } from '@/lib/damage-docs'
 import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import type { DamageRecord } from '@/lib/types'
@@ -26,6 +27,7 @@ export default function DamageDetailView({
   photoTotal = 1,
 }: DamageDetailViewProps) {
   const router = useRouter()
+  const confirm = useConfirm()
   const formRef = useRef<HTMLDivElement>(null)
   const [editing, setEditing] = useState(false)
   const [note, setNote] = useState(damage.note)
@@ -36,8 +38,15 @@ export default function DamageDetailView({
     syncPrefilledFloatingLabels(formRef.current)
   }, [editing, note])
 
-  const handleDelete = () => {
-    if (!window.confirm('Delete this damage record? This cannot be undone.')) return
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete damage record?',
+      message: 'Delete this damage record? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(true)
     void deleteDamageDoc(damage.id).then((ok) => {
       if (ok) router.replace(`/clients/${clientId}/vehicles/${vehicleId}`)

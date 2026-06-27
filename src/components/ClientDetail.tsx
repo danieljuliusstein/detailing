@@ -10,6 +10,8 @@ import { vehicleDisplayName } from '@/lib/damage-docs'
 import { JOB_STATUS_CONFIG } from '@/lib/job-status-display'
 import { deleteClient } from '@/lib/api'
 import { openMapsDirections } from '@/lib/maps-url'
+import { useConfirm } from '@/providers/ConfirmProvider'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { Client, JobWithRelations, Vehicle } from '@/lib/types'
 
 interface ClientDetailProps {
@@ -21,19 +23,25 @@ interface ClientDetailProps {
 
 export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: ClientDetailProps) {
   const router = useRouter()
+  const confirm = useConfirm()
+  const { showMessage } = useActionToast()
   const [removing, setRemoving] = useState(false)
   const avgJob = jobs.length > 0 ? totalRevenue / jobs.length : 0
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
     const parts = [
       jobs.length > 0 ? `${jobs.length} job${jobs.length === 1 ? '' : 's'}` : null,
       vehicles.length > 0 ? `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}` : null,
     ].filter(Boolean)
     const detail = parts.length > 0 ? ` This will permanently delete ${parts.join(' and ')}.` : ''
-    const confirmed = window.confirm(
-      `Remove ${client.name} from your client list?${detail} This cannot be undone.`
-    )
-    if (!confirmed) return
+    const ok = await confirm({
+      title: 'Remove client?',
+      message: `Remove ${client.name} from your client list?${detail} This cannot be undone.`,
+      confirmLabel: 'Remove client',
+      cancelLabel: 'Keep client',
+      destructive: true,
+    })
+    if (!ok) return
 
     setRemoving(true)
     void deleteClient(client.id).then((result) => {
@@ -42,7 +50,7 @@ export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: C
         return
       }
       setRemoving(false)
-      window.alert(result.error ?? 'Could not remove this client. Try again.')
+      showMessage(result.error ?? 'Could not remove this client. Try again.')
     })
   }
 

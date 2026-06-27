@@ -22,6 +22,7 @@ import { fmtDetailed } from '@/lib/calculations'
 import { computeFormProgress } from '@/lib/form-progress'
 import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
 import { useActionToast } from '@/providers/ActionToastProvider'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import type { BusinessExpense, Supply, SupplyKind, SupplyPurchaseInput } from '@/lib/types'
 
 const CHEMICAL_UNITS = ['oz', 'gal', 'ml', 'L'] as const
@@ -147,6 +148,7 @@ export default function SupplyPurchaseSheet({ expense, onClose, onSaved }: Suppl
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const { handleWriteError } = useActionToast()
+  const confirm = useConfirm()
 
   const isNewSupply = supplyKey === NEW_SUPPLY
   const unitOptions = kind === 'consumable' ? CONSUMABLE_UNITS : CHEMICAL_UNITS
@@ -287,7 +289,15 @@ export default function SupplyPurchaseSheet({ expense, onClose, onSaved }: Suppl
   }
 
   const handleDelete = async () => {
-    if (!expense || !confirm('Delete this supply purchase? Inventory will be adjusted.')) return
+    if (!expense) return
+    const ok = await confirm({
+      title: 'Delete purchase?',
+      message: 'Delete this supply purchase? Inventory will be adjusted.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     setSaving(true)
     setError('')
     try {

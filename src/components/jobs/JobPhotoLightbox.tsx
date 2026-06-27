@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { Trash } from '@phosphor-icons/react'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import type { JobPhoto, PhotoType } from '@/lib/types'
 
 const SWIPE_THRESHOLD = 48
@@ -24,6 +25,7 @@ export default function JobPhotoLightbox({
   onNavigate,
   onDelete,
 }: JobPhotoLightboxProps) {
+  const confirm = useConfirm()
   const touchStartX = useRef<number | null>(null)
   const photo = photos[index]
   const pillClass = type === 'before' ? 'job-photos-lightbox__pill--before' : 'job-photos-lightbox__pill--after'
@@ -52,8 +54,15 @@ export default function JobPhotoLightbox({
 
   if (!photo) return null
 
-  const handleDelete = () => {
-    if (!window.confirm('Delete this photo?')) return
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete photo?',
+      message: 'Delete this photo from the job?',
+      confirmLabel: 'Delete photo',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    })
+    if (!ok) return
     onDelete(photo.filename)
     if (photos.length <= 1) {
       onClose()

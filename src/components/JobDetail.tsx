@@ -11,6 +11,8 @@ import ShareLinkActions from '@/components/portal/ShareLinkActions'
 import { SHARE_LINK_PRESETS } from '@/lib/share-link-presets'
 import { openMapsDirections } from '@/lib/maps-url'
 import { deleteJob, getQuotes } from '@/lib/api'
+import { useConfirm } from '@/providers/ConfirmProvider'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import {
   effectiveRate,
   fmtDetailed,
@@ -44,6 +46,8 @@ interface JobDetailProps {
 
 export default function JobDetail({ job }: JobDetailProps) {
   const router = useRouter()
+  const confirm = useConfirm()
+  const { showMessage } = useActionToast()
   const [cancelling, setCancelling] = useState(false)
   const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null)
 
@@ -91,17 +95,21 @@ export default function JobDetail({ job }: JobDetailProps) {
 
   const isUpcoming = job.status === 'scheduled' || job.status === 'in_progress'
 
-  const handleCancel = () => {
-    const dateLabel = new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', {
+  const handleCancel = async () => {
+    const cancelDateLabel = new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
     })
     const clientName = job.client?.name ?? 'this client'
-    const confirmed = window.confirm(
-      `Cancel the appointment for ${clientName} on ${dateLabel}? The time slot will be freed on your website calendar. This cannot be undone.`
-    )
-    if (!confirmed) return
+    const ok = await confirm({
+      title: 'Cancel appointment?',
+      message: `Cancel the appointment for ${clientName} on ${cancelDateLabel}? The time slot will be freed on your website calendar. This cannot be undone.`,
+      confirmLabel: 'Cancel appointment',
+      cancelLabel: 'Keep appointment',
+      destructive: true,
+    })
+    if (!ok) return
 
     setCancelling(true)
     void deleteJob(job.id).then((result) => {
@@ -110,7 +118,7 @@ export default function JobDetail({ job }: JobDetailProps) {
         return
       }
       setCancelling(false)
-      window.alert(result.error ?? 'Could not cancel this appointment. Try again.')
+      showMessage(result.error ?? 'Could not cancel this appointment. Try again.')
     })
   }
 

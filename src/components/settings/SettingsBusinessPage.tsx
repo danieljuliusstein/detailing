@@ -7,6 +7,7 @@ import { validateLogoFile } from '@/lib/logo-upload'
 import { isValidHexColor, normalizeAccentColor } from '@/lib/brand-color'
 import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import { saveSettingsAsync } from '@/lib/settings'
+import { useConfirm } from '@/providers/ConfirmProvider'
 import { loadOrganizationSlug } from '@/lib/tenant'
 import WebsiteBookingGuide from './WebsiteBookingGuide'
 import LogoSection, { logoMetaFromFile, logoMetaFromUrl, type LogoMeta } from './LogoSection'
@@ -15,6 +16,7 @@ import { useSettingsDraft } from './SettingsDraftProvider'
 
 export default function SettingsBusinessPage() {
   const { settings, ready, update, reload } = useSettingsDraft()
+  const confirm = useConfirm()
   const formRef = useRef<HTMLDivElement>(null)
   const [orgSlug, setOrgSlug] = useState('')
   const [removingLogo, setRemovingLogo] = useState(false)
@@ -98,7 +100,14 @@ export default function SettingsBusinessPage() {
 
   const handleRemoveLogo = async () => {
     if (!hasCustomBusinessLogo(settings?.logo_url)) return
-    if (!confirm('Remove your custom logo? The default mark will be used until you upload a new one.')) return
+    const ok = await confirm({
+      title: 'Remove logo?',
+      message: 'Remove your custom logo? The default mark will be used until you upload a new one.',
+      confirmLabel: 'Remove logo',
+      cancelLabel: 'Keep logo',
+      destructive: true,
+    })
+    if (!ok) return
     setRemovingLogo(true)
     try {
       await saveSettingsAsync({ ...settings!, logo_url: '/logo.png' }, null, { clearLogo: true })

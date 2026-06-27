@@ -3,6 +3,7 @@ import { DM_Sans, Syne } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/providers/AuthProvider'
 import { ActionToastProvider } from '@/providers/ActionToastProvider'
+import { ConfirmProvider } from '@/providers/ConfirmProvider'
 import AppShell from '@/components/AppShell'
 import './globals.css'
 
@@ -51,7 +52,9 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <AuthProvider>
           <ActionToastProvider>
-            <AppShell>{children}</AppShell>
+            <ConfirmProvider>
+              <AppShell>{children}</AppShell>
+            </ConfirmProvider>
           </ActionToastProvider>
         </AuthProvider>
         <Analytics />

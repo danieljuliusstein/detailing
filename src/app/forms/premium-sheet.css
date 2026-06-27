@@ -493,3 +493,64 @@
   border: 1px solid rgba(34, 197, 94, 0.2) !important;
 }
 
+/* Destructive / action confirmations */
+.confirm-sheet__message {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.confirm-sheet__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.confirm-sheet__confirm {
+  width: 100%;
+  padding: 16px;
+  border-radius: 14px;
+  border: none;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirm-sheet__confirm--primary {
+  background: #4caf50;
+  color: #0a0a0a;
+}
+
+.confirm-sheet__confirm--primary:active {
+  opacity: 0.92;
+}
+
+.confirm-sheet__confirm--danger {
+  background: #ef4444;
+  color: #fff;
+}
+
+.confirm-sheet__confirm--danger:active {
+  opacity: 0.92;
+}
+
+.confirm-sheet__cancel {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #1c1c1c;
+  border: 1.5px solid #252525;
+  color: #888;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.confirm-sheet__cancel:active {
+  background: #222;
+}
+
