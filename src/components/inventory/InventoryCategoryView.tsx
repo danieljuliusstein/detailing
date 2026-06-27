@@ -206,11 +206,11 @@ export default function InventoryCategoryView({
         {showViewToggle && <ViewModeToggle mode={viewMode} onChange={setViewMode} />}
       </div>
 
-      <div className="inventory-search">
-        <MagnifyingGlass className="inventory-search__icon" size={16} weight="bold" />
+      <div className="inventory-search premium-search">
+        <MagnifyingGlass className="premium-search__icon inventory-search__icon" size={16} weight="bold" />
         <input
           type="search"
-          className="inventory-search__input"
+          className="premium-search__input inventory-search__input"
           placeholder={`Search ${section.title.toLowerCase()}…`}
           value={query}
           onChange={(e) => setQuery(e.target.value)}

@@ -170,6 +170,7 @@ export async function createPackage(input: import('../types').PackageInput): Pro
       base_price: input.base_price,
       description: input.description ?? '',
       expected_return_days: input.expected_return_days ?? 90,
+      duration_minutes: input.duration_minutes ?? 120,
       default_supplies: input.default_supplies ?? [],
       active: input.active !== false,
     }),
@@ -184,6 +185,7 @@ export async function updatePackage(id: string, input: Partial<import('../types'
     if (input.base_price !== undefined) payload.base_price = input.base_price
     if (input.description !== undefined) payload.description = input.description
     if (input.expected_return_days !== undefined) payload.expected_return_days = input.expected_return_days
+    if (input.duration_minutes !== undefined) payload.duration_minutes = input.duration_minutes
     if (input.default_supplies !== undefined) payload.default_supplies = input.default_supplies
     if (input.active !== undefined) payload.active = input.active
 

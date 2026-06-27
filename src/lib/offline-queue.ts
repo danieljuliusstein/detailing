@@ -30,6 +30,10 @@ export type QueueOperation =
   | { type: 'deleteSupplyPurchase'; params: { id: string } }
   | { type: 'uploadJobPhoto'; params: { jobId: string; dataUrl: string; photoType: import('./types').PhotoType; filename: string } }
   | { type: 'deleteJobPhoto'; params: { jobId: string; filename: string } }
+  | { type: 'uploadSupplyPhoto'; params: { id: string; dataUrl: string; filename: string } }
+  | { type: 'clearSupplyPhoto'; params: { id: string } }
+  | { type: 'uploadEquipmentPhoto'; params: { id: string; dataUrl: string; filename: string } }
+  | { type: 'clearEquipmentPhoto'; params: { id: string } }
   | { type: 'createVehicle'; params: import('./types').VehicleInput; localVehicleId: string }
   | { type: 'createDamageDoc'; params: import('./types').DamageRecordInput; localDamageId: string }
   | { type: 'updateDamageDocNote'; params: { id: string; note: string } }

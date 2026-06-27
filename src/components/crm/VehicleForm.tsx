@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BackButton from '@/components/BackButton'
+import { FloatingField, SheetSubmitButton } from '@/components/forms'
 import { createVehicle, updateVehicle } from '@/lib/api'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import type { Vehicle, VehicleInput, VehicleType } from '@/lib/types'
 import { VehicleTypeIcon, VehicleTypePicker } from '@/lib/vehicle-type-icons'
 import { normalizeVehicleColorHex, vehicleIconColorOnPaint } from '@/lib/vehicle-color'
@@ -16,6 +18,7 @@ interface Props {
 
 export default function VehicleForm({ clientId, vehicle }: Props) {
   const router = useRouter()
+  const formRef = useRef<HTMLDivElement>(null)
   const isEdit = !!vehicle
   const [make, setMake] = useState(vehicle?.make ?? '')
   const [model, setModel] = useState(vehicle?.model ?? '')
@@ -27,6 +30,10 @@ export default function VehicleForm({ clientId, vehicle }: Props) {
   const [type, setType] = useState<VehicleType>(vehicle?.type ?? 'sedan')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [make, model, year, plate, vin, color])
 
   const buildInput = (): VehicleInput => ({
     client_id: clientId,
@@ -90,41 +97,89 @@ export default function VehicleForm({ clientId, vehicle }: Props) {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {([
-          ['Year', year, setYear, 'number'],
-          ['Make', make, setMake, 'text'],
-          ['Model', model, setModel, 'text'],
-          ['Plate', plate, setPlate, 'text'],
-          ['VIN', vin, setVin, 'text'],
-          ['Color', color, setColor, 'text'],
-        ] as const).map(([label, value, setter, inputType]) => (
-          <div key={label}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
-            <input
-              className="input"
-              type={inputType}
-              value={value}
-              onChange={(e) => setter(e.target.value)}
-              placeholder={label === 'Year' ? 'e.g. 2022' : undefined}
-            />
-          </div>
-        ))}
+      <div ref={formRef} className="page-form-card page-form">
+        <FloatingField id="vehicle-year" label="Year" filled={year.trim().length > 0} optional>
+          <input
+            id="vehicle-year"
+            className={`f-input${year.trim() ? ' hv' : ''}`}
+            type="number"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="vehicle-make" label="Make" filled={make.trim().length > 0}>
+          <input
+            id="vehicle-make"
+            className={`f-input${make.trim() ? ' hv' : ''}`}
+            value={make}
+            onChange={(e) => setMake(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="vehicle-model" label="Model" filled={model.trim().length > 0}>
+          <input
+            id="vehicle-model"
+            className={`f-input${model.trim() ? ' hv' : ''}`}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="vehicle-plate" label="Plate" filled={plate.trim().length > 0} optional>
+          <input
+            id="vehicle-plate"
+            className={`f-input${plate.trim() ? ' hv' : ''}`}
+            value={plate}
+            onChange={(e) => setPlate(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="vehicle-vin" label="VIN" filled={vin.trim().length > 0} optional>
+          <input
+            id="vehicle-vin"
+            className={`f-input${vin.trim() ? ' hv' : ''}`}
+            value={vin}
+            onChange={(e) => setVin(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="vehicle-color" label="Color" filled={color.trim().length > 0} optional>
+          <input
+            id="vehicle-color"
+            className={`f-input${color.trim() ? ' hv' : ''}`}
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Color swatch</div>
           <VehicleColorSwatchPicker value={colorHex} onChange={setColorHex} />
         </div>
+
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Type</div>
           <VehicleTypePicker value={type} onChange={setType} />
         </div>
       </div>
 
-      {error && <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12 }}>{error}</div>}
+      {error ? <div className="error-banner" style={{ marginBottom: 12 }}>{error}</div> : null}
 
-      <button className="btn-primary" onClick={handleSave} disabled={saving}>
-        {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add vehicle'}
-      </button>
+      <div className="page-form-save">
+        <SheetSubmitButton
+          label={saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add vehicle'}
+          ready={make.trim().length > 0 && model.trim().length > 0}
+          disabled={saving}
+          onClick={() => void handleSave()}
+        />
+      </div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { fmtLineItem } from './calculations'
+import { hasCustomBusinessLogo } from './business-logo'
 import type { AppSettings } from './settings'
 import type { Invoice, InvoiceStatus, JobWithRelations } from './types'
 
@@ -124,7 +125,7 @@ export function buildInvoiceViewModel(
     businessPhone: settings.business_phone?.trim() || undefined,
     businessEmail: settings.business_email?.trim() || undefined,
     businessAddress: settings.business_address?.trim() || undefined,
-    logoUrl: settings.logo_url?.trim() || undefined,
+    logoUrl: hasCustomBusinessLogo(settings.logo_url) ? settings.logo_url!.trim() : undefined,
     invoiceNumber: invoice.invoice_number,
     issuedDateLabel: formatLongDate(issuedSource.split('T')[0]),
     statusLabel,

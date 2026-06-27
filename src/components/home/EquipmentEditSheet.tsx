@@ -1,12 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ArrowSquareOut, Trash } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowSquareOut } from '@phosphor-icons/react'
 import BottomSheet from '@/components/BottomSheet'
 import AcquisitionToggle, { type AcquisitionMode } from '@/components/inventory/AcquisitionToggle'
 import EquipmentStatusToggle from '@/components/inventory/EquipmentStatusToggle'
 import InventoryImagePicker from '@/components/inventory/InventoryImagePicker'
+import {
+  FloatingAffixField,
+  FloatingField,
+  FormProgressBar,
+  SheetFooter,
+} from '@/components/forms'
+import { clearEquipmentPhoto, uploadEquipmentPhoto } from '@/lib/api'
 import { fmtDetailed } from '@/lib/calculations'
+import { computeFormProgress } from '@/lib/form-progress'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import type { BusinessExpense, Equipment, EquipmentAddOptions, EquipmentInput, EquipmentStatus } from '@/lib/types'
 
 export type EquipmentSheetMode = 'add' | 'edit'
@@ -16,10 +25,11 @@ interface EquipmentEditSheetProps {
   mode: EquipmentSheetMode
   linkedExpense?: BusinessExpense | null
   onViewExpense?: () => void
-  onSaveAdd: (input: EquipmentInput, options?: EquipmentAddOptions) => Promise<void>
+  onSaveAdd: (input: EquipmentInput, options?: EquipmentAddOptions) => Promise<Equipment>
   onSaveEdit: (id: string, input: Partial<EquipmentInput>) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onClose: () => void
+  onAfterSave?: () => Promise<void>
 }
 
 export default function EquipmentEditSheet({
@@ -31,16 +41,21 @@ export default function EquipmentEditSheet({
   onSaveEdit,
   onDelete,
   onClose,
+  onAfterSave,
 }: EquipmentEditSheetProps) {
+  const formRef = useRef<HTMLDivElement>(null)
   const [name, setName] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [supplier, setSupplier] = useState('')
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState<EquipmentStatus>('active')
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [clearPhoto, setClearPhoto] = useState(false)
   const [acquisition, setAcquisition] = useState<AcquisitionMode>('already_owned')
   const [saving, setSaving] = useState(false)
+
+  const progress = computeFormProgress([name, purchasePrice, purchaseDate, supplier, notes], 1, 1)
 
   useEffect(() => {
     if (mode === 'add') {
@@ -50,7 +65,8 @@ export default function EquipmentEditSheet({
       setSupplier('')
       setNotes('')
       setStatus('active')
-      setImageUrl(null)
+      setPhotoFile(null)
+      setClearPhoto(false)
       setAcquisition('already_owned')
       return
     }
@@ -61,8 +77,23 @@ export default function EquipmentEditSheet({
     setSupplier(item.supplier ?? '')
     setNotes(item.notes ?? '')
     setStatus(item.status ?? 'active')
-    setImageUrl(item.image_url ?? null)
+    setPhotoFile(null)
+    setClearPhoto(false)
   }, [item, mode])
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [name, purchasePrice, purchaseDate, supplier, notes, item, mode])
+
+  const handlePhotoChange = (file: File | null) => {
+    setPhotoFile(file)
+    if (file) setClearPhoto(false)
+  }
+
+  const persistPhoto = async (id: string) => {
+    if (clearPhoto) await clearEquipmentPhoto(id)
+    else if (photoFile) await uploadEquipmentPhoto(id, photoFile)
+  }
 
   const handleSave = async () => {
     const trimmed = name.trim()
@@ -77,162 +108,134 @@ export default function EquipmentEditSheet({
         supplier: supplier.trim() || undefined,
         notes: notes.trim() || undefined,
         status,
-        image_url: imageUrl ?? undefined,
       }
       if (mode === 'add') {
         const options: EquipmentAddOptions = includeExpense
           ? { logExpense: true, purchaseDate }
           : { logExpense: false }
-        await onSaveAdd(payload, options)
+        const created = await onSaveAdd(payload, options)
+        await persistPhoto(created.id)
       } else if (item) {
         await onSaveEdit(item.id, payload)
+        await persistPhoto(item.id)
       }
+      await onAfterSave?.()
       onClose()
     } finally {
       setSaving(false)
     }
   }
 
-  const saveLabel = saving ? 'Saving…' : mode === 'add' ? 'Add equipment' : 'Save changes'
-
   return (
     <BottomSheet
+      variant="premium"
       title={mode === 'add' ? 'Add equipment' : item?.name ?? 'Edit equipment'}
       subtitle={mode === 'add' ? 'New durable tool or machine' : 'Update equipment details'}
-      sheetClassName="inv-sheet--form inv-sheet--equipment"
       onClose={onClose}
       footer={
-        <div className="inv-sheet-actions inv-sheet-actions--split">
-          {mode === 'edit' && item && onDelete ? (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={() => onDelete(item.id)}
-              aria-label="Delete equipment"
-              style={{ gridColumn: '1 / -1' }}
-            >
-              <Trash size={18} weight="bold" color="#f87171" />
-            </button>
-          ) : null}
-          <button type="button" className="inv-sheet-save" onClick={handleSave} disabled={saving}>
-            {saveLabel}
-          </button>
-          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-        </div>
+        <SheetFooter
+          saveLabel={mode === 'add' ? 'Add equipment' : 'Save changes'}
+          ready={name.trim().length > 0}
+          saving={saving}
+          layout="split"
+          onSave={() => void handleSave()}
+          onCancel={onClose}
+          onDelete={mode === 'edit' && item && onDelete ? () => void onDelete(item.id) : undefined}
+        />
       }
     >
-        <div className="inv-sheet-section">
-          <InventoryImagePicker imageUrl={imageUrl} onChange={setImageUrl} />
-        </div>
+      <div className="premium-sheet__section">
+        <InventoryImagePicker
+          previewUrl={clearPhoto ? null : (item?.image_url ?? null)}
+          onChange={handlePhotoChange}
+          onClearExisting={() => setClearPhoto(true)}
+        />
+      </div>
 
-        {mode === 'edit' && linkedExpense && onViewExpense && (
-          <>
-            <div className="inv-sheet-divider" />
-            <div className="inv-sheet-section">
-              <div className="inv-expense-link-panel">
-                <p className="inv-expense-link-panel__title">Logged in business expenses</p>
-                <p className="inv-expense-link-panel__meta">
-                  {fmtDetailed(linkedExpense.amount)} · {linkedExpense.date}
-                  {linkedExpense.vendor ? ` · ${linkedExpense.vendor}` : ''}
-                </p>
-                <button type="button" className="inv-expense-link-panel__btn" onClick={onViewExpense}>
-                  <ArrowSquareOut size={14} weight="bold" aria-hidden />
-                  View expense
-                </button>
-              </div>
+      {mode === 'edit' && linkedExpense && onViewExpense ? (
+        <>
+          <div className="f-form-divider" />
+          <div className="premium-sheet__section">
+            <div className="inv-expense-link-panel">
+              <p className="inv-expense-link-panel__title">Logged in business expenses</p>
+              <p className="inv-expense-link-panel__meta">
+                {fmtDetailed(linkedExpense.amount)} · {linkedExpense.date}
+                {linkedExpense.vendor ? ` · ${linkedExpense.vendor}` : ''}
+              </p>
+              <button type="button" className="inv-expense-link-panel__btn" onClick={onViewExpense}>
+                <ArrowSquareOut size={14} weight="bold" aria-hidden />
+                View expense
+              </button>
             </div>
-          </>
-        )}
+          </div>
+        </>
+      ) : null}
 
-        <div className="inv-sheet-divider" />
+      <div className="f-form-divider" />
 
-        <div className="inv-sheet-section">
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="equipment-name">Name</label>
+      {mode === 'add' ? <FormProgressBar progress={progress} /> : null}
+
+      <div ref={formRef} className="premium-sheet__form">
+        <FloatingField id="equipment-name" label="Name" filled={name.trim().length > 0}>
+          <input
+            id="equipment-name"
+            className={`f-input${name.trim() ? ' hv' : ''}`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        {mode === 'add' ? <AcquisitionToggle value={acquisition} onChange={setAcquisition} /> : null}
+
+        <div className="premium-sheet__grid2">
+          <FloatingAffixField
+            id="equipment-price"
+            label="Purchase price"
+            type="number"
+            min={0}
+            step="0.01"
+            value={purchasePrice}
+            filled={purchasePrice.trim().length > 0}
+            onChange={(e) => setPurchasePrice(e.target.value)}
+          />
+          <FloatingField id="equipment-date" label="Purchase date" filled={Boolean(purchaseDate)} optional>
             <input
-              id="equipment-name"
-              className="inv-field-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Rupes DA polisher"
+              id="equipment-date"
+              type="date"
+              className={`f-input${purchaseDate ? ' hv' : ''}`}
+              value={purchaseDate}
+              onChange={(e) => setPurchaseDate(e.target.value)}
+              placeholder=" "
             />
-          </div>
-
-          {mode === 'add' && <AcquisitionToggle value={acquisition} onChange={setAcquisition} />}
-
-          <div className="inv-field-row">
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="equipment-price">
-                Purchase price
-                {mode === 'add' && acquisition === 'already_owned' && (
-                  <span className="inv-field-label-optional">(optional)</span>
-                )}
-              </label>
-              <div className="inv-input-affix inv-input-affix--pre">
-                <span className="inv-input-affix__pre">$</span>
-                <input
-                  id="equipment-price"
-                  className="inv-field-input"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={purchasePrice}
-                  onChange={(e) => setPurchasePrice(e.target.value)}
-                  placeholder="450"
-                />
-              </div>
-            </div>
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="equipment-date">
-                Purchase date
-                <span className="inv-field-label-optional">(optional)</span>
-              </label>
-              <input
-                id="equipment-date"
-                className="inv-field-input"
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="equipment-supplier">
-              Supplier
-              <span className="inv-field-label-optional">(optional)</span>
-            </label>
-            <input
-              id="equipment-supplier"
-              className="inv-field-input"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder="Where you bought it"
-            />
-          </div>
+          </FloatingField>
         </div>
 
-        <div className="inv-sheet-divider" />
+        <FloatingField id="equipment-supplier" label="Supplier" filled={supplier.trim().length > 0} optional>
+          <input
+            id="equipment-supplier"
+            className={`f-input${supplier.trim() ? ' hv' : ''}`}
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
 
-        <div className="inv-sheet-section">
-          <EquipmentStatusToggle value={status} onChange={setStatus} />
+        <div className="f-form-divider" />
 
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="equipment-notes">
-              Notes
-              <span className="inv-field-label-optional">(optional)</span>
-            </label>
-            <textarea
-              id="equipment-notes"
-              className="inv-field-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. upgraded from entry-level DA..."
-            />
-          </div>
-        </div>
+        <EquipmentStatusToggle value={status} onChange={setStatus} />
+
+        <FloatingField id="equipment-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
+          <textarea
+            id="equipment-notes"
+            className={`f-textarea${notes.trim() ? ' hv' : ''}`}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder=" "
+            rows={3}
+          />
+        </FloatingField>
+      </div>
     </BottomSheet>
   )
 }

@@ -3,6 +3,19 @@ export type VehicleType = 'sedan' | 'suv' | 'truck' | 'van' | 'boat' | 'other'
 export type JobStatus = 'scheduled' | 'in_progress' | 'completed' | 'invoiced' | 'paid'
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired'
+
+export type LeadStage = 'inquiry' | 'quoted' | 'booked'
+
+export type LeadSource =
+  | 'instagram'
+  | 'google'
+  | 'referral'
+  | 'facebook'
+  | 'tiktok'
+  | 'word_of_mouth'
+  | 'website'
+  | 'text'
+  | 'other'
 export type PhotoType = 'before' | 'after'
 export type OverheadCategory = 'vehicle' | 'insurance' | 'equipment' | 'software' | 'marketing' | 'other'
 export type BillingCycle = 'monthly' | 'annual' | 'one_time'
@@ -32,6 +45,8 @@ export interface Package {
   description?: string
   /** Typical days until this service type should be booked again. */
   expected_return_days: number
+  /** Minutes blocked on the calendar when clients book online. */
+  duration_minutes: number
   default_supplies?: { supply_id: string; default_qty: number }[]
   active: boolean
 }
@@ -255,6 +270,46 @@ export interface QuoteInput {
   valid_until?: string
 }
 
+export interface Lead {
+  id: string
+  name: string
+  phone?: string
+  email?: string
+  source: LeadSource
+  vehicle_type: VehicleType
+  package_id?: string
+  service_interest?: string
+  quote_amount?: number
+  stage: LeadStage
+  client_id?: string
+  quote_id?: string
+  job_id?: string
+  notes?: string
+  created?: string
+}
+
+export interface LeadWithRelations extends Lead {
+  package?: Package
+  quote?: Quote
+  client?: Client
+}
+
+export interface LeadInput {
+  name: string
+  phone?: string
+  email?: string
+  source: LeadSource
+  vehicle_type: VehicleType
+  package_id?: string
+  service_interest?: string
+  quote_amount?: number
+  stage?: LeadStage
+  client_id?: string
+  quote_id?: string
+  job_id?: string
+  notes?: string
+}
+
 export interface Invoice {
   id: string
   invoice_number: string
@@ -410,8 +465,26 @@ export interface PackageInput {
   base_price: number
   description?: string
   expected_return_days?: number
+  duration_minutes?: number
   default_supplies?: { supply_id: string; default_qty: number }[]
   active?: boolean
+}
+
+export interface TimeBlock {
+  id: string
+  date: string
+  start_time?: string
+  end_time?: string
+  all_day: boolean
+  label?: string
+}
+
+export interface TimeBlockInput {
+  date: string
+  start_time?: string
+  end_time?: string
+  all_day?: boolean
+  label?: string
 }
 
 export interface ClientWithStats extends Client {
@@ -430,4 +503,5 @@ export interface WeekDay {
   dayNum: number
   isToday: boolean
   jobCount: number
+  blocked?: boolean
 }

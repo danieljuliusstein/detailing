@@ -47,7 +47,13 @@ async function pbAuth() {
   })
   if (!res.ok) throw new Error(`Auth failed: ${res.status}`)
   const data = await res.json()
-  return data.token
+  const orgId = String(data.record?.organization_id ?? '').trim()
+  if (!orgId) throw new Error('Auth user missing organization_id')
+  return { token: data.token, orgId }
+}
+
+function withOrg(orgId, body) {
+  return { ...body, organization_id: orgId }
 }
 
 async function pbGet(token, path) {
@@ -111,9 +117,10 @@ record('Pre-flight', 'Env PB_URL set', !!PB_URL, PB_URL)
 record('Pre-flight', 'Env credentials set', !!(EMAIL && PASSWORD))
 
 let token
+let orgId
 try {
-  token = await pbAuth()
-  record('Pre-flight', 'PocketBase auth', true)
+  ;({ token, orgId } = await pbAuth())
+  record('Pre-flight', 'PocketBase auth', true, orgId)
 } catch (e) {
   record('Pre-flight', 'PocketBase auth', false, e.message)
   console.log('\nCannot continue without auth.')
@@ -134,7 +141,7 @@ const ts = Date.now()
 const testClientName = `QA Client ${ts}`
 
 // B1: Create client
-const clientRes = await pbPost(token, 'clients', { name: testClientName, phone: '555-0100' })
+const clientRes = await pbPost(token, 'clients', withOrg(orgId, { name: testClientName, phone: '555-0100' }))
 record('Clients', 'B1 Create client', clientRes.ok, clientRes.ok ? clientRes.data.id : String(clientRes.data))
 const clientId = clientRes.ok ? clientRes.data.id : null
 
@@ -154,7 +161,7 @@ record('Jobs', 'C1 Package available', !!packageId, packageId ?? 'no active pack
 let jobId = null
 if (clientId && packageId) {
   const today = new Date().toISOString().slice(0, 10)
-  const jobRes = await pbPost(token, 'jobs', {
+  const jobRes = await pbPost(token, 'jobs', withOrg(orgId, {
     date: today,
     client_id: clientId,
     package_id: packageId,
@@ -165,7 +172,7 @@ if (clientId && packageId) {
     tip: 10,
     travel_cost: 5,
     expenses: [{ category: 'other', label: 'QA expense', amount: 3 }],
-  })
+  }))
   record('Jobs', 'C1 Create job', jobRes.ok, jobRes.ok ? jobRes.data.id : String(jobRes.data))
   jobId = jobRes.ok ? jobRes.data.id : null
 
@@ -183,14 +190,14 @@ if (clientId && packageId) {
 }
 
 // F1: Create supply
-const supplyRes = await pbPost(token, 'supplies', {
+const supplyRes = await pbPost(token, 'supplies', withOrg(orgId, {
   name: `QA Supply ${ts}`,
   unit: 'bottle',
   quantity_on_hand: 10,
   reorder_threshold: 15,
   cost_per_unit: 5,
   kind: 'chemical',
-})
+}))
 record('Inventory', 'F1 Add supply', supplyRes.ok)
 const supplyId = supplyRes.ok ? supplyRes.data.id : null
 
@@ -205,22 +212,22 @@ if (supplyId) {
 }
 
 // F5: Business expense
-const expRes = await pbPost(token, 'business_expenses', {
+const expRes = await pbPost(token, 'business_expenses', withOrg(orgId, {
   date: new Date().toISOString().slice(0, 10),
   name: `QA Expense ${ts}`,
   amount: 25,
   category: 'other',
-})
+}))
 record('Expenses', 'F5 Log business expense', expRes.ok)
 const expenseId = expRes.ok ? expRes.data.id : null
 
 // F6: Overhead
-const ohRes = await pbPost(token, 'overhead_expenses', {
+const ohRes = await pbPost(token, 'overhead_expenses', withOrg(orgId, {
   name: `QA Overhead ${ts}`,
   amount: 50,
   category: 'software',
   billing_cycle: 'monthly',
-})
+}))
 record('Expenses', 'F6 Add overhead', ohRes.ok)
 const overheadId = ohRes.ok ? ohRes.data.id : null
 
@@ -260,7 +267,7 @@ console.log('\n=== 5. INVOICES ===\n')
 
 if (jobId && clientId) {
   const invNum = `INV-QA-${ts}`
-  const invRes = await pbPost(token, 'invoices', {
+  const invRes = await pbPost(token, 'invoices', withOrg(orgId, {
     invoice_number: invNum,
     job_id: jobId,
     client_id: clientId,
@@ -271,7 +278,7 @@ if (jobId && clientId) {
     balance_due: 160,
     amount_paid: 0,
     payments: [],
-  })
+  }))
   record('Invoices', 'E1 Generate invoice', invRes.ok, invRes.ok ? invNum : String(invRes.data))
   const invoiceId = invRes.ok ? invRes.data.id : null
 
@@ -311,11 +318,11 @@ if (jobId && clientId) {
 
 // --- Packages ---
 console.log('\n=== 6. PACKAGES ===\n')
-const pkgCreate = await pbPost(token, 'packages', {
+const pkgCreate = await pbPost(token, 'packages', withOrg(orgId, {
   name: `QA Pkg ${ts}`,
   base_price: 99,
   active: true,
-})
+}))
 record('Packages', 'G1 Create package', pkgCreate.ok)
 const qaPkgId = pkgCreate.ok ? pkgCreate.data.id : null
 if (qaPkgId) {
@@ -437,7 +444,7 @@ let quoteId = null
 let portalToken = null
 
 if (clientId && qaPkgId) {
-  const quoteCreate = await pbPost(token, 'quotes', {
+  const quoteCreate = await pbPost(token, 'quotes', withOrg(orgId, {
     client_id: clientId,
     package_id: qaPkgId,
     vehicle_type: 'sedan',
@@ -446,7 +453,7 @@ if (clientId && qaPkgId) {
     subtotal: 99,
     status: 'draft',
     valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-  })
+  }))
   record('Quotes', 'Q1 Create quote', quoteCreate.ok, quoteCreate.ok ? '' : String(quoteCreate.data))
   quoteId = quoteCreate.ok ? quoteCreate.data.id : null
 

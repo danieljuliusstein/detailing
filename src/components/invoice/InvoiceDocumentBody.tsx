@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import BusinessLogo from '@/components/BusinessLogo'
 import CurrencyAmount from '@/components/ui/CurrencyAmount'
 import {
@@ -7,6 +8,7 @@ import {
   formatInvoiceMoney,
   type InvoiceViewModel,
 } from '@/lib/invoice-layout'
+import { openPortalLink } from '@/lib/portal-client'
 import type { AppSettings } from '@/lib/settings'
 import type { Invoice, JobWithRelations } from '@/lib/types'
 
@@ -17,8 +19,24 @@ interface InvoiceDocumentBodyProps {
   portalUrl?: string
 }
 
-function statusClass(tone: InvoiceViewModel['statusTone']): string {
-  return `invoice-doc-status invoice-doc-status--${tone}`
+const STATUS_STYLES: Record<
+  InvoiceViewModel['statusTone'],
+  { bg: string; color: string }
+> = {
+  draft: { bg: '#f4f4f4', color: '#888888' },
+  sent: { bg: 'rgba(34, 197, 94, 0.10)', color: '#22c55e' },
+  paid: { bg: 'rgba(34, 197, 94, 0.10)', color: '#22c55e' },
+  overdue: { bg: 'rgba(239, 68, 68, 0.10)', color: '#ef4444' },
+  partial: { bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' },
+}
+
+function KVRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="invoice-doc-kv">
+      <span className="invoice-doc-kv__label">{label}</span>
+      <span className="invoice-doc-kv__value">{value}</span>
+    </div>
+  )
 }
 
 export default function InvoiceDocumentBody({
@@ -27,93 +45,106 @@ export default function InvoiceDocumentBody({
   settings,
   portalUrl,
 }: InvoiceDocumentBodyProps) {
+  const router = useRouter()
   const vm = buildInvoiceViewModel(job, invoice, settings, { portalUrl })
+  const statusStyle = STATUS_STYLES[vm.statusTone]
+  const clientAddressParts = [vm.billToAddress].filter(Boolean) as string[]
 
   return (
-    <div className="invoice-doc">
-      <div className="invoice-doc-header">
-        <div className="invoice-doc-header-left">
-          <BusinessLogo logoUrl={vm.logoUrl} size={64} />
-          <div className="invoice-doc-business">
-            <div className="invoice-doc-business-name">{vm.businessName}</div>
-            {vm.businessPhone && <div className="invoice-doc-muted">{vm.businessPhone}</div>}
-            {vm.businessEmail && <div className="invoice-doc-muted">{vm.businessEmail}</div>}
-            {vm.businessAddress && <div className="invoice-doc-muted">{vm.businessAddress}</div>}
+    <div className="invoice-doc invoice-doc--rinse">
+      <div className="invoice-doc-brand">
+        <div className="invoice-doc-brand__logo">
+          <BusinessLogo logoUrl={vm.logoUrl} size={52} />
+        </div>
+        <div className="invoice-doc-brand__info">
+          <div className="invoice-doc-brand__name">{vm.businessName}</div>
+          {vm.businessEmail && <div className="invoice-doc-brand__contact">{vm.businessEmail}</div>}
+          {vm.businessPhone && <div className="invoice-doc-brand__contact">{vm.businessPhone}</div>}
+        </div>
+      </div>
+
+      <div className="invoice-doc-section invoice-doc-section--border">
+        <div className="invoice-doc-meta">
+          <div className="invoice-doc-meta__left">
+            <div className="invoice-doc-section-label">Invoice</div>
+            <div className="invoice-doc-meta__number">{vm.invoiceNumber}</div>
+            <div className="invoice-doc-meta__issued">Issued {vm.issuedDateLabel}</div>
           </div>
-        </div>
-        <div className="invoice-doc-header-right">
-          <div className="invoice-doc-invoice-label">INVOICE</div>
-          <div className="invoice-doc-invoice-number">{vm.invoiceNumber}</div>
-          <div className="invoice-doc-muted">Issued {vm.issuedDateLabel}</div>
-          <span className={statusClass(vm.statusTone)}>{vm.statusLabel}</span>
-        </div>
-      </div>
-
-      <div className="invoice-doc-two-col">
-        <div>
-          <div className="invoice-doc-label">Bill to</div>
-          <div className="invoice-doc-client-name">{vm.billToName}</div>
-          {vm.billToPhone && <div className="invoice-doc-muted">{vm.billToPhone}</div>}
-          {vm.billToEmail && <div className="invoice-doc-muted">{vm.billToEmail}</div>}
-          {vm.billToAddress && <div className="invoice-doc-muted">{vm.billToAddress}</div>}
-        </div>
-        <div>
-          <div className="invoice-doc-label">Service details</div>
-          <div className="invoice-doc-muted">Date: {vm.serviceDateLabel}</div>
-          <div className="invoice-doc-muted">Vehicle: {vm.vehicleLabel}</div>
-          <div className="invoice-doc-muted">Location: {vm.locationLabel}</div>
-          <div className="invoice-doc-context">{vm.serviceContextLine}</div>
+          <span
+            className="invoice-doc-status-pill"
+            style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}
+          >
+            {vm.statusLabel}
+          </span>
         </div>
       </div>
 
-      <div className="invoice-doc-table">
-        <div className="invoice-doc-table-head">
+      <div className="invoice-doc-section invoice-doc-section--border">
+        <div className="invoice-doc-section-label">Bill to</div>
+        <div className="invoice-doc-bill-name">{vm.billToName}</div>
+        {clientAddressParts.length > 0 && (
+          <div className="invoice-doc-bill-address">{clientAddressParts.join(' · ')}</div>
+        )}
+      </div>
+
+      <div className="invoice-doc-section invoice-doc-section--border">
+        <div className="invoice-doc-section-label">Service details</div>
+        <div className="invoice-doc-kv-list">
+          <KVRow label="Date" value={vm.serviceDateLabel} />
+          <KVRow label="Vehicle" value={vm.vehicleLabel} />
+          <KVRow label="Location" value={vm.locationLabel} />
+        </div>
+      </div>
+
+      <div className="invoice-doc-section">
+        <div className="invoice-doc-lines-head">
           <span>Description</span>
           <span>Amount</span>
         </div>
+
         {vm.lineItems.map((item, i) => (
-          <div key={i} className="invoice-doc-table-row">
-            <div className="invoice-doc-table-desc">
+          <div key={i} className="invoice-doc-line">
+            <div className="invoice-doc-line__desc">
               <span>{item.description}</span>
-              {item.note && <span className="invoice-doc-line-note">{item.note}</span>}
+              {item.note && <span className="invoice-doc-line__note">{item.note}</span>}
             </div>
-            <span className="invoice-doc-table-amount">{formatInvoiceMoney(item.amount)}</span>
+            <span className="invoice-doc-line__amount">{formatInvoiceMoney(item.amount)}</span>
           </div>
         ))}
-      </div>
 
-      <div className="invoice-doc-summary">
-        <div className="invoice-doc-summary-row">
-          <span className="invoice-doc-muted">Subtotal</span>
-          <span>{formatInvoiceMoney(vm.subtotal)}</span>
-        </div>
-        {vm.showTip && (
-          <div className="invoice-doc-summary-row">
-            <span className="invoice-doc-muted">Tip</span>
-            <span>{formatInvoiceMoney(vm.tip)}</span>
+        <div className="invoice-doc-totals">
+          <div className="invoice-doc-totals__row">
+            <span className="invoice-doc-totals__muted">Subtotal</span>
+            <span>{formatInvoiceMoney(vm.subtotal)}</span>
           </div>
-        )}
-        <div className="invoice-doc-summary-divider" />
-        <div className="invoice-doc-summary-row invoice-doc-summary-total">
-          <span>Total</span>
-          <span>{formatInvoiceMoney(vm.total)}</span>
-        </div>
-        <div className="invoice-doc-summary-row">
-          <span className="invoice-doc-muted">Balance due</span>
-          <CurrencyAmount
-            value={vm.balanceDue}
-            variant={vm.balanceDue > 0 ? 'expense' : 'revenue'}
-            unsigned={vm.balanceDue >= 0}
-          />
+          {vm.showTip && (
+            <div className="invoice-doc-totals__row">
+              <span className="invoice-doc-totals__muted">Tip</span>
+              <span>{formatInvoiceMoney(vm.tip)}</span>
+            </div>
+          )}
+          <div className="invoice-doc-totals__divider" />
+          <div className="invoice-doc-totals__row invoice-doc-totals__row--grand">
+            <span>Total</span>
+            <span>{formatInvoiceMoney(vm.total)}</span>
+          </div>
+          <div className="invoice-doc-totals__row">
+            <span className="invoice-doc-totals__muted">Balance due</span>
+            <CurrencyAmount
+              value={vm.balanceDue}
+              variant={vm.balanceDue > 0 ? 'expense' : 'revenue'}
+              unsigned={vm.balanceDue >= 0}
+            />
+          </div>
         </div>
       </div>
 
       {vm.showPayments && (
-        <div className="invoice-doc-payments">
-          <div className="invoice-doc-label">Payments</div>
+        <div className="invoice-doc-section invoice-doc-section--border">
+          <div className="invoice-doc-section-label">Payments</div>
           {vm.payments.map((p, i) => (
-            <div key={i} className="invoice-doc-summary-row">
-              <span className="invoice-doc-muted">
+            <div key={i} className="invoice-doc-totals__row">
+              <span className="invoice-doc-totals__muted">
                 {p.method} · {p.date}
               </span>
               <CurrencyAmount value={p.amount} variant="revenue" />
@@ -122,20 +153,21 @@ export default function InvoiceDocumentBody({
         </div>
       )}
 
-      <div className="invoice-doc-footer">
+      <div className="invoice-doc-footer-rinse">
         {vm.termsFooter && <p>{vm.termsFooter}</p>}
         {vm.questionsLine && <p>{vm.questionsLine}</p>}
         {vm.portalUrl && (
-          <p className="invoice-doc-portal">
-            <a
-              href={vm.portalUrl}
-              className="invoice-doc-portal-link"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View your invoice online
-            </a>
-          </p>
+          <a
+            href={vm.portalUrl}
+            className="invoice-doc-view-btn"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.preventDefault()
+              openPortalLink(vm.portalUrl!, router.push)
+            }}
+          >
+            View invoice online
+          </a>
         )}
       </div>
     </div>

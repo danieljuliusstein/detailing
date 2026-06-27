@@ -95,6 +95,7 @@ describe('buildInventoryAlert', () => {
       name: 'Full Detail',
       base_price: 200,
       expected_return_days: 30,
+      duration_minutes: 120,
       active: true,
       default_supplies: [{ supply_id: 's1', default_qty: 1 }],
     },

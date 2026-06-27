@@ -1,12 +1,16 @@
 import type { Icon as PhosphorIcon } from '@phosphor-icons/react'
 import {
   Bell,
+  CalendarBlank,
+  CreditCard,
   CurrencyDollar,
+  Lifebuoy,
   Package,
   Receipt,
   Shield,
   Sparkle,
   Storefront,
+  Trophy,
   Wallet,
 } from '@phosphor-icons/react'
 
@@ -14,7 +18,7 @@ export type SettingsIconTone = 'green' | 'amber' | 'blue' | 'purple'
 
 export interface SettingsMenuItem {
   id: string
-  group: 'business' | 'preferences' | 'management'
+  group: 'business' | 'preferences' | 'management' | 'support'
   title: string
   subtitle: string
   href: string
@@ -27,6 +31,7 @@ export const SETTINGS_MENU_GROUPS = [
   { id: 'business', label: 'Business' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'management', label: 'Management' },
+  { id: 'support', label: 'Support' },
 ] as const
 
 export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
@@ -52,6 +57,16 @@ export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
     ],
   },
   {
+    id: 'schedule',
+    group: 'business',
+    title: 'Schedule & time off',
+    subtitle: 'Hours, lunch, and blocked days',
+    href: '/settings/schedule',
+    Icon: CalendarBlank,
+    tone: 'blue',
+    searchKeys: ['hours', 'calendar', 'block', 'vacation', 'schedule', 'lunch', 'time off', 'travel', 'miles', 'booking'],
+  },
+  {
     id: 'invoicing',
     group: 'business',
     title: 'Invoicing',
@@ -59,7 +74,27 @@ export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
     href: '/settings/invoicing',
     Icon: Receipt,
     tone: 'amber',
-    searchKeys: ['terms', 'footer', 'invoice', 'quote'],
+    searchKeys: ['terms', 'footer', 'invoice', 'quote', 'stripe', 'payments', 'pay online', 'connect'],
+  },
+  {
+    id: 'billing',
+    group: 'business',
+    title: 'Billing',
+    subtitle: 'Plan, trial, and subscription',
+    href: '/settings/billing',
+    Icon: CreditCard,
+    tone: 'green',
+    searchKeys: ['billing', 'subscription', 'plan', 'trial', 'stripe', 'upgrade'],
+  },
+  {
+    id: 'progress',
+    group: 'preferences',
+    title: 'Your progress',
+    subtitle: 'Milestones from your business activity',
+    href: '/settings/progress',
+    Icon: Trophy,
+    tone: 'green',
+    searchKeys: ['progress', 'milestone', 'achievement', 'badge', 'stats'],
   },
   {
     id: 'preferences',
@@ -75,11 +110,11 @@ export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
     id: 'access',
     group: 'preferences',
     title: 'Access and data',
-    subtitle: 'PIN, backups, and exports',
+    subtitle: 'Backups, exports, and privacy',
     href: '/settings/access',
     Icon: Shield,
     tone: 'purple',
-    searchKeys: ['pin', 'password', 'backup', 'export', 'privacy'],
+    searchKeys: ['password', 'backup', 'export', 'privacy', 'sign in', 'account'],
   },
   {
     id: 'inventory',
@@ -120,5 +155,15 @@ export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
     Icon: Wallet,
     tone: 'purple',
     searchKeys: ['expenses', 'overhead', 'business costs'],
+  },
+  {
+    id: 'support',
+    group: 'support',
+    title: 'Help & support',
+    subtitle: 'Contact, FAQ, and troubleshooting',
+    href: '/settings/support',
+    Icon: Lifebuoy,
+    tone: 'blue',
+    searchKeys: ['support', 'help', 'contact', 'faq', 'bug', 'feedback', 'tour', 'pipeline', 'payments', 'messages'],
   },
 ]

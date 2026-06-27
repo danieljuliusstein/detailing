@@ -1,5 +1,7 @@
 import { getOrganizationBySlug } from '@/lib/server/organization'
 import { listPublicPackagesForOrg } from '@/lib/server/booking-public'
+import { getClientIp } from '@/lib/server/client-ip'
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/server/rate-limit'
 import { jsonWithCors, publicCorsHeaders } from '@/lib/server/public-cors'
 
 type Params = { params: Promise<{ slug: string }> }
@@ -9,6 +11,12 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request, { params }: Params) {
+  const ip = getClientIp(request)
+  const limited = enforceRateLimit(`public-read:${ip}`, RATE_LIMITS.publicRead)
+  if (limited) {
+    return jsonWithCors(request, { error: 'Too many requests' }, 429)
+  }
+
   const { slug } = await params
   const org = await getOrganizationBySlug(slug)
   if (!org) {

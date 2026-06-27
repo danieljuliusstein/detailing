@@ -535,3 +535,27 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* Floating-label money fields inside new job */
+.new-job-body .page-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.new-job-body .page-form .f-field {
+  margin: 0;
+}
+
+.new-job-body .page-form .f-input,
+.new-job-body .page-form .f-textarea {
+  background: #1a1a1a;
+  border: 1.5px solid #222;
+  border-radius: 12px;
+}
+
+.new-job-body .page-form .f-input:focus,
+.new-job-body .page-form .f-textarea:focus {
+  border-color: var(--green);
+  background: #0b1e10;
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { authenticateServerPocketBase } from '@/lib/server/pocketbase-admin'
+import { authenticateServerAdmin } from '@/lib/server/pocketbase-admin'
 import { validatePortalToken } from '@/lib/server/portal-tokens'
 
 export async function POST(
@@ -13,7 +13,7 @@ export async function POST(
   }
 
   try {
-    const pb = await authenticateServerPocketBase()
+    const pb = await authenticateServerAdmin()
     const quote = await pb.collection('quotes').getOne(record.quote_id)
 
     if (quote.status === 'accepted') {

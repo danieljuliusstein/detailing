@@ -1,4 +1,5 @@
-import { authenticateServerPocketBase } from './pocketbase-admin'
+import { pocketBaseLogoFilename } from '../business-logo'
+import { authenticateServerAdmin } from './pocketbase-admin'
 import type { PortalScope, PortalTokenRecord } from './portal-tokens'
 
 export interface PortalPhoto {
@@ -16,6 +17,7 @@ export interface PortalPayload {
     address: string
     logoUrl?: string
     termsFooter?: string
+    accentColor?: string | null
   }
   client: { name: string }
   job?: {
@@ -53,12 +55,12 @@ export interface PortalPayload {
 }
 
 export async function loadPortalBusiness(appBaseUrl: string, organizationId: string, slug?: string): Promise<PortalPayload['business']> {
-  const pb = await authenticateServerPocketBase()
+  const pb = await authenticateServerAdmin()
   return loadSettingsForOrg(pb, appBaseUrl, organizationId, slug)
 }
 
 async function loadSettingsForOrg(
-  pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>,
+  pb: Awaited<ReturnType<typeof authenticateServerAdmin>>,
   appBaseUrl: string,
   organizationId: string,
   slug?: string
@@ -92,6 +94,7 @@ async function loadSettingsForOrg(
     address: String(s.business_address ?? ''),
     logoUrl,
     termsFooter: String(s.invoice_terms_footer ?? ''),
+    accentColor: s.accent_color ? String(s.accent_color) : null,
   }
 }
 
@@ -99,15 +102,17 @@ export async function buildPortalPayload(
   tokenRecord: PortalTokenRecord,
   appBaseUrl: string
 ): Promise<PortalPayload | null> {
-  const pb = await authenticateServerPocketBase()
+  const pb = await authenticateServerAdmin()
 
   let clientName = 'Client'
-  let organizationId = ''
+  let organizationId = tokenRecord.organization_id ?? ''
   let orgSlug = ''
   try {
     const client = await pb.collection('clients').getOne(tokenRecord.client_id)
     clientName = String(client.name ?? 'Client')
-    organizationId = String(client.organization_id ?? '')
+    if (!organizationId) {
+      organizationId = String(client.organization_id ?? '')
+    }
     if (organizationId) {
       try {
         const org = await pb.collection('organizations').getOne(organizationId)
@@ -227,7 +232,7 @@ export async function streamPortalPhoto(
   const record = await validatePortalToken(token)
   if (!record?.job_id) return null
 
-  const pb = await authenticateServerPocketBase()
+  const pb = await authenticateServerAdmin()
   const job = await pb.collection('jobs').getOne(record.job_id)
   const photos = Array.isArray(job.photos) ? (job.photos as string[]) : []
   if (!photos.includes(filename)) return null
@@ -245,7 +250,7 @@ export async function streamPortalPhoto(
 
 export async function streamBusinessLogo(slug?: string): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
   try {
-    const pb = await authenticateServerPocketBase()
+    const pb = await authenticateServerAdmin()
     let records: Record<string, unknown>[] = []
 
     if (slug) {
@@ -263,10 +268,10 @@ export async function streamBusinessLogo(slug?: string): Promise<{ bytes: ArrayB
     }
 
     const s = records[0]
-    const logo = s?.logo
+    const logoFilename = pocketBaseLogoFilename(s?.logo)
 
-    if (s && typeof logo === 'string' && logo) {
-      const url = pb.files.getURL(s, logo)
+    if (s && logoFilename) {
+      const url = pb.files.getURL(s, logoFilename)
       const res = await fetch(url, {
         headers: { Authorization: pb.authStore.token },
       })

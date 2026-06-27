@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { FloatingField } from '@/components/forms'
+import { Button } from '@/components/ui'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getCurrentOrganizationId } from '@/lib/tenant'
@@ -9,9 +12,10 @@ import { saveSettingsToPocketBase, loadSettingsFromPocketBase } from '@/lib/api/
 import { getAllPackages } from '@/lib/api/pocketbase'
 import { DEFAULT_INVOICE_TERMS } from '@/lib/settings'
 import { markTourPending } from '@/lib/product-tour'
+import WebsiteBookingGuide from '@/components/settings/WebsiteBookingGuide'
 import type { Package } from '@/lib/types'
 
-const STEPS = ['Your business', 'Your packages', 'Booking link'] as const
+const STEPS = ['Your business', 'Your packages', 'Get booked'] as const
 
 function formatPrice(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -29,7 +33,11 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [businessName, phone])
 
   useEffect(() => {
     void (async () => {
@@ -93,17 +101,6 @@ export default function OnboardingPage() {
     }
   }
 
-  async function copyLink() {
-    if (!bookingLink) return
-    try {
-      await navigator.clipboard.writeText(bookingLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setError('Could not copy link')
-    }
-  }
-
   if (loading) {
     return (
       <div className="auth-loading-screen">
@@ -134,30 +131,30 @@ export default function OnboardingPage() {
           <p className="onboarding-screen__lead" style={{ marginBottom: 12 }}>
             This name and logo appear on invoices, your booking page, and the client portal.
           </p>
-          <label className="onboarding-field-label" htmlFor="onboarding-business-name">
-            Business name
-          </label>
-          <input
-            id="onboarding-business-name"
-            type="text"
-            className="auth-input"
-            placeholder="Atlas Detailing"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-            autoComplete="organization"
-          />
-          <label className="onboarding-field-label" htmlFor="onboarding-phone">
-            Business phone
-          </label>
-          <input
-            id="onboarding-phone"
-            type="tel"
-            className="auth-input"
-            placeholder="(555) 123-4567"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            autoComplete="tel"
-          />
+          <div ref={formRef} className="page-form">
+            <FloatingField id="onboarding-business-name" label="Business name" filled={businessName.trim().length > 0}>
+              <input
+                id="onboarding-business-name"
+                type="text"
+                className={`f-input${businessName.trim() ? ' hv' : ''}`}
+                placeholder=" "
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                autoComplete="organization"
+              />
+            </FloatingField>
+            <FloatingField id="onboarding-phone" label="Business phone" filled={phone.trim().length > 0}>
+              <input
+                id="onboarding-phone"
+                type="tel"
+                className={`f-input${phone.trim() ? ' hv' : ''}`}
+                placeholder=" "
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
+              />
+            </FloatingField>
+          </div>
           <div className="onboarding-logo-block">
             <span className="onboarding-field-label">Logo (optional)</span>
             {logoPreview ? (
@@ -181,14 +178,9 @@ export default function OnboardingPage() {
             />
           </div>
           <div className="onboarding-actions">
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!phone.trim() || !businessName.trim()}
-              onClick={() => setStep(2)}
-            >
+            <Button type="button" disabled={!phone.trim() || !businessName.trim()} onClick={() => setStep(2)}>
               Continue
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
@@ -215,60 +207,54 @@ export default function OnboardingPage() {
             <Link href="/settings/packages">Edit packages in Settings</Link>
           </p>
           <div className="onboarding-actions">
-            <button type="button" className="btn-secondary" onClick={() => setStep(1)}>
+            <Button type="button" variant="secondary" onClick={() => setStep(1)}>
               Back
-            </button>
-            <button type="button" className="btn-primary" onClick={() => setStep(3)}>
+            </Button>
+            <Button type="button" onClick={() => setStep(3)}>
               Continue
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
 
       {step === 3 ? (
-        <section className="card onboarding-card">
-          <h2 className="onboarding-card__title">Your booking link</h2>
+        <section className="card onboarding-card onboarding-card--hero">
+          <p className="onboarding-screen__eyebrow">Your booking link</p>
+          <h2 className="onboarding-card__title">Get customers booked</h2>
           <p className="onboarding-screen__lead onboarding-card__lead">
-            Share this link on Instagram, Google, or texts so customers can book you online.
+            Copy your link and share it anywhere — Instagram bio, Google Business, or your existing site.
           </p>
-          {bookingLink ? (
-            <div className="booking-link-block">
-              <div className="booking-link-url">{bookingLink}</div>
-              <div className="booking-link-actions">
-                <button type="button" className="btn-secondary booking-link-btn" onClick={() => void copyLink()}>
-                  {copied ? 'Copied!' : 'Copy link'}
-                </button>
-                <a
-                  href={bookingLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary booking-link-btn"
-                >
-                  Preview booking page
-                </a>
-              </div>
-            </div>
+
+          {slug && appUrl && bookingLink ? (
+            <WebsiteBookingGuide
+              appOrigin={appUrl}
+              slug={slug}
+              bookingUrl={bookingLink}
+              brandName={businessName}
+              compact
+            />
           ) : (
-            <p className="onboarding-screen__lead">Your link will appear after setup completes.</p>
+            <p className="onboarding-screen__lead">Your booking options will appear after setup completes.</p>
           )}
 
           {error ? <p className="auth-error onboarding-card__error">{error}</p> : null}
 
+          <p className="onboarding-trial-note">Your 14-day trial starts when you finish setup.</p>
+
           <div className="onboarding-actions onboarding-actions--finish">
-            <button type="button" className="btn-secondary" onClick={() => setStep(2)}>
+            <Button type="button" variant="secondary" onClick={() => setStep(2)}>
               Back
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-primary"
               disabled={saving || !phone.trim() || !businessName.trim()}
               onClick={() => void finish()}
             >
-              {saving ? '…' : 'Go to dashboard'}
-            </button>
-            <button type="button" className="btn-ghost" onClick={() => router.replace('/')}>
+              {saving ? 'Saving…' : 'Go to dashboard'}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => { markTourPending(); router.replace('/') }}>
               Skip for now
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}

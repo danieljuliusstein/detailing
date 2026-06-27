@@ -1,5 +1,6 @@
 import { getPocketBase } from '../pocketbase'
 import { pbQuoteToApp, pbQuoteToAppWithRelations, escapeFilterValue, type PbRecord } from './mappers'
+import { syncLeadForQuoteJob } from './leads-pocketbase'
 import { withOrganization } from './tenant-pocketbase'
 import type { Quote, QuoteInput, QuoteWithRelations } from '../types'
 
@@ -82,6 +83,8 @@ export async function acceptQuote(quoteId: string): Promise<{ quote: Quote; jobI
     status: 'accepted',
     job_id: job.id,
   })
+
+  await syncLeadForQuoteJob(quoteId, job.id)
 
   return { quote: pbQuoteToApp(updated), jobId: job.id }
 }

@@ -9,12 +9,10 @@ import {
   Wrench,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
-import ProductTile from '@/components/inventory/ProductTile'
 import { SupplyInventoryRow } from '@/components/inventory/InventoryRow'
 import {
   SECTION_CONFIG,
   attentionSupplies,
-  catalogProducts,
   categoryMeta,
   sectionForSupply,
   type SectionKey,
@@ -51,7 +49,6 @@ export default function InventoryHome({
   onOpenSupply,
 }: InventoryHomeProps) {
   const attention = attentionSupplies(catalog)
-  const products = catalogProducts(catalog)
 
   return (
     <>
@@ -109,22 +106,6 @@ export default function InventoryHome({
                 key={supply.id}
                 supply={supply}
                 onPress={() => onOpenSupply(supply, sectionForSupply(supply))}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {products.length > 0 && (
-        <>
-          <p className="inventory-section-label inventory-section-label--spaced">Your products</p>
-          <div className="product-grid">
-            {products.map((supply) => (
-              <ProductTile
-                key={supply.id}
-                supply={supply}
-                onPress={() => onOpenSupply(supply, sectionForSupply(supply))}
-                FallbackIcon={supply.kind === 'consumable' ? Package : Flask}
               />
             ))}
           </div>

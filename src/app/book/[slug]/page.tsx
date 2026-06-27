@@ -1,20 +1,19 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   CalendarBlank,
   CheckCircle,
   Circle,
-  Clock,
-  EnvelopeSimple,
   House,
   MapPin,
-  NotePencil,
   Phone,
-  User,
 } from '@phosphor-icons/react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
+import { FloatingField } from '@/components/forms'
+import { brandCssVars } from '@/lib/brand-color'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import type { VehicleType } from '@/lib/types'
 import { VEHICLE_TYPE_OPTIONS } from '@/lib/vehicle-type-icons'
 
@@ -37,6 +36,7 @@ interface PublicBusiness {
   email?: string
   address?: string
   logoUrl?: string
+  accentColor?: string | null
 }
 
 function BookBrandMark({ business }: { business?: PublicBusiness | null }) {
@@ -69,6 +69,10 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function isValidBookDate(iso: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso)
+}
+
 function addDays(iso: string, days: number) {
   const d = new Date(iso + 'T12:00:00')
   d.setDate(d.getDate() + days)
@@ -95,32 +99,102 @@ function formatTimeDisplay(time: string): string {
   return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-function BookDateField({
-  id,
+function formatDayChip(iso: string): { weekday: string; day: string; month: string } {
+  const d = new Date(iso + 'T12:00:00')
+  return {
+    weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
+    day: d.toLocaleDateString('en-US', { day: 'numeric' }),
+    month: d.toLocaleDateString('en-US', { month: 'short' }),
+  }
+}
+
+function buildDayChipRange(startIso: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => addDays(startIso, i))
+}
+
+function BookDayChips({
   value,
   min,
   max,
   onChange,
 }: {
-  id: string
   value: string
   min: string
   max: string
   onChange: (value: string) => void
 }) {
+  const moreDatesRef = useRef<HTMLInputElement>(null)
+  const chipDays = useMemo(() => {
+    if (!min) return []
+    const range = buildDayChipRange(min, 14)
+    return range.filter((d) => d <= max)
+  }, [min, max])
+
   return (
-    <label className="book-datetime-box book-datetime-box--input" htmlFor={id}>
-      <CalendarBlank size={18} color="var(--book-muted)" aria-hidden="true" />
+    <div className="book-day-chips-wrap">
+      <div className="book-day-chips" role="listbox" aria-label="Choose a date">
+        {chipDays.map((iso) => {
+          const chip = formatDayChip(iso)
+          const selected = value === iso
+          return (
+            <button
+              key={iso}
+              type="button"
+              role="option"
+              aria-selected={selected}
+              className={`book-day-chip${selected ? ' book-day-chip--active' : ''}`}
+              onClick={() => onChange(iso)}
+            >
+              <span className="book-day-chip__weekday">{chip.weekday}</span>
+              <span className="book-day-chip__day">{chip.day}</span>
+              <span className="book-day-chip__month">{chip.month}</span>
+            </button>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        className="book-day-more"
+        onClick={() => moreDatesRef.current?.showPicker?.() ?? moreDatesRef.current?.click()}
+      >
+        More dates
+      </button>
       <input
-        id={id}
+        ref={moreDatesRef}
         type="date"
-        className="book-date-input"
+        className="book-day-more-input"
         min={min}
         max={max}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        tabIndex={-1}
+        aria-hidden="true"
       />
-    </label>
+    </div>
+  )
+}
+
+function BookDateTimeSummary({
+  date,
+  startTime,
+  onChange,
+}: {
+  date: string
+  startTime: string
+  onChange: () => void
+}) {
+  return (
+    <div className="book-datetime-summary">
+      <div className="book-datetime-summary__row">
+        <CalendarBlank size={18} color="var(--book-muted)" aria-hidden="true" />
+        <span>
+          {formatDateBox(date)} · {formatTimeDisplay(startTime)}
+        </span>
+      </div>
+      <button type="button" className="book-datetime-summary__change" onClick={onChange}>
+        Change
+      </button>
+    </div>
   )
 }
 
@@ -147,13 +221,15 @@ function BookPageShell({
   header,
   children,
   footerContact,
+  brandStyle,
 }: {
   header: ReactNode
   children: ReactNode
   footerContact?: string
+  brandStyle?: React.CSSProperties
 }) {
   return (
-    <div className="book-root client-light-root">
+    <div className="book-root client-light-root" style={brandStyle}>
       <header className="book-header">{header}</header>
       <main className="book-body">{children}</main>
       <footer className="book-footer">
@@ -168,7 +244,10 @@ function BookPageShell({
 
 function BookContent() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const slug = String(params.slug ?? '')
+  const initialDateParam = searchParams.get('date')?.trim() ?? ''
+  const initialTimeParam = searchParams.get('time')?.trim() ?? ''
 
   const [business, setBusiness] = useState<PublicBusiness | null>(null)
   const [step, setStep] = useState(1)
@@ -191,12 +270,14 @@ function BookContent() {
   const [error, setError] = useState('')
   const [notFound, setNotFound] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [prefillApplied, setPrefillApplied] = useState(false)
   const [confirmed, setConfirmed] = useState<{
     packageName: string
     date: string
     startTime?: string
     customerEmail?: string
   } | null>(null)
+  const detailsFormRef = useRef<HTMLDivElement>(null)
 
   const apiBase = `/api/public/${encodeURIComponent(slug)}`
   const selectedPackage = useMemo(() => packages.find((p) => p.id === packageId), [packages, packageId])
@@ -204,12 +285,16 @@ function BookContent() {
   const maxDate = dateBounds?.max ?? ''
 
   const stepLabel = step === 1 ? 'Choose service' : step === 2 ? 'Date & time' : 'Your details'
+  const brandStyle = brandCssVars(business?.accentColor)
 
   useEffect(() => {
     const today = todayIso()
-    setDateBounds({ min: today, max: addDays(today, 60) })
-    setDate((current) => current || today)
-  }, [])
+    const max = addDays(today, 60)
+    setDateBounds({ min: today, max })
+    const fromUrl = isValidBookDate(initialDateParam) ? initialDateParam : ''
+    const nextDate = fromUrl && fromUrl >= today && fromUrl <= max ? fromUrl : today
+    setDate(nextDate)
+  }, [initialDateParam])
 
   useEffect(() => {
     let cancelled = false
@@ -231,7 +316,18 @@ function BookContent() {
         if (biz.business) setBusiness(biz.business)
         const list = pkgs.packages ?? []
         setPackages(list)
-        if (list.length === 1) setPackageId(list[0].id)
+        if (list.length === 1) {
+          setPackageId(list[0].id)
+          const today = todayIso()
+          const max = addDays(today, 60)
+          if (
+            isValidBookDate(initialDateParam) &&
+            initialDateParam >= today &&
+            initialDateParam <= max
+          ) {
+            setStep(2)
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setError('Could not load booking page')
@@ -242,14 +338,16 @@ function BookContent() {
     return () => {
       cancelled = true
     }
-  }, [apiBase])
+  }, [apiBase, initialDateParam])
 
   const loadSlots = useCallback(
     async (d: string) => {
       setLoadingSlots(true)
       setError('')
       try {
-        const res = await fetch(`${apiBase}/availability?date=${encodeURIComponent(d)}`)
+        const qs = new URLSearchParams({ date: d })
+        if (packageId) qs.set('packageId', packageId)
+        const res = await fetch(`${apiBase}/availability?${qs.toString()}`)
         const data = await res.json()
         setSlots(data.slots ?? [])
         setStartTime('')
@@ -260,12 +358,25 @@ function BookContent() {
         setLoadingSlots(false)
       }
     },
-    [apiBase],
+    [apiBase, packageId],
   )
 
   useEffect(() => {
     if (step >= 2 && date) void loadSlots(date)
-  }, [step, date, loadSlots])
+  }, [step, date, loadSlots, packageId])
+
+  useEffect(() => {
+    if (prefillApplied || !initialTimeParam || loadingSlots || slots.length === 0) return
+    const match = slots.find((s) => s.available && s.time === initialTimeParam)
+    if (match) {
+      setStartTime(initialTimeParam)
+      setPrefillApplied(true)
+    }
+  }, [initialTimeParam, loadingSlots, slots, prefillApplied])
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(detailsFormRef.current)
+  }, [name, phone, email, address, notes, step, showMoreOptions])
 
   async function handleSubmit() {
     setError('')
@@ -358,6 +469,7 @@ function BookContent() {
   return (
     <BookPageShell
       footerContact={bookFooterContact(business)}
+      brandStyle={brandStyle}
       header={
         <>
           <BookBrandMark business={business} />
@@ -427,32 +539,19 @@ function BookContent() {
           ) : null}
 
           <p className="book-label">Date</p>
-          <div className="book-datetime-grid book-datetime-grid--step2">
-            {dateBounds ? (
-              <BookDateField
-                id="book-date"
-                value={date}
-                min={minDate}
-                max={maxDate}
-                onChange={setDate}
-              />
-            ) : (
-              <div className="book-datetime-box book-datetime-box--static">
-                <CalendarBlank size={18} color="var(--book-muted)" aria-hidden="true" />
-                <span className="book-datetime-value book-datetime-value--empty">Pick a date</span>
-              </div>
-            )}
-          </div>
+          {dateBounds ? (
+            <BookDayChips value={date} min={minDate} max={maxDate} onChange={setDate} />
+          ) : (
+            <p className="book-lead">Loading dates…</p>
+          )}
 
           <p className="book-label book-label--spaced">Pick a time</p>
-          {startTime ? (
-            <p className="book-selected-time">
-              <Clock size={16} weight="fill" color="var(--book-green)" aria-hidden="true" />
-              <span>Selected: {formatTimeDisplay(startTime)}</span>
-            </p>
-          ) : null}
           {loadingSlots ? (
             <p className="book-lead">Loading times…</p>
+          ) : slots.length === 0 ? (
+            <p className="book-slots-empty">No times available on this day. Try another date.</p>
+          ) : slots.every((s) => !s.available) ? (
+            <p className="book-slots-empty">All times are booked on this day. Try another date.</p>
           ) : (
             <div className="book-slots-grid">
               {slots.map((slot) => {
@@ -491,79 +590,63 @@ function BookContent() {
       ) : null}
 
       {step === 3 ? (
-        <section className="book-step-card">
+        <section ref={detailsFormRef} className="book-step-card">
           {selectedPackage ? (
             <BookStickySummary name={selectedPackage.name} price={selectedPackage.base_price} />
           ) : null}
 
           {date && startTime ? (
-            <div className="book-datetime-grid book-datetime-grid--summary">
-              <div className="book-datetime-box book-datetime-box--static">
-                <CalendarBlank size={18} color="var(--book-muted)" aria-hidden="true" />
-                <span className="book-datetime-value">{formatDateBox(date)}</span>
-              </div>
-              <div className="book-datetime-box book-datetime-box--static">
-                <Clock size={18} color="var(--book-muted)" aria-hidden="true" />
-                <span className="book-datetime-value">{formatTimeDisplay(startTime)}</span>
-              </div>
-            </div>
+            <BookDateTimeSummary date={date} startTime={startTime} onChange={() => setStep(2)} />
           ) : null}
 
           <p className="book-label">Contact</p>
           <div className="book-field">
-            <label htmlFor="book-name">Name</label>
-            <div className="book-input-wrap">
-              <User size={16} className="book-input-icon" aria-hidden="true" />
-              <input
-                id="book-name"
-                className="book-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+              <FloatingField id="book-name" label="Name" filled={name.trim().length > 0}>
+                <input
+                  id="book-name"
+                  className={`f-input${name.trim() ? ' hv' : ''}`}
+                  placeholder=" "
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </FloatingField>
             </div>
-          </div>
-          <div className="book-field">
-            <label htmlFor="book-phone">Phone</label>
-            <div className="book-input-wrap">
-              <Phone size={16} className="book-input-icon" aria-hidden="true" />
-              <input
-                id="book-phone"
-                type="tel"
-                className="book-input"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
+            <div className="book-field">
+              <FloatingField id="book-phone" label="Phone" filled={phone.trim().length > 0}>
+                <input
+                  id="book-phone"
+                  type="tel"
+                  className={`f-input${phone.trim() ? ' hv' : ''}`}
+                  placeholder=" "
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              </FloatingField>
             </div>
-          </div>
-          <div className="book-field">
-            <label htmlFor="book-email">
-              Email <span className="book-optional">optional</span>
-            </label>
-            <div className="book-input-wrap">
-              <EnvelopeSimple size={16} className="book-input-icon" aria-hidden="true" />
-              <input
-                id="book-email"
-                type="email"
-                className="book-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+            <div className="book-field">
+              <FloatingField id="book-email" label="Email" filled={email.trim().length > 0} optional>
+                <input
+                  id="book-email"
+                  type="email"
+                  className={`f-input${email.trim() ? ' hv' : ''}`}
+                  placeholder=" "
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </FloatingField>
             </div>
-          </div>
-          <div className="book-field">
-            <label htmlFor="book-address">Service address</label>
-            <div className="book-input-wrap">
-              <MapPin size={16} className="book-input-icon" aria-hidden="true" />
-              <input
-                id="book-address"
-                className="book-input"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Street, city"
-              />
-            </div>
+            <div className="book-field">
+              <FloatingField id="book-address" label="Service address" filled={address.trim().length > 0}>
+                <input
+                  id="book-address"
+                  className={`f-input${address.trim() ? ' hv' : ''}`}
+                  placeholder=" "
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+            </FloatingField>
           </div>
 
           <button
@@ -618,20 +701,16 @@ function BookContent() {
           </div>
 
           <div className="book-field book-field--notes">
-            <label htmlFor="book-notes">
-              Notes <span className="book-optional">optional</span>
-            </label>
-            <div className="book-notes-box">
-              <NotePencil size={16} className="book-notes-icon" aria-hidden="true" />
+            <FloatingField id="book-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
               <textarea
                 id="book-notes"
-                className="book-notes-input"
+                className={`f-textarea${notes.trim() ? ' hv' : ''}`}
                 rows={3}
+                placeholder=" "
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Gate code, parking, pet hair…"
               />
-            </div>
+            </FloatingField>
           </div>
             </>
           ) : null}

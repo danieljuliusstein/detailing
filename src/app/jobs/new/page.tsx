@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import QuickAddJob from '@/components/QuickAddJob'
+import { useRequireSignIn } from '@/hooks/useRequireSignIn'
 import { createJob, getClient, getClientsWithStats, getPackages } from '@/lib/api'
 import { DEFAULT_RETURN_DAYS } from '@/lib/package-cadence'
 import type { ClientWithStats, Package } from '@/lib/types'
 
 export default function NewJobPage() {
+  const isLoggedIn = useRequireSignIn()
   const searchParams = useSearchParams()
   const clientId = searchParams.get('clientId')
   const packageId = searchParams.get('packageId')
@@ -42,7 +44,7 @@ export default function NewJobPage() {
     )
   }, [clientId])
 
-  if (!ready) {
+  if (!isLoggedIn || !ready) {
     return (
       <div className="screen page-content" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading…

@@ -1,0 +1,67 @@
+import { NextResponse } from 'next/server'
+import { authenticateRequestUser } from '@/lib/server/request-auth'
+import { authenticateServerAdmin } from '@/lib/server/pocketbase-admin'
+import {
+  appOriginFromRequest,
+  ensureConnectAccount,
+  refreshConnectStatus,
+} from '@/lib/server/stripe-connect'
+import { getStripe, isStripeConfigured } from '@/lib/server/stripe'
+
+export const runtime = 'nodejs'
+
+function errorMessage(e: unknown): string {
+  if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string') {
+    return e.message
+  }
+  return 'Could not start Stripe onboarding'
+}
+
+export async function POST(request: Request) {
+  try {
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 })
+    }
+
+    const auth = await authenticateRequestUser(request)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const stripe = getStripe()
+    if (!stripe) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 })
+    }
+
+    const admin = await authenticateServerAdmin()
+    const settings = await admin.collection('app_settings').getFullList({
+      filter: `organization_id = "${auth.organizationId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
+      limit: 1,
+    })
+    const businessName = String(settings[0]?.business_name ?? '').trim()
+    const businessEmail = String(settings[0]?.business_email ?? '').trim()
+    const connectEmail =
+      businessEmail && !businessEmail.endsWith('@example.com') ? businessEmail : auth.email
+
+    const accountId = await ensureConnectAccount(auth.organizationId, connectEmail, businessName)
+    const status = await refreshConnectStatus(auth.organizationId)
+    const origin = appOriginFromRequest(request)
+    const returnPath = '/settings/invoicing'
+
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${origin}${returnPath}?connect=refresh`,
+      return_url: `${origin}${returnPath}?connect=return`,
+      type: status.ready ? 'account_update' : 'account_onboarding',
+    })
+
+    if (!link.url) {
+      return NextResponse.json({ error: 'Could not start Stripe onboarding' }, { status: 500 })
+    }
+
+    return NextResponse.json({ url: link.url })
+  } catch (e) {
+    console.error('[stripe/connect/onboard]', e)
+    return NextResponse.json({ error: errorMessage(e) }, { status: 500 })
+  }
+}

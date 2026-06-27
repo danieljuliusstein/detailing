@@ -1,13 +1,13 @@
 'use client'
 
-import type { AutoMessageTemplate, MessageChannel } from '@/lib/messages'
+import type { AutoMessageTemplate } from '@/lib/messages'
 import AutoMessageCard from '@/components/messages/AutoMessageCard'
 
 interface Props {
   templates: AutoMessageTemplate[]
   expandedId: string
   onExpandedChange: (id: string) => void
-  onUpdate: (id: string, patch: Partial<Pick<AutoMessageTemplate, 'enabled' | 'channel'>>) => void
+  onUpdate: (id: string, patch: Partial<Pick<AutoMessageTemplate, 'enabled'>>) => void
 }
 
 export default function AutoMessagesTab({ templates, expandedId, onExpandedChange, onUpdate }: Props) {
@@ -22,7 +22,6 @@ export default function AutoMessagesTab({ templates, expandedId, onExpandedChang
             onExpandedChange(expandedId === template.id ? '' : template.id)
           }
           onEnabledChange={(enabled) => onUpdate(template.id, { enabled })}
-          onChannelChange={(channel: MessageChannel) => onUpdate(template.id, { channel })}
         />
       ))}
     </div>

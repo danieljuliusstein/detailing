@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import OfflineBanner from '@/components/OfflineBanner'
+import { useAuth } from '@/providers/AuthProvider'
 import { getSyncStatus, resetBackend, syncOnReconnect, type SyncStatus } from '@/lib/api'
 import { getInternalApiSecret, runNotificationsCheck } from '@/lib/export-data'
 
 const CRON_LAST_KEY = 'detailing_cron_last_run'
 
 export default function SyncProvider({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn } = useAuth()
   const [status, setStatus] = useState<SyncStatus | null>(null)
 
   const refresh = useCallback(async () => {
@@ -45,7 +47,7 @@ export default function SyncProvider({ children }: { children: React.ReactNode }
 
   return (
     <>
-      {status && <OfflineBanner status={status} onSync={handleSync} />}
+      {isLoggedIn && status ? <OfflineBanner status={status} onSync={handleSync} /> : null}
       {children}
     </>
   )

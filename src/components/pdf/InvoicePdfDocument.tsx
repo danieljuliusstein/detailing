@@ -1,4 +1,5 @@
-import { Document, Image, Link, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Link, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { PdfBusinessLogo } from '@/components/pdf/PdfBusinessLogo'
 import {
   INVOICE_ACCENT,
   buildInvoiceViewModel,
@@ -209,7 +210,7 @@ interface Props {
   job: JobWithRelations
   invoice: Invoice
   settings: AppSettings
-  logoDataUri: string
+  logoDataUri?: string | null
   portalUrl?: string
 }
 
@@ -221,7 +222,7 @@ export default function InvoicePdfDocument({ job, invoice, settings, logoDataUri
       <Page size="LETTER" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Image src={logoDataUri} style={styles.logo} />
+            <PdfBusinessLogo logoDataUri={logoDataUri} />
             <View>
               <Text style={styles.businessName}>{vm.businessName}</Text>
               {vm.businessPhone ? <Text style={styles.muted}>{vm.businessPhone}</Text> : null}

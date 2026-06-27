@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   SquaresFour,
   Briefcase,
@@ -10,7 +10,9 @@ import {
   Plus,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
+import { useVisualViewportBottom } from '@/hooks/useVisualViewportBottom'
 import { useQuickAction } from '@/providers/QuickActionContext'
+import { useAuth } from '@/providers/AuthProvider'
 
 interface NavItem {
   href: string
@@ -31,7 +33,13 @@ const RIGHT_TABS: NavItem[] = [
 function NavTab({ tab, active }: { tab: NavItem; active: boolean }) {
   const { Icon } = tab
   const tourId =
-    tab.href === '/jobs' ? 'nav-jobs' : tab.href === '/clients' ? 'nav-clients' : undefined
+    tab.href === '/jobs'
+      ? 'nav-jobs'
+      : tab.href === '/clients'
+        ? 'nav-clients'
+        : tab.href === '/reports'
+          ? 'nav-reports'
+          : undefined
   return (
     <Link
       href={tab.href}
@@ -55,7 +63,10 @@ function NavTab({ tab, active }: { tab: NavItem; active: boolean }) {
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
+  const navRef = useVisualViewportBottom<HTMLElement>()
   const { menuOpen, openMenu, closeMenu } = useQuickAction()
+  const { isLoggedIn } = useAuth()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href)
@@ -64,6 +75,7 @@ export default function BottomNav() {
     pathname === '/auth' ||
     pathname.startsWith('/portal') ||
     pathname.startsWith('/book/') ||
+    pathname.startsWith('/embed/') ||
     pathname === '/onboarding' ||
     pathname === '/privacy' ||
     pathname.startsWith('/jobs/new') ||
@@ -71,7 +83,7 @@ export default function BottomNav() {
   ) return null
 
   return (
-    <nav className="bottom-nav" aria-label="Main navigation">
+    <nav ref={navRef} className="bottom-nav" aria-label="Main navigation">
       {LEFT_TABS.map((tab) => (
         <NavTab key={tab.href} tab={tab} active={isActive(tab.href)} />
       ))}
@@ -83,7 +95,14 @@ export default function BottomNav() {
           aria-label={menuOpen ? 'Close quick actions' : 'Quick actions'}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
-          onClick={() => (menuOpen ? closeMenu() : openMenu())}
+          onClick={() => {
+            if (!isLoggedIn) {
+              router.push('/auth')
+              return
+            }
+            if (menuOpen) closeMenu()
+            else openMenu()
+          }}
         >
           <Plus size={24} weight="bold" color="#071407" aria-hidden="true" />
         </button>

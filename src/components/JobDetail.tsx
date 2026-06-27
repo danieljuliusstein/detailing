@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, FileText, PencilSimple, Link, Receipt, Trash } from '@phosphor-icons/react'
+import { CalendarPlus, FileText, MapPin, PencilSimple, Receipt, Trash } from '@phosphor-icons/react'
 import JobPhotosEntry from '@/components/jobs/JobPhotosEntry'
 import { suggestNextServiceDate } from '@/lib/next-service'
 import { normalizeReturnDays } from '@/lib/package-cadence'
 import BackButton from '@/components/BackButton'
 import ShareLinkActions from '@/components/portal/ShareLinkActions'
+import { SHARE_LINK_PRESETS } from '@/lib/share-link-presets'
+import { openMapsDirections } from '@/lib/maps-url'
 import { deleteJob, getQuotes } from '@/lib/api'
 import {
   effectiveRate,
@@ -71,7 +73,14 @@ export default function JobDetail({ job }: JobDetailProps) {
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0)
   const balanceDue = (job.revenue + job.tip) - totalPaid
 
-  const invoiceNumber = job.invoice?.invoice_number ?? '—'
+  const invoiceNumber = job.invoice?.invoice_number
+  const dateLabel = new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const isPostService =
+    job.status === 'completed' || job.status === 'invoiced' || job.status === 'paid'
 
   const showNextService =
     (job.status === 'completed' || job.status === 'paid' || job.status === 'invoiced') &&
@@ -114,7 +123,8 @@ export default function JobDetail({ job }: JobDetailProps) {
             {job.client?.name ?? 'Unknown client'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
-            {invoiceNumber} · {new Date(job.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            {invoiceNumber ? `${invoiceNumber} · ` : ''}
+            {dateLabel}
           </div>
         </div>
         <span className={`badge ${status.badge}`}>{status.label}</span>
@@ -135,6 +145,20 @@ export default function JobDetail({ job }: JobDetailProps) {
           ))}
         </div>
       </div>
+
+      {job.location_type === 'mobile' && job.client?.address ? (
+        <div className="detail-context-links" style={{ marginBottom: 12 }}>
+          <button
+            type="button"
+            className="detail-context-link"
+            style={{ gridColumn: '1 / -1' }}
+            onClick={() => openMapsDirections(job.client!.address!)}
+          >
+            <MapPin size={18} aria-hidden="true" />
+            Directions — {job.client.address}
+          </button>
+        </div>
+      ) : null}
 
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -231,23 +255,46 @@ export default function JobDetail({ job }: JobDetailProps) {
         </div>
       )}
 
-      <div className="detail-context-links">
-        {linkedQuoteId ? (
+      {linkedQuoteId ? (
+        <div className="detail-context-links">
           <button type="button" className="detail-context-link" onClick={() => router.push(`/quotes/${linkedQuoteId}`)}>
             <FileText size={18} aria-hidden="true" />
             View quote
           </button>
-        ) : null}
-        <button
-          type="button"
-          className="detail-context-link"
-          onClick={() => router.push(`/jobs/${job.id}/invoice`)}
-          style={linkedQuoteId ? undefined : { gridColumn: '1 / -1' }}
-        >
-          <Receipt size={18} aria-hidden="true" />
-          {job.invoice ? 'View invoice' : 'Invoice'}
-        </button>
-      </div>
+        </div>
+      ) : null}
+
+      {isUpcoming && job.client ? (
+        <div className="card job-detail-phase" style={{ marginBottom: 12 }}>
+          <div className="section-title">{SHARE_LINK_PRESETS.appointment.sectionTitle}</div>
+          <p className="job-detail-phase__hint">
+            Send a confirmation link before the appointment. Invoicing is available after the job is complete.
+          </p>
+          <ShareLinkActions
+            clientId={job.client_id}
+            clientEmail={job.client.email}
+            clientName={job.client.name}
+            jobId={job.id}
+            context="appointment"
+          />
+        </div>
+      ) : null}
+
+      {isPostService ? (
+        <>
+          <div className="detail-context-links">
+            <button
+              type="button"
+              className="detail-context-link"
+              onClick={() => router.push(`/jobs/${job.id}/invoice`)}
+              style={{ gridColumn: '1 / -1' }}
+            >
+              <Receipt size={18} aria-hidden="true" />
+              {job.invoice ? 'View invoice' : 'Create invoice'}
+            </button>
+          </div>
+        </>
+      ) : null}
 
       <JobPhotosEntry job={job} onPress={() => router.push(`/jobs/${job.id}/photos`)} />
 
@@ -258,21 +305,20 @@ export default function JobDetail({ job }: JobDetailProps) {
         </div>
       )}
 
-      {job.client && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Link size={18} /> Client portal link
-          </div>
+      {isPostService && job.client ? (
+        <div className="card job-detail-phase" style={{ marginBottom: 12 }}>
+          <div className="section-title">{SHARE_LINK_PRESETS.full.sectionTitle}</div>
+          <p className="job-detail-phase__hint">Share invoice, photos, and service details after the job.</p>
           <ShareLinkActions
             clientId={job.client_id}
             clientEmail={job.client.email}
             clientName={job.client.name}
             jobId={job.id}
-            scope="full"
-            emailMessage="View your service details, invoice, and photos using the secure link below."
+            context="full"
+            invoiceNumber={job.invoice?.invoice_number}
           />
         </div>
-      )}
+      ) : null}
 
       <button className="btn-ghost" onClick={() => router.push(`/jobs/${job.id}/edit`)} style={{ width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         <PencilSimple size={16} weight="regular" color="var(--text-secondary)" />

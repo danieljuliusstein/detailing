@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CameraPlus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { FloatingField, SheetSubmitButton } from '@/components/forms'
 import {
   createDamageDoc,
   dataUrlToFile,
@@ -11,6 +12,7 @@ import {
   getVehicle,
 } from '@/lib/api'
 import { DAMAGE_AREA_OPTIONS, pendingDamagePhotoKey } from '@/lib/damage-docs'
+import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
 
 interface AddDamageFormProps {
   clientId: string
@@ -19,6 +21,8 @@ interface AddDamageFormProps {
 
 export default function AddDamageForm({ clientId, vehicleId }: AddDamageFormProps) {
   const router = useRouter()
+  const formRef = useRef<HTMLDivElement>(null)
+  const linkedJobRef = useRef<HTMLSelectElement>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [area, setArea] = useState('')
@@ -50,6 +54,11 @@ export default function AddDamageForm({ clientId, vehicleId }: AddDamageFormProp
       )
     })
   }, [clientId, vehicleId])
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+    syncSelectFloatingLabel(linkedJobRef.current)
+  }, [area, note, date, linkedJobId])
 
   const activeChip = useMemo(
     () => DAMAGE_AREA_OPTIONS.find((opt) => opt === area) ?? null,
@@ -110,56 +119,73 @@ export default function AddDamageForm({ clientId, vehicleId }: AddDamageFormProp
             </button>
           ))}
         </div>
-        <input
-          className="field-input"
-          value={area}
-          onChange={(e) => setArea(e.target.value)}
-          placeholder="Or type custom area"
-        />
 
-        <div className="field-label">Note</div>
-        <textarea
-          className="field-input field-input--multiline"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Describe pre-existing condition…"
-          rows={3}
-        />
+        <div ref={formRef} className="page-form-card page-form">
+          <FloatingField id="damage-area" label="Custom area" filled={area.trim().length > 0}>
+            <input
+              id="damage-area"
+              className={`f-input${area.trim() ? ' hv' : ''}`}
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
 
-        <div className="field-label">Date</div>
-        <input
-          type="date"
-          className="field-input"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+          <FloatingField id="damage-note" label="Note" filled={note.trim().length > 0} optional textarea>
+            <textarea
+              id="damage-note"
+              className={`f-textarea${note.trim() ? ' hv' : ''}`}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder=" "
+              rows={3}
+            />
+          </FloatingField>
 
-        <div className="field-label">Link to job (optional)</div>
-        <select
-          className="field-input"
-          value={linkedJobId}
-          onChange={(e) => setLinkedJobId(e.target.value)}
-        >
-          <option value="">Select job…</option>
-          {jobOptions.map((j) => (
-            <option key={j.id} value={j.id}>
-              {j.label}
-            </option>
-          ))}
-        </select>
+          <FloatingField id="damage-date" label="Date" filled={date.trim().length > 0}>
+            <input
+              id="damage-date"
+              type="date"
+              className={`f-input${date.trim() ? ' hv' : ''}`}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+
+          <FloatingField id="damage-linked-job" label="Link to job" filled={Boolean(linkedJobId)} optional>
+            <select
+              ref={linkedJobRef}
+              id="damage-linked-job"
+              className={`f-select${linkedJobId ? ' hv' : ''}`}
+              value={linkedJobId}
+              onChange={(e) => {
+                setLinkedJobId(e.target.value)
+                syncSelectFloatingLabel(linkedJobRef.current)
+              }}
+            >
+              <option value=""> </option>
+              {jobOptions.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {j.label}
+                </option>
+              ))}
+            </select>
+          </FloatingField>
+        </div>
 
         {vehicleLabel ? (
           <p style={{ fontSize: 11, color: 'var(--dmg-t3)', marginBottom: 12 }}>Vehicle: {vehicleLabel}</p>
         ) : null}
 
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={saving || !area.trim()}
-          onClick={handleSave}
-        >
-          {saving ? 'Saving…' : 'Save documentation'}
-        </button>
+        <div className="page-form-save">
+          <SheetSubmitButton
+            label={saving ? 'Saving…' : 'Save documentation'}
+            ready={area.trim().length > 0}
+            disabled={saving}
+            onClick={() => void handleSave()}
+          />
+        </div>
       </div>
     </div>
   )

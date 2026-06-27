@@ -1,42 +1,108 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ArrowSquareOut, Copy } from '@phosphor-icons/react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { FloatingField } from '@/components/forms'
+import { hasCustomBusinessLogo } from '@/lib/business-logo'
+import { validateLogoFile } from '@/lib/logo-upload'
+import { isValidHexColor, normalizeAccentColor } from '@/lib/brand-color'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import { saveSettingsAsync } from '@/lib/settings'
 import { loadOrganizationSlug } from '@/lib/tenant'
+import WebsiteBookingGuide from './WebsiteBookingGuide'
+import LogoSection, { logoMetaFromFile, logoMetaFromUrl, type LogoMeta } from './LogoSection'
 import SettingsDetailShell from './SettingsDetailShell'
 import { useSettingsDraft } from './SettingsDraftProvider'
 
 export default function SettingsBusinessPage() {
-  const { settings, ready, update, logoFile, setLogoFile, reload } = useSettingsDraft()
+  const { settings, ready, update, reload } = useSettingsDraft()
+  const formRef = useRef<HTMLDivElement>(null)
   const [orgSlug, setOrgSlug] = useState('')
-  const [linkCopied, setLinkCopied] = useState(false)
   const [removingLogo, setRemovingLogo] = useState(false)
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const [logoMeta, setLogoMeta] = useState<LogoMeta | null>(null)
 
   useEffect(() => {
     void loadOrganizationSlug().then((slug) => setOrgSlug(slug ?? ''))
   }, [])
 
+  useEffect(() => {
+    if (!settings) return
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [settings?.business_name, settings?.business_phone, settings?.business_email, settings?.business_address])
+
   const bookingUrl =
     typeof window !== 'undefined' && orgSlug ? `${window.location.origin}/book/${orgSlug}` : ''
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : ''
 
-  const copyBookingLink = async () => {
-    if (!bookingUrl) return
+  useEffect(() => {
+    return () => {
+      if (logoPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(logoPreviewUrl)
+    }
+  }, [logoPreviewUrl])
+
+  const displayLogoSrc: string | null =
+    logoPreviewUrl ??
+    (settings && hasCustomBusinessLogo(settings.logo_url) ? settings.logo_url ?? null : null)
+
+  useEffect(() => {
+    if (!displayLogoSrc) {
+      setLogoMeta(null)
+      return
+    }
+    if (logoPreviewUrl) return
+    let cancelled = false
+    void logoMetaFromUrl(displayLogoSrc).then((meta) => {
+      if (!cancelled) setLogoMeta(meta)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [displayLogoSrc, logoPreviewUrl])
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !settings) return
+
+    setLogoError(null)
+
+    const validationError = validateLogoFile(file)
+    if (validationError) {
+      setLogoError(validationError)
+      return
+    }
+
+    if (logoPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(logoPreviewUrl)
+    const preview = URL.createObjectURL(file)
+    setLogoPreviewUrl(preview)
+    setLogoUploading(true)
+    void logoMetaFromFile(file).then(setLogoMeta)
+
     try {
-      await navigator.clipboard.writeText(bookingUrl)
-      setLinkCopied(true)
-      window.setTimeout(() => setLinkCopied(false), 2000)
+      const saved = await saveSettingsAsync(settings, file)
+      if (!hasCustomBusinessLogo(saved.logo_url)) {
+        throw new Error('Logo was not saved')
+      }
+      URL.revokeObjectURL(preview)
+      setLogoPreviewUrl(null)
+      await reload()
     } catch {
-      setLinkCopied(false)
+      setLogoError('Could not save logo. Check your connection and try again.')
+      setLogoMeta(null)
+    } finally {
+      setLogoUploading(false)
     }
   }
 
   const handleRemoveLogo = async () => {
-    if (!settings?.logo_url || settings.logo_url === '/logo.png') return
+    if (!hasCustomBusinessLogo(settings?.logo_url)) return
     if (!confirm('Remove your custom logo? The default mark will be used until you upload a new one.')) return
     setRemovingLogo(true)
     try {
-      await saveSettingsAsync({ ...settings, logo_url: '/logo.png' }, null, { clearLogo: true })
+      await saveSettingsAsync({ ...settings!, logo_url: '/logo.png' }, null, { clearLogo: true })
+      setLogoMeta(null)
       await reload()
     } finally {
       setRemovingLogo(false)
@@ -54,102 +120,121 @@ export default function SettingsBusinessPage() {
   return (
     <SettingsDetailShell title="Your business">
       <div className="settings-panel">
-        <p className="settings-panel__lead">
-          Logo and business name appear on invoices, your booking page, and the client portal.
-        </p>
-
         <div className="settings-field">
           <span className="settings-field__label" id="settings-logo-label">
             Logo
           </span>
-          {settings.logo_url && settings.logo_url !== '/logo.png' ? (
-            <img src={settings.logo_url} alt="Business logo" className="settings-logo-preview" />
-          ) : null}
-          <div className="settings-logo-actions">
-            <label htmlFor="settings-logo" className="btn-ghost settings-logo-upload-btn">
-              {settings.logo_url && settings.logo_url !== '/logo.png' ? 'Change logo' : 'Upload logo'}
-            </label>
-            <input
-              id="settings-logo"
-              type="file"
-              accept="image/*"
-              className="settings-file-input"
-              aria-labelledby="settings-logo-label"
-              onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-            />
-            {logoFile ? <span className="settings-logo-pending">{logoFile.name}</span> : null}
-            {settings.logo_url && settings.logo_url !== '/logo.png' ? (
-              <button
-                type="button"
-                className="btn-ghost settings-remove-logo"
-                onClick={() => void handleRemoveLogo()}
-                disabled={removingLogo}
-              >
-                {removingLogo ? 'Removing…' : 'Remove logo'}
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="settings-field">
-          <label htmlFor="settings-business_name">Business name</label>
-          <input
-            id="settings-business_name"
-            className="input"
-            value={settings.business_name}
-            onChange={(e) => update('business_name', e.target.value)}
-            placeholder="Your detailing business"
-            autoComplete="organization"
+          <LogoSection
+            logoSrc={displayLogoSrc}
+            businessName={settings.business_name}
+            logoMeta={logoMeta}
+            uploading={logoUploading}
+            removing={removingLogo}
+            error={logoError}
+            inputId="settings-logo"
+            onFileChange={(e) => void handleLogoChange(e)}
+            onRemoveLogo={() => void handleRemoveLogo()}
           />
         </div>
 
-        <div className="settings-divider" />
-
-        {(
-          [
-            ['business_phone', 'Phone'],
-            ['business_email', 'Email'],
-            ['business_address', 'Address'],
-          ] as const
-        ).map(([key, label]) => (
-          <div key={key} className="settings-field">
-            <label htmlFor={`settings-${key}`}>{label}</label>
+        <div className="settings-field settings-accent-field">
+          <span className="settings-field__label">Brand accent</span>
+          <p className="settings-panel__lead settings-panel__lead--tight">
+            Used on your booking page and client portal.
+          </p>
+          <div className="settings-accent-row">
             <input
-              id={`settings-${key}`}
-              className="input"
-              value={settings[key]}
-              onChange={(e) => update(key, e.target.value)}
+              type="color"
+              className="settings-accent-swatch-input"
+              value={normalizeAccentColor(settings.accent_color)}
+              onChange={(e) => update('accent_color', e.target.value)}
+              aria-label="Accent color"
+            />
+            <input
+              type="text"
+              className="f-input settings-accent-hex"
+              value={settings.accent_color ?? ''}
+              placeholder="#22c55e"
+              onChange={(e) => {
+                const next = e.target.value
+                if (!next.trim() || isValidHexColor(next)) update('accent_color', next.trim() || null)
+              }}
             />
           </div>
-        ))}
+          <div className="settings-accent-preview client-light-root" style={{ '--cl-accent': normalizeAccentColor(settings.accent_color) } as CSSProperties}>
+            <div className="cl-card settings-accent-preview__card">
+              <p className="cl-label">Preview</p>
+              <button type="button" className="cl-btn-primary">
+                Book now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div ref={formRef} className="page-form-card page-form" style={{ marginTop: 0 }}>
+          <FloatingField id="settings-business_name" label="Business name" filled={settings.business_name.trim().length > 0}>
+            <input
+              id="settings-business_name"
+              className={`f-input${settings.business_name.trim() ? ' hv' : ''}`}
+              value={settings.business_name}
+              onChange={(e) => update('business_name', e.target.value)}
+              placeholder=" "
+              autoComplete="organization"
+            />
+          </FloatingField>
+
+          <div className="settings-divider" />
+
+          <FloatingField id="settings-business_phone" label="Phone" filled={settings.business_phone.trim().length > 0} optional>
+            <input
+              id="settings-business_phone"
+              className={`f-input${settings.business_phone.trim() ? ' hv' : ''}`}
+              type="tel"
+              value={settings.business_phone}
+              onChange={(e) => update('business_phone', e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+
+          <FloatingField id="settings-business_email" label="Email" filled={settings.business_email.trim().length > 0} optional>
+            <input
+              id="settings-business_email"
+              className={`f-input${settings.business_email.trim() ? ' hv' : ''}`}
+              type="email"
+              value={settings.business_email}
+              onChange={(e) => update('business_email', e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+
+          <FloatingField id="settings-business_address" label="Address" filled={settings.business_address.trim().length > 0} optional>
+            <input
+              id="settings-business_address"
+              className={`f-input${settings.business_address.trim() ? ' hv' : ''}`}
+              value={settings.business_address}
+              onChange={(e) => update('business_address', e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+        </div>
 
         <div className="settings-divider" />
 
-        <p className="settings-field__label">Online booking</p>
-        <div className="booking-link-block">
-          {bookingUrl ? (
-            <>
-              <div className="booking-link-url">{bookingUrl}</div>
-              <div className="booking-link-actions">
-                <button type="button" className="btn-ghost booking-link-btn" onClick={() => void copyBookingLink()}>
-                  <Copy size={16} weight="bold" aria-hidden="true" />
-                  {linkCopied ? 'Copied!' : 'Copy booking link'}
-                </button>
-                <a
-                  href={bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary booking-link-btn"
-                >
-                  <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
-                  Preview booking page
-                </a>
-              </div>
-            </>
-          ) : (
-            <p className="settings-status-line">Your booking link will appear after you sign in.</p>
-          )}
-        </div>
+        <p className="settings-field__label">Get booked online</p>
+        <p className="settings-panel__lead settings-panel__lead--tight">
+          Works with what you already have — no need to rebuild your site.
+        </p>
+
+        {orgSlug && appOrigin && bookingUrl ? (
+          <WebsiteBookingGuide
+            appOrigin={appOrigin}
+            slug={orgSlug}
+            bookingUrl={bookingUrl}
+            brandName={settings.business_name}
+          />
+        ) : (
+          <p className="settings-status-line">Your booking options will appear after you sign in.</p>
+        )}
       </div>
     </SettingsDetailShell>
   )

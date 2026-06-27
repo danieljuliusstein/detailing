@@ -27,7 +27,7 @@ export default function ProductTile({ supply, onPress, FallbackIcon = Package, i
       <div className="product-tile__media">
         {supply.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={supply.image_url} alt="" className="product-tile__img" />
+          <img src={supply.image_url} alt="" className="product-tile__img" loading="lazy" />
         ) : (
           <div
             className="product-tile__monogram"

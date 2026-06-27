@@ -16,7 +16,8 @@
       { "name": "expected_return_days", "type": "number" },
       { "name": "description", "type": "text" },
       { "name": "default_supplies", "type": "json" },
-      { "name": "active", "type": "bool" }
+      { "name": "active", "type": "bool" },
+      { "name": "duration_minutes", "type": "number" }
     ]
   },
   {
@@ -68,7 +69,13 @@
         "values": ["chemical", "consumable", "other"]
       },
       { "name": "notes", "type": "text" },
-      { "name": "image_url", "type": "text" }
+      {
+        "name": "photo",
+        "type": "file",
+        "maxSelect": 1,
+        "maxSize": 262144,
+        "mimeTypes": ["image/jpeg", "image/png", "image/webp"]
+      }
     ]
   },
   {
@@ -93,7 +100,13 @@
         "type": "select",
         "values": ["active", "retired"]
       },
-      { "name": "image_url", "type": "text" }
+      {
+        "name": "photo",
+        "type": "file",
+        "maxSelect": 1,
+        "maxSize": 262144,
+        "mimeTypes": ["image/jpeg", "image/png", "image/webp"]
+      }
     ]
   },
   {
@@ -182,7 +195,11 @@
       { "name": "invoice_terms_footer", "type": "text" },
       { "name": "logo", "type": "file", "maxSelect": 1, "maxSize": 5242880 },
       { "name": "notifications", "type": "json" },
-      { "name": "last_backup_at", "type": "date" }
+      { "name": "last_backup_at", "type": "date" },
+      { "name": "booking_schedule", "type": "json" },
+      { "name": "travel_rate_per_mile", "type": "number" },
+      { "name": "track_job_supplies", "type": "bool" },
+      { "name": "accent_color", "type": "text" }
     ]
   },
   {
@@ -491,6 +508,31 @@
       },
       { "name": "expires_at", "type": "date", "required": true },
       { "name": "revoked", "type": "bool" }
+    ]
+  },
+  {
+    "id": "pbc_det_time_blocks",
+    "name": "time_blocks",
+    "type": "base",
+    "system": false,
+    "listRule": "@request.auth.id != \"\" && organization_id = @request.auth.organization_id",
+    "viewRule": "@request.auth.id != \"\" && organization_id = @request.auth.organization_id",
+    "createRule": "@request.auth.id != \"\" && organization_id = @request.auth.organization_id",
+    "updateRule": "@request.auth.id != \"\" && organization_id = @request.auth.organization_id",
+    "deleteRule": "@request.auth.id != \"\" && organization_id = @request.auth.organization_id",
+    "indexes": [],
+    "fields": [
+      {
+        "name": "organization_id",
+        "type": "relation",
+        "collectionId": "pbc_det_organizations",
+        "maxSelect": 1
+      },
+      { "name": "date", "type": "date", "required": true },
+      { "name": "start_time", "type": "text" },
+      { "name": "end_time", "type": "text" },
+      { "name": "all_day", "type": "bool" },
+      { "name": "label", "type": "text" }
     ]
   }
 ]

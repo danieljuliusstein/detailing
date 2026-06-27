@@ -283,6 +283,28 @@ async function processItem(item: QueueItem, maps: IdMaps): Promise<void> {
       await photosPb.deleteJobPhoto(resolvedId, op.params.filename)
       break
     }
+    case 'uploadSupplyPhoto': {
+      const supplyId = maps.resolveSupply(op.params.id)
+      const file = await suppliesPb.dataUrlToFile(op.params.dataUrl, op.params.filename)
+      await suppliesPb.uploadSupplyPhoto(supplyId, file)
+      break
+    }
+    case 'clearSupplyPhoto': {
+      const supplyId = maps.resolveSupply(op.params.id)
+      await suppliesPb.clearSupplyPhoto(supplyId)
+      break
+    }
+    case 'uploadEquipmentPhoto': {
+      const equipmentId = maps.resolveEquipment(op.params.id)
+      const file = await suppliesPb.dataUrlToFile(op.params.dataUrl, op.params.filename)
+      await equipmentPb.uploadEquipmentPhoto(equipmentId, file)
+      break
+    }
+    case 'clearEquipmentPhoto': {
+      const equipmentId = maps.resolveEquipment(op.params.id)
+      await equipmentPb.clearEquipmentPhoto(equipmentId)
+      break
+    }
     case 'createVehicle': {
       await vehiclesPb.createVehicle(op.params)
       break

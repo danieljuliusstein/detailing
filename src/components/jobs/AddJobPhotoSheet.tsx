@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { Camera, Images } from '@phosphor-icons/react'
-import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
+import BottomSheet from '@/components/BottomSheet'
+import { SheetFooter } from '@/components/forms'
 
 interface AddJobPhotoSheetProps {
   sectionLabel: string
@@ -18,76 +19,65 @@ export default function AddJobPhotoSheet({
   const cameraRef = useRef<HTMLInputElement>(null)
   const libraryRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    lockBodyScroll()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      unlockBodyScroll()
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [onClose])
-
   const handleFile = (file: File | undefined) => {
     if (!file) return
     onPhotoSelected(file)
   }
 
   return (
-    <div className="damage-sheet-root" role="dialog" aria-modal="true" aria-label={`Add ${sectionLabel} photo`}>
-      <button type="button" className="damage-sheet-overlay" onClick={onClose} aria-label="Close" />
-      <div className="damage-sheet">
-        <div className="damage-sheet__handle" />
-        <div className="damage-sheet__title">Add {sectionLabel.toLowerCase()} photo</div>
+    <BottomSheet
+      variant="premium"
+      title={`Add ${sectionLabel.toLowerCase()} photo`}
+      subtitle="Capture progress or completion shots for this job"
+      ariaLabel={`Add ${sectionLabel} photo`}
+      onClose={onClose}
+      footer={
+        <SheetFooter layout="save-only" saveLabel="Cancel" ready onSave={onClose} />
+      }
+    >
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          handleFile(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={libraryRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          handleFile(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
 
-        <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          hidden
-          onChange={(e) => {
-            handleFile(e.target.files?.[0])
-            e.target.value = ''
-          }}
-        />
-        <input
-          ref={libraryRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            handleFile(e.target.files?.[0])
-            e.target.value = ''
-          }}
-        />
-
-        <button type="button" className="damage-sheet-row" onClick={() => cameraRef.current?.click()}>
-          <span className="damage-sheet-row__icon">
+      <div className="photo-picker-actions">
+        <button type="button" className="photo-picker-row" onClick={() => cameraRef.current?.click()}>
+          <span className="photo-picker-row__icon">
             <Camera size={18} weight="duotone" aria-hidden="true" />
           </span>
           <span>
-            <div className="damage-sheet-row__title">Take photo</div>
-            <div className="damage-sheet-row__sub">Opens camera · best on the job</div>
+            <div className="photo-picker-row__title">Take photo</div>
+            <div className="photo-picker-row__sub">Opens camera · best on the job</div>
           </span>
         </button>
 
-        <button type="button" className="damage-sheet-row" onClick={() => libraryRef.current?.click()}>
-          <span className="damage-sheet-row__icon">
+        <button type="button" className="photo-picker-row" onClick={() => libraryRef.current?.click()}>
+          <span className="photo-picker-row__icon">
             <Images size={18} weight="duotone" aria-hidden="true" />
           </span>
           <span>
-            <div className="damage-sheet-row__title">Photo library</div>
-            <div className="damage-sheet-row__sub">Choose from camera roll</div>
+            <div className="photo-picker-row__title">Photo library</div>
+            <div className="photo-picker-row__sub">Choose from camera roll</div>
           </span>
         </button>
-
-        <button type="button" className="damage-sheet__cancel" onClick={onClose}>
-          Cancel
-        </button>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

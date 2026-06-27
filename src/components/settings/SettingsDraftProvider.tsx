@@ -56,13 +56,17 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
 
   const save = useCallback(async () => {
     if (!settings) return false
-    const savedSettings = await saveSettingsAsync(settings, logoFile)
-    setSettings(savedSettings)
-    setLogoFileState(null)
-    setDirty(false)
-    setSavedFlash(true)
-    window.setTimeout(() => setSavedFlash(false), 2000)
-    return true
+    try {
+      const savedSettings = await saveSettingsAsync(settings, logoFile)
+      setSettings(savedSettings)
+      setLogoFileState(null)
+      setDirty(false)
+      setSavedFlash(true)
+      window.setTimeout(() => setSavedFlash(false), 2000)
+      return true
+    } catch (error) {
+      throw error
+    }
   }, [settings, logoFile])
 
   const value = useMemo(

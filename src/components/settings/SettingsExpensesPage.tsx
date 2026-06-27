@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { CaretRight, CurrencyDollar, Wallet } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { useSettingsBack } from '@/hooks/useSettingsBack'
 import SettingsFooter from './SettingsFooter'
 
 const EXPENSE_ITEMS = [
@@ -26,11 +27,12 @@ const EXPENSE_ITEMS = [
 
 export default function SettingsExpensesPage() {
   const router = useRouter()
+  const goBack = useSettingsBack()
 
   return (
     <div className="screen page-content settings-screen">
       <header className="settings-header">
-        <BackButton onClick={() => router.push('/settings')} />
+        <BackButton onClick={goBack} />
         <h1 className="settings-header__title">Expenses</h1>
       </header>
 

@@ -1,12 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BackButton from '@/components/BackButton'
+import { FloatingField, PillGroup, SheetSubmitButton } from '@/components/forms'
 import { createClient, updateClient } from '@/lib/api'
+import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { Client, ClientInput } from '@/lib/types'
 
-const LEAD_SOURCES = ['google', 'referral', 'instagram', 'facebook', 'tiktok', 'word_of_mouth', 'other']
+const LEAD_SOURCE_PILLS = [
+  { value: 'google', label: 'Google' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'word_of_mouth', label: 'Word of mouth' },
+  { value: 'other', label: 'Other' },
+] as const
 
 interface Props {
   client?: Client
@@ -14,15 +25,22 @@ interface Props {
 
 export default function ClientForm({ client }: Props) {
   const router = useRouter()
+  const { handleWriteError } = useActionToast()
+  const formRef = useRef<HTMLDivElement>(null)
   const isEdit = !!client
   const [name, setName] = useState(client?.name ?? '')
   const [phone, setPhone] = useState(client?.phone ?? '')
   const [email, setEmail] = useState(client?.email ?? '')
   const [address, setAddress] = useState(client?.address ?? '')
-  const [leadSource, setLeadSource] = useState(client?.lead_source ?? '')
+  const [leadSource, setLeadSource] = useState(client?.lead_source ?? 'other')
   const [notes, setNotes] = useState(client?.notes ?? '')
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [name, phone, email, address, notes])
 
   const buildInput = (): ClientInput => ({
     name,
@@ -44,12 +62,15 @@ export default function ClientForm({ client }: Props) {
       if (isEdit && client) {
         const updated = await updateClient(client.id, buildInput())
         if (!updated) throw new Error('Update failed')
-        router.push(`/clients/${client.id}`)
+        setSaved(true)
+        window.setTimeout(() => router.push(`/clients/${client.id}`), 1500)
       } else {
         const created = await createClient(buildInput())
-        router.push(`/clients/${created.id}`)
+        setSaved(true)
+        window.setTimeout(() => router.push(`/clients/${created.id}`), 1500)
       }
     } catch (err) {
+      if (handleWriteError(err)) return
       setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSaving(false)
@@ -63,38 +84,81 @@ export default function ClientForm({ client }: Props) {
         <div style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? 'Edit client' : 'New client'}</div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {([
-          ['Name', name, setName, 'text'],
-          ['Phone', phone, setPhone, 'tel'],
-          ['Email', email, setEmail, 'email'],
-          ['Address', address, setAddress, 'text'],
-        ] as const).map(([label, value, setter, type]) => (
-          <div key={label}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
-            <input className="input" type={type} value={value} onChange={(e) => setter(e.target.value)} />
-          </div>
-        ))}
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Lead source</div>
-          <select className="input" value={leadSource} onChange={(e) => setLeadSource(e.target.value)}>
-            <option value="">—</option>
-            {LEAD_SOURCES.map((s) => (
-              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
+      <div ref={formRef} className="page-form-card page-form">
+        <div className="page-form__grid2">
+          <FloatingField id="client-name" label="Name" filled={name.trim().length > 0}>
+            <input
+              id="client-name"
+              className={`f-input${name.trim() ? ' hv' : ''}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+          <FloatingField id="client-phone" label="Phone" filled={phone.trim().length > 0}>
+            <input
+              id="client-phone"
+              className={`f-input${phone.trim() ? ' hv' : ''}`}
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
         </div>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Notes</div>
-          <textarea className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} style={{ resize: 'vertical' }} />
-        </div>
+
+        <FloatingField id="client-email" label="Email" filled={email.trim().length > 0}>
+          <input
+            id="client-email"
+            className={`f-input${email.trim() ? ' hv' : ''}`}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="client-address" label="Address" filled={address.trim().length > 0} optional>
+          <input
+            id="client-address"
+            className={`f-input${address.trim() ? ' hv' : ''}`}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <PillGroup
+          label="Lead source"
+          options={[...LEAD_SOURCE_PILLS]}
+          value={LEAD_SOURCE_PILLS.some((p) => p.value === leadSource) ? leadSource : 'other'}
+          onChange={setLeadSource}
+        />
+
+        <FloatingField id="client-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
+          <textarea
+            id="client-notes"
+            className={`f-textarea${notes.trim() ? ' hv' : ''}`}
+            rows={3}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
       </div>
 
-      {error && <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12 }}>{error}</div>}
+      {error ? <div className="error-banner" style={{ marginBottom: 12 }}>{error}</div> : null}
 
-      <button className="btn-primary" onClick={handleSave} disabled={saving}>
-        {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create client'}
-      </button>
+      <div className="page-form-save">
+        <SheetSubmitButton
+          label={saved ? 'Saved' : saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create client'}
+          ready={name.trim().length > 0}
+          done={saved}
+          disabled={saving || saved}
+          onClick={() => void handleSave()}
+        />
+        {saved ? <p className="form-save-flash">Saved</p> : null}
+      </div>
     </div>
   )
 }

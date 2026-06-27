@@ -82,3 +82,21 @@ export function saveSuppliesCatalog(catalog: Supply[]): void {
   data.supplies = catalog
   saveData(data)
 }
+
+async function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function uploadSupplyPhoto(id: string, file: File): Promise<Supply | null> {
+  const dataUrl = await readFileAsDataUrl(file)
+  return updateSupply(id, { image_url: dataUrl })
+}
+
+export async function clearSupplyPhoto(id: string): Promise<Supply | null> {
+  return updateSupply(id, { image_url: undefined })
+}

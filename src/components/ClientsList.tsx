@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MagnifyingGlass, Plus } from '@phosphor-icons/react'
+import { MagnifyingGlass, Plus, Users } from '@phosphor-icons/react'
+import AuthEmptyState from '@/components/AuthEmptyState'
 import ClientCard from '@/components/clients/ClientCard'
 import FollowUpClientCard from '@/components/clients/FollowUpClientCard'
+import { useAuthEmptyState } from '@/hooks/useAuthEmptyState'
 import {
   buildDerivedMap,
   filterBySegment,
@@ -41,6 +43,7 @@ export default function ClientsList({
   onClientRemoved?: (id: string) => void
 }) {
   const router = useRouter()
+  const { isLoggedOut } = useAuthEmptyState()
   const [search, setSearch] = useState('')
   const [segment, setSegment] = useState<ClientSegment>('all')
   const [showAllRest, setShowAllRest] = useState(false)
@@ -80,25 +83,29 @@ export default function ClientsList({
         <div>
           <h1>Clients</h1>
           <p>
-            {clients.length} client{clients.length !== 1 ? 's' : ''}
-            {overdue.length > 0 && (
-              <> · {overdue.length} need follow-up</>
-            )}
+            {isLoggedOut
+              ? 'Sign in to load clients'
+              : `${clients.length} client${clients.length !== 1 ? 's' : ''}${
+                  overdue.length > 0 ? ` · ${overdue.length} need follow-up` : ''
+                }`}
           </p>
         </div>
-        <button
-          type="button"
-          className="icon-btn green"
-          onClick={() => router.push('/clients/new')}
-          aria-label="Add client"
-        >
-          <Plus size={18} weight="bold" aria-hidden="true" />
-        </button>
+        {!isLoggedOut ? (
+          <button
+            type="button"
+            className="icon-btn green"
+            onClick={() => router.push('/clients/new')}
+            aria-label="Add client"
+          >
+            <Plus size={18} weight="bold" aria-hidden="true" />
+          </button>
+        ) : null}
       </header>
 
-      <div className="search">
-        <MagnifyingGlass size={16} aria-hidden="true" />
+      <div className="search premium-search">
+        <MagnifyingGlass size={16} className="premium-search__icon" aria-hidden="true" />
         <input
+          className="premium-search__input"
           placeholder="Search clients..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -121,7 +128,13 @@ export default function ClientsList({
         ))}
       </div>
 
-      {segment !== 'all' ? (
+      {isLoggedOut ? (
+        <AuthEmptyState
+          icon={<Users size={26} weight="duotone" />}
+          title="Sign in to see your clients"
+          subtitle="Your client list and history sync after you sign in."
+        />
+      ) : segment !== 'all' ? (
         filtered.length === 0 ? (
           <div className="empty-state"><p>No clients found</p></div>
         ) : (

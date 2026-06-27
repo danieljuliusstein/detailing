@@ -1,7 +1,8 @@
 import { isDemoAppData } from './demo-data'
+import { DEMO_CLIENT_ADDRESSES } from './demo-schedule'
 import { isPocketBaseConfigured } from './pocketbase'
 import { scopedStorageKey } from './tenant'
-import type { BusinessExpense, Client, DamageRecord, Equipment, Invoice, Job, OverheadExpense, Package, Quote, Supply, Vehicle } from './types'
+import type { BusinessExpense, Client, DamageRecord, Equipment, Invoice, Job, Lead, OverheadExpense, Package, Quote, Supply, Vehicle } from './types'
 
 function useDevDemoSeed(): boolean {
   return process.env.NODE_ENV === 'development' && !isPocketBaseConfigured()
@@ -21,6 +22,7 @@ export interface AppData {
   jobs: Job[]
   invoices: Invoice[]
   quotes?: Quote[]
+  leads?: Lead[]
   supplies: Supply[]
   equipment?: Equipment[]
   overhead_expenses: OverheadExpense[]
@@ -36,10 +38,10 @@ function generateId(): string {
 
 export function createSeedData(): AppData {
   const packages: Package[] = [
-    { id: 'pkg_basic', name: 'Basic Wash', base_price: 80, expected_return_days: 30, active: true, description: 'Exterior wash and dry', default_supplies: [{ supply_id: 'sup_soap', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 2 }] },
-    { id: 'pkg_full', name: 'Full Detail', base_price: 320, expected_return_days: 90, active: true, description: 'Interior + exterior full detail', default_supplies: [{ supply_id: 'sup_soap', default_qty: 8 }, { supply_id: 'sup_interior', default_qty: 6 }, { supply_id: 'sup_towel', default_qty: 4 }] },
-    { id: 'pkg_paint', name: 'Paint Correct', base_price: 450, expected_return_days: 180, active: true, description: 'Single-stage paint correction', default_supplies: [{ supply_id: 'sup_soap', default_qty: 6 }, { supply_id: 'sup_wax', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 6 }] },
-    { id: 'pkg_ceramic', name: 'Ceramic Coat', base_price: 800, expected_return_days: 365, active: true, description: 'Ceramic coating application', default_supplies: [{ supply_id: 'sup_ceramic', default_qty: 8 }, { supply_id: 'sup_towel', default_qty: 4 }] },
+    { id: 'pkg_basic', name: 'Basic Wash', base_price: 80, expected_return_days: 30, duration_minutes: 90, active: true, description: 'Exterior wash and dry', default_supplies: [{ supply_id: 'sup_soap', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 2 }] },
+    { id: 'pkg_full', name: 'Full Detail', base_price: 320, expected_return_days: 90, duration_minutes: 240, active: true, description: 'Interior + exterior full detail', default_supplies: [{ supply_id: 'sup_soap', default_qty: 8 }, { supply_id: 'sup_interior', default_qty: 6 }, { supply_id: 'sup_towel', default_qty: 4 }] },
+    { id: 'pkg_paint', name: 'Paint Correct', base_price: 450, expected_return_days: 180, duration_minutes: 300, active: true, description: 'Single-stage paint correction', default_supplies: [{ supply_id: 'sup_soap', default_qty: 6 }, { supply_id: 'sup_wax', default_qty: 4 }, { supply_id: 'sup_towel', default_qty: 6 }] },
+    { id: 'pkg_ceramic', name: 'Ceramic Coat', base_price: 800, expected_return_days: 365, duration_minutes: 360, active: true, description: 'Ceramic coating application', default_supplies: [{ supply_id: 'sup_ceramic', default_qty: 8 }, { supply_id: 'sup_towel', default_qty: 4 }] },
   ]
 
   const supplies: Supply[] = [
@@ -64,9 +66,33 @@ export function createSeedData(): AppData {
   ]
 
   const clients: Client[] = [
-    { id: 'cli_marcus', name: 'Marcus Thompson', phone: '(555) 234-8901', email: 'marcus.t@email.com', lead_source: 'referral', tags: ['repeat', 'vip'], created: '2026-03-01T10:00:00Z' },
-    { id: 'cli_sarah', name: 'Sarah K.', phone: '(555) 876-5432', email: 'sarah.k@email.com', lead_source: 'google', created: '2026-04-15T10:00:00Z' },
-    { id: 'cli_james', name: 'James R.', phone: '(555) 111-2233', lead_source: 'instagram', created: '2026-05-01T10:00:00Z' },
+    {
+      id: 'cli_marcus',
+      name: 'Marcus Thompson',
+      phone: '(555) 234-8901',
+      email: 'marcus.t@email.com',
+      address: DEMO_CLIENT_ADDRESSES.cli_marcus,
+      lead_source: 'referral',
+      tags: ['repeat', 'vip'],
+      created: '2026-03-01T10:00:00Z',
+    },
+    {
+      id: 'cli_sarah',
+      name: 'Sarah K.',
+      phone: '(555) 876-5432',
+      email: 'sarah.k@email.com',
+      address: DEMO_CLIENT_ADDRESSES.cli_sarah,
+      lead_source: 'google',
+      created: '2026-04-15T10:00:00Z',
+    },
+    {
+      id: 'cli_james',
+      name: 'James R.',
+      phone: '(555) 111-2233',
+      address: DEMO_CLIENT_ADDRESSES.cli_james,
+      lead_source: 'instagram',
+      created: '2026-05-01T10:00:00Z',
+    },
   ]
 
   const today = new Date()
@@ -77,21 +103,40 @@ export function createSeedData(): AppData {
       id: 'job_001',
       date: fmtDate(today),
       start_time: '09:00',
-      hours_worked: 3.5,
+      hours_worked: 0,
       location_type: 'mobile',
       package_id: 'pkg_full',
       vehicle_type: 'truck',
       client_id: 'cli_marcus',
-      status: 'paid',
+      status: 'in_progress',
       revenue: 320,
-      tip: 20,
-      expenses: [{ category: 'supplies', description: 'Supplies used', amount: 38 }],
-      supplies_used: [{ supply_id: 'sup_soap', quantity_used: 8 }, { supply_id: 'sup_interior', quantity_used: 6 }],
-      travel_cost: 22,
+      tip: 0,
+      expenses: [],
+      supplies_used: [],
+      travel_cost: 18.76,
       marketing_cost: 0,
       equipment_depreciation: 0,
-      photo_count: 6,
-      invoice_id: 'inv_001',
+      photo_count: 2,
+    },
+    {
+      id: 'job_005',
+      date: fmtDate(today),
+      start_time: '10:00',
+      hours_worked: 0,
+      location_type: 'mobile',
+      package_id: 'pkg_full',
+      vehicle_type: 'suv',
+      client_id: 'cli_sarah',
+      status: 'scheduled',
+      revenue: 320,
+      tip: 0,
+      expenses: [],
+      supplies_used: [],
+      travel_cost: 0,
+      marketing_cost: 0,
+      equipment_depreciation: 0,
+      photo_count: 0,
+      notes: 'Demo — blocks 10:00 and 12:00 booking slots (4h service)',
     },
     {
       id: 'job_002',
@@ -155,16 +200,16 @@ export function createSeedData(): AppData {
     {
       id: 'inv_001',
       invoice_number: 'DET-2026-06-031',
-      job_id: 'job_001',
+      job_id: 'job_004',
       client_id: 'cli_marcus',
-      subtotal: 320,
-      tip: 20,
-      total: 340,
+      subtotal: 800,
+      tip: 50,
+      total: 850,
       status: 'paid',
-      payments: [{ amount: 340, method: 'Venmo', date: fmtDate(today) }],
-      amount_paid: 340,
+      payments: [{ amount: 850, method: 'Venmo', date: fmtDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 5)) }],
+      amount_paid: 850,
       balance_due: 0,
-      paid_at: new Date().toISOString(),
+      paid_at: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 5).toISOString(),
       terms: 'Due on receipt',
     },
     {
@@ -248,7 +293,34 @@ export function createSeedData(): AppData {
     },
   ]
 
-  return { packages, clients, jobs, invoices, supplies, equipment, overhead_expenses, business_expenses: [], job_photos: {}, vehicles, damage_docs }
+  const leads: Lead[] = [
+    {
+      id: 'lead_001',
+      name: 'Alex M.',
+      phone: '(555) 444-7788',
+      email: 'alex@email.com',
+      source: 'instagram',
+      vehicle_type: 'suv',
+      package_id: 'pkg_full',
+      service_interest: 'Full detail',
+      quote_amount: 320,
+      stage: 'inquiry',
+      created: '2026-06-01T10:00:00Z',
+    },
+    {
+      id: 'lead_002',
+      name: 'Taylor R.',
+      phone: '(555) 222-9911',
+      source: 'google',
+      vehicle_type: 'sedan',
+      package_id: 'pkg_paint',
+      stage: 'quoted',
+      client_id: 'cli_sarah',
+      created: '2026-06-03T10:00:00Z',
+    },
+  ]
+
+  return { packages, clients, jobs, invoices, quotes: [], leads, supplies, equipment, overhead_expenses, business_expenses: [], job_photos: {}, vehicles, damage_docs }
 }
 
 /** Empty store — used when PocketBase is configured so we never show demo seed data on fallback. */
@@ -258,6 +330,8 @@ export function createEmptyData(): AppData {
     clients: [],
     jobs: [],
     invoices: [],
+    quotes: [],
+    leads: [],
     supplies: [],
     equipment: [],
     overhead_expenses: [],
@@ -276,7 +350,7 @@ export function loadData(): AppData {
   if (typeof window === 'undefined') return createSeedData()
 
   const raw = localStorage.getItem(scopedStorageKey(STORAGE_KEY))
-  if (!raw) {
+  if (!raw || !raw.trim()) {
     const initial = defaultLocalData()
     if (useDevDemoSeed()) {
       saveData(initial)
@@ -284,15 +358,26 @@ export function loadData(): AppData {
     return initial
   }
 
-  const parsed = JSON.parse(raw) as Partial<AppData>
+  let parsed: Partial<AppData>
+  try {
+    parsed = JSON.parse(raw) as Partial<AppData>
+  } catch {
+    const initial = defaultLocalData()
+    saveData(initial)
+    return initial
+  }
   const fallback = defaultLocalData()
   const merged: AppData = {
     packages: parsed.packages ?? fallback.packages,
     clients: parsed.clients ?? fallback.clients,
     jobs: parsed.jobs ?? fallback.jobs,
     invoices: parsed.invoices ?? fallback.invoices,
+    quotes: parsed.quotes ?? fallback.quotes ?? [],
+    leads: parsed.leads ?? fallback.leads ?? [],
     supplies: parsed.supplies ?? fallback.supplies,
+    equipment: parsed.equipment ?? fallback.equipment ?? [],
     overhead_expenses: parsed.overhead_expenses ?? fallback.overhead_expenses,
+    business_expenses: parsed.business_expenses ?? fallback.business_expenses ?? [],
     job_photos: parsed.job_photos ?? {},
     vehicles: parsed.vehicles ?? fallback.vehicles ?? [],
     damage_docs: parsed.damage_docs ?? fallback.damage_docs ?? [],

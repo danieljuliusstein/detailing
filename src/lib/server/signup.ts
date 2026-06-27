@@ -1,14 +1,15 @@
 import { slugifyBusinessName } from '../tenant'
 import { DEFAULT_INVOICE_TERMS } from '../settings'
+import { DEFAULT_BOOKING_SCHEDULE } from '../booking-availability'
 import { authenticateServerAdmin } from './pocketbase-admin'
 import { escapeFilterValue } from '../api/mappers'
 import type { PbRecord } from '../api/mappers'
 
 const DEFAULT_PACKAGES = [
-  { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry' },
-  { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail' },
-  { name: 'Paint Correction', base_price: 450, active: true, description: 'Single-stage paint correction' },
-  { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application' },
+  { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry', duration_minutes: 90 },
+  { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail', duration_minutes: 240 },
+  { name: 'Paint Correction', base_price: 450, active: true, description: 'Single-stage paint correction', duration_minutes: 300 },
+  { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application', duration_minutes: 360 },
 ]
 
 const DEFAULT_SUPPLIES = [
@@ -60,6 +61,8 @@ export async function registerOrganization(input: SignupInput) {
     plan: 'founding',
     founding_member: true,
     booking_enabled: true,
+    subscription_status: 'trialing',
+    trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
   })
 
   const user = await pb.collection('users').create<PbRecord>({
@@ -77,6 +80,7 @@ export async function registerOrganization(input: SignupInput) {
     business_email: email,
     business_address: '',
     invoice_terms_footer: DEFAULT_INVOICE_TERMS,
+    booking_schedule: DEFAULT_BOOKING_SCHEDULE,
     notifications: {
       job_reminder: true,
       morning_reminder: true,

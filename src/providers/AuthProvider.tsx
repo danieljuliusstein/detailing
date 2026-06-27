@@ -5,25 +5,18 @@ import { usePathname, useRouter } from 'next/navigation'
 import { resetBackend, syncOnReconnect } from '@/lib/api'
 import { clearLocalDeviceDataSync } from '@/lib/clear-local-data'
 import {
-  hasPinSet,
-  isUnlocked,
-  lock,
-  setPin,
-  touchActivity,
-  unlock,
-  verifyPin,
-} from '@/lib/auth'
-import {
   authenticatePocketBase,
   clearPocketBaseAuth,
   isPocketBaseAuthenticated,
 } from '@/lib/pb-auth'
+import { getCurrentOrganizationId } from '@/lib/tenant'
+import { getPocketBase } from '@/lib/pocketbase'
+import { isSubscriptionActive, type OrgSubscription } from '@/lib/subscription'
 
 interface AuthContextValue {
+  isLoggedIn: boolean
   isAuthenticated: boolean
-  needsSetup: boolean
-  setupPin: (pin: string) => Promise<void>
-  login: (pin: string) => Promise<boolean>
+  needsOnboarding: boolean
   logout: () => void
 }
 
@@ -37,8 +30,32 @@ function isPublicPath(pathname: string): boolean {
   )
 }
 
+function isBillingGracePath(pathname: string): boolean {
+  return (
+    pathname === '/settings/billing' ||
+    pathname === '/settings/access' ||
+    pathname === '/settings/support' ||
+    pathname === '/privacy' ||
+    pathname.startsWith('/settings/faq')
+  )
+}
+
+function isAdminPath(pathname: string): boolean {
+  return pathname === '/admin'
+}
+
 function isOnboardingPath(pathname: string): boolean {
   return pathname === '/onboarding'
+}
+
+function safeReplace(router: ReturnType<typeof useRouter>, href: string) {
+  queueMicrotask(() => {
+    try {
+      router.replace(href)
+    } catch {
+      // Router may not be ready during hydration
+    }
+  })
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -54,70 +71,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const ready = mounted
   void authTick
 
-  const hasAccount = mounted && isPocketBaseAuthenticated()
-  const needsSetup = mounted && hasAccount && !hasPinSet()
-  const authenticated = mounted && hasAccount && hasPinSet() && isUnlocked()
+  const isLoggedIn = mounted && isPocketBaseAuthenticated()
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
-
-  useEffect(() => {
-    if (!mounted || !authenticated || isOnboardingPath(pathname)) return
-    void (async () => {
-      try {
-        const { loadSettingsFromPocketBase } = await import('@/lib/api/settings-pocketbase')
-        const settings = await loadSettingsFromPocketBase()
-        if (settings && !settings.business_phone?.trim()) {
-          setNeedsOnboarding(true)
-          router.replace('/onboarding')
-        } else {
-          setNeedsOnboarding(false)
-        }
-      } catch {
-        setNeedsOnboarding(false)
-      }
-    })()
-  }, [mounted, authenticated, pathname, router])
-
-  useEffect(() => {
-    if (!ready) return
-
-    const onActivity = () => {
-      if (authenticated) touchActivity()
-    }
-
-    const events = ['mousedown', 'touchstart', 'keydown', 'scroll'] as const
-    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
-
-    const interval = setInterval(() => {
-      if (!hasPinSet() || !hasAccount) return
-      if (!isUnlocked()) {
-        bumpAuth()
-        router.replace('/auth')
-      }
-    }, 30_000)
-
-    return () => {
-      events.forEach((e) => window.removeEventListener(e, onActivity))
-      clearInterval(interval)
-    }
-  }, [ready, authenticated, hasAccount, router, bumpAuth])
+  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false)
 
   const isPublicRoute = isPublicPath(pathname)
   const isOnboardingRoute = isOnboardingPath(pathname)
 
   useEffect(() => {
-    if (!ready || isPublicRoute) return
-
-    if (isOnboardingRoute) {
-      if (!hasAccount || needsSetup || !isUnlocked()) {
-        router.replace('/auth')
+    if (!mounted || !isLoggedIn || isOnboardingPath(pathname)) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const { loadSettingsFromPocketBase } = await import('@/lib/api/settings-pocketbase')
+        const settings = await loadSettingsFromPocketBase()
+        if (cancelled) return
+        if (settings && !settings.business_phone?.trim()) {
+          setNeedsOnboarding(true)
+          safeReplace(router, '/onboarding')
+        } else {
+          setNeedsOnboarding(false)
+        }
+      } catch {
+        if (!cancelled) setNeedsOnboarding(false)
       }
-      return
+    })()
+    return () => {
+      cancelled = true
     }
+  }, [mounted, isLoggedIn, pathname, router])
 
-    if (!hasAccount || needsSetup || !isUnlocked()) {
-      router.replace('/auth')
+  useEffect(() => {
+    if (!mounted || !isLoggedIn || isPublicPath(pathname) || isOnboardingPath(pathname)) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const orgId = getCurrentOrganizationId()
+        const pb = getPocketBase()
+        if (!orgId || !pb?.authStore.isValid) {
+          if (!cancelled) setSubscriptionBlocked(false)
+          return
+        }
+        const org = await pb.collection('organizations').getOne(orgId)
+        if (cancelled) return
+        const sub: OrgSubscription = {
+          plan: String(org.plan ?? ''),
+          founding_member: org.founding_member === true,
+          subscription_status: String(org.subscription_status ?? 'none'),
+          trial_ends_at: org.trial_ends_at ? String(org.trial_ends_at) : undefined,
+        }
+        const blocked = !isSubscriptionActive(sub)
+        setSubscriptionBlocked(blocked)
+        if (blocked && !isBillingGracePath(pathname) && !isAdminPath(pathname)) {
+          safeReplace(router, '/settings/billing')
+        }
+      } catch {
+        if (!cancelled) setSubscriptionBlocked(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [ready, hasAccount, needsSetup, pathname, router, isPublicRoute, isOnboardingRoute, authTick])
+  }, [mounted, isLoggedIn, pathname, router])
+
+  useEffect(() => {
+    if (!ready || isPublicRoute || !isOnboardingRoute || isLoggedIn) return
+    safeReplace(router, '/')
+  }, [ready, isLoggedIn, router, isPublicRoute, isOnboardingRoute])
 
   const syncPocketBaseInBackground = useCallback(() => {
     void (async () => {
@@ -133,107 +153,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!ready || !authenticated) return
+    if (!ready || !isLoggedIn) return
     syncPocketBaseInBackground()
-  }, [ready, authenticated, syncPocketBaseInBackground])
+  }, [ready, isLoggedIn, syncPocketBaseInBackground])
 
   useEffect(() => {
-    if (!ready || !authenticated || pathname !== '/auth') return
+    if (!ready || !isLoggedIn || pathname !== '/auth') return
     if (needsOnboarding) {
-      router.replace('/onboarding')
+      safeReplace(router, '/onboarding')
       return
     }
-    router.replace('/')
-  }, [ready, authenticated, needsOnboarding, pathname, router])
-
-  const setupPinFn = useCallback(async (pin: string) => {
-    await setPin(pin)
-    unlock()
-    bumpAuth()
-    router.replace('/')
-    syncPocketBaseInBackground()
-  }, [router, bumpAuth, syncPocketBaseInBackground])
-
-  const login = useCallback(async (pin: string) => {
-    const ok = await verifyPin(pin)
-    if (ok) {
-      unlock()
-      bumpAuth()
-      router.replace('/')
-      syncPocketBaseInBackground()
-    }
-    return ok
-  }, [router, bumpAuth, syncPocketBaseInBackground])
+    safeReplace(router, '/')
+  }, [ready, isLoggedIn, needsOnboarding, pathname, router])
 
   const logout = useCallback(() => {
-    lock()
     clearPocketBaseAuth()
     void clearLocalDeviceDataSync()
     resetBackend()
     bumpAuth()
-    router.replace('/auth')
+    safeReplace(router, '/')
   }, [router, bumpAuth])
 
-  const contextValue = {
-    isAuthenticated: authenticated,
-    needsSetup,
-    setupPin: setupPinFn,
-    login,
+  const contextValue: AuthContextValue = {
+    isLoggedIn,
+    isAuthenticated: isLoggedIn,
+    needsOnboarding,
     logout,
   }
 
-  if (!ready && (isPublicRoute || isOnboardingRoute)) {
-    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
-  }
+  const showBlockingRedirect =
+    !ready ||
+    (isOnboardingRoute && !isLoggedIn) ||
+    (isLoggedIn && needsOnboarding && !isOnboardingRoute && !isPublicRoute) ||
+    (isLoggedIn &&
+      subscriptionBlocked &&
+      !isBillingGracePath(pathname) &&
+      !isAdminPath(pathname) &&
+      !isPublicRoute)
 
-  if (!ready) {
-    return (
-      <div className="auth-loading-screen">
-        <div className="auth-loading-text">Loading…</div>
-      </div>
-    )
-  }
-
-  if (isPublicRoute) {
-    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
-  }
-
-  if (isOnboardingRoute) {
-    if (!hasAccount || needsSetup || !isUnlocked()) {
-      return (
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {showBlockingRedirect ? (
         <div className="auth-loading-screen">
-          <div className="auth-loading-text">Redirecting…</div>
+          <div className="auth-loading-text">{ready ? 'Redirecting…' : 'Loading…'}</div>
         </div>
-      )
-    }
-    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
-  }
-
-  if (!authenticated && !needsSetup && hasAccount) {
-    return (
-      <div className="auth-loading-screen">
-        <div className="auth-loading-text">Locked</div>
-      </div>
-    )
-  }
-
-  if (!hasAccount || needsSetup || !isUnlocked()) {
-    return (
-      <div className="auth-loading-screen">
-        <div className="auth-loading-text">Redirecting…</div>
-      </div>
-    )
-  }
-
-  if (needsOnboarding) {
-    return (
-      <div className="auth-loading-screen">
-        <div className="auth-loading-text">Redirecting…</div>
-      </div>
-    )
-  }
-
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

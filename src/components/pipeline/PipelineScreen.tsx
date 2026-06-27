@@ -2,190 +2,160 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Car, Plus } from '@phosphor-icons/react'
+import AuthEmptyState from '@/components/AuthEmptyState'
 import BackButton from '@/components/BackButton'
-import { getClients, getJobs } from '@/lib/api'
-import type { Client, JobWithRelations } from '@/lib/types'
-import { Car, Globe } from '@phosphor-icons/react'
+import PipelineLeadCard from '@/components/pipeline/PipelineLeadCard'
+import PipelineStepper from '@/components/pipeline/PipelineStepper'
+import { useAuthEmptyState } from '@/hooks/useAuthEmptyState'
+import { useQuickAction } from '@/providers/QuickActionContext'
+import { getLeads } from '@/lib/api'
+import { isLeadsCollectionMissing, LEADS_MIGRATION_BANNER } from '@/lib/api/leads-migration'
+import { LEAD_STAGES } from '@/lib/lead-sources'
+import type { LeadStage, LeadWithRelations } from '@/lib/types'
 
-type PipelineStage = 'new' | 'scheduled' | 'completed'
+const STAGE_PRIORITY: LeadStage[] = ['booked', 'quoted', 'inquiry']
 
-interface PipelineItem {
-  id: string
-  stage: PipelineStage
-  clientName: string
-  clientId: string
-  jobId?: string
-  packageName: string
-  date?: string
-  startTime?: string
-  created: string
-}
-
-function formatDate(iso?: string) {
-  if (!iso) return '—'
-  const d = new Date(iso + 'T12:00:00')
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function buildPipelineItems(clients: Client[], jobs: JobWithRelations[]): PipelineItem[] {
-  const websiteClients = clients.filter((c) => c.lead_source === 'website')
-  const items: PipelineItem[] = []
-  const usedJobIds = new Set<string>()
-
-  for (const client of websiteClients) {
-    const clientJobs = jobs
-      .filter((j) => j.client_id === client.id)
-      .sort((a, b) => (b.date > a.date ? 1 : -1))
-
-    const activeJob =
-      clientJobs.find((j) => j.status === 'scheduled' || j.status === 'in_progress') ??
-      clientJobs.find((j) => j.status === 'completed')
-
-    if (activeJob) {
-      usedJobIds.add(activeJob.id)
-      const stage: PipelineStage =
-        activeJob.status === 'completed' ? 'completed' : 'scheduled'
-      items.push({
-        id: activeJob.id,
-        stage,
-        clientName: client.name,
-        clientId: client.id,
-        jobId: activeJob.id,
-        packageName: activeJob.package?.name ?? 'Detail',
-        date: activeJob.date,
-        startTime: activeJob.start_time,
-        created: client.created ?? activeJob.date,
-      })
-    } else {
-      items.push({
-        id: client.id,
-        stage: 'new',
-        clientName: client.name,
-        clientId: client.id,
-        packageName: 'Website inquiry',
-        created: client.created ?? '',
-      })
-    }
+function firstStageWithLeads(leads: LeadWithRelations[]): LeadStage {
+  for (const stage of STAGE_PRIORITY) {
+    if (leads.some((l) => l.stage === stage)) return stage
   }
-
-  const today = new Date().toISOString().slice(0, 10)
-  for (const job of jobs) {
-    if (usedJobIds.has(job.id)) continue
-    if (job.status !== 'scheduled' && job.status !== 'in_progress') continue
-    if (job.date < today) continue
-    const client = clients.find((c) => c.id === job.client_id)
-    items.push({
-      id: job.id,
-      stage: 'scheduled',
-      clientName: client?.name ?? 'Client',
-      clientId: job.client_id,
-      jobId: job.id,
-      packageName: job.package?.name ?? 'Detail',
-      date: job.date,
-      startTime: job.start_time,
-      created: job.date,
-    })
-  }
-
-  return items.sort((a, b) => (b.created > a.created ? 1 : -1))
-}
-
-const STAGES: { id: PipelineStage; label: string }[] = [
-  { id: 'new', label: 'New leads' },
-  { id: 'scheduled', label: 'Scheduled' },
-  { id: 'completed', label: 'Completed' },
-]
-
-function PipelineCard({ item, onPress }: { item: PipelineItem; onPress: () => void }) {
-  return (
-    <button type="button" className="pipeline-card" onClick={onPress}>
-      <div className="pipeline-card__icon">
-        <Car size={16} weight="duotone" aria-hidden="true" />
-      </div>
-      <div className="pipeline-card__body">
-        <div className="pipeline-card__name">{item.clientName}</div>
-        <div className="pipeline-card__meta">
-          {item.packageName}
-          {item.date ? ` · ${formatDate(item.date)}` : ''}
-          {item.startTime ? ` · ${item.startTime}` : ''}
-        </div>
-      </div>
-    </button>
-  )
+  return 'inquiry'
 }
 
 export default function PipelineScreen() {
   const router = useRouter()
-  const [ready, setReady] = useState(false)
-  const [items, setItems] = useState<PipelineItem[]>([])
+  const { isLoggedOut } = useAuthEmptyState()
+  const { openLeadSheet } = useQuickAction()
+  const [leads, setLeads] = useState<LeadWithRelations[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [migrationNeeded, setMigrationNeeded] = useState(false)
+  const [activeStage, setActiveStage] = useState<LeadStage>('inquiry')
+  const [stageInitialized, setStageInitialized] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    Promise.all([getClients(), getJobs()])
-      .then(([clients, jobs]) => {
-        if (cancelled) return
-        setItems(buildPipelineItems(clients, jobs))
-        setReady(true)
+  const load = () => {
+    getLeads()
+      .then((next) => {
+        setLeads(next)
+        setError(null)
+        setMigrationNeeded(isLeadsCollectionMissing())
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load pipeline')
+        setLeads([])
+        setError(e instanceof Error ? e.message : 'Failed to load pipeline')
       })
-    return () => {
-      cancelled = true
-    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  useEffect(() => {
+    const onChanged = () => load()
+    window.addEventListener('leads-changed', onChanged)
+    return () => window.removeEventListener('leads-changed', onChanged)
   }, [])
 
   const grouped = useMemo(() => {
-    const map: Record<PipelineStage, PipelineItem[]> = { new: [], scheduled: [], completed: [] }
-    for (const item of items) map[item.stage].push(item)
+    const map: Record<LeadStage, LeadWithRelations[]> = { inquiry: [], quoted: [], booked: [] }
+    for (const lead of leads ?? []) map[lead.stage].push(lead)
     return map
-  }, [items])
+  }, [leads])
 
-  function openItem(item: PipelineItem) {
-    if (item.jobId) router.push(`/jobs/${item.jobId}`)
-    else router.push(`/clients/${item.clientId}`)
+  useEffect(() => {
+    if (!leads?.length || stageInitialized) return
+    setActiveStage(firstStageWithLeads(leads))
+    setStageInitialized(true)
+  }, [leads, stageInitialized])
+
+  const handleRefresh = () => {
+    load()
+    window.dispatchEvent(new Event('leads-changed'))
   }
+
+  const isEmpty = (leads?.length ?? 0) === 0
+  const activeLabel = LEAD_STAGES.find((s) => s.id === activeStage)?.label ?? activeStage
 
   return (
     <div className="screen page-content body pipeline-screen">
-      <header className="page-header">
-        <BackButton onClick={() => router.push('/')} />
-        <div>
-          <h1 className="lg">Lead pipeline</h1>
-          <p>Website bookings and upcoming work</p>
+      <header className="pipeline-header">
+        <div className="pipeline-header__back">
+          <BackButton onClick={() => router.push('/')} />
         </div>
+        <h1 className="pipeline-title">Lead pipeline</h1>
+        <button
+          type="button"
+          className="pipeline-header__add"
+          aria-label="New lead"
+          onClick={() => (isLoggedOut ? router.push('/auth') : openLeadSheet())}
+        >
+          <Plus size={20} weight="bold" aria-hidden="true" />
+        </button>
       </header>
 
-      {error ? (
-        <div className="error-banner">{error}</div>
-      ) : !ready ? (
-        <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
-      ) : items.length === 0 ? (
-        <div className="empty-state">
-          <Globe size={32} weight="duotone" style={{ marginBottom: 12, opacity: 0.5 }} />
-          <p>No website leads yet</p>
-          <p className="stat-sub">Share your booking link to start filling the pipeline</p>
+      {!isEmpty && leads ? (
+        <PipelineStepper
+          activeStage={activeStage}
+          stageCounts={{
+            inquiry: grouped.inquiry.length,
+            quoted: grouped.quoted.length,
+            booked: grouped.booked.length,
+          }}
+          onStageChange={setActiveStage}
+        />
+      ) : null}
+
+      {migrationNeeded ? (
+        <div className="error-banner" role="status">
+          {LEADS_MIGRATION_BANNER}
+        </div>
+      ) : null}
+
+      {error ? <div className="error-banner">{error}</div> : null}
+
+      {!leads ? (
+        <p className="pipeline-loading">Loading…</p>
+      ) : isLoggedOut ? (
+        <AuthEmptyState
+          icon={<Car size={28} weight="duotone" />}
+          title="Sign in to see your pipeline"
+          subtitle="Leads and inquiries load from your account after you sign in."
+        />
+      ) : isEmpty ? (
+        <div className="empty-card pipeline-empty-card">
+          <div className="empty-card__icon">
+            <Car size={24} weight="duotone" aria-hidden="true" />
+          </div>
+          <p className="empty-card__title">No leads yet</p>
+          <p className="empty-card__subtitle">
+            Add an inquiry or share your booking link to start filling your pipeline.
+          </p>
+          <button type="button" className="btn--new-lead" onClick={() => openLeadSheet()}>
+            New lead
+          </button>
         </div>
       ) : (
-        <div className="pipeline-columns">
-          {STAGES.map((stage) => (
-            <section key={stage.id} className="pipeline-column">
-              <h2 className="pipeline-column__title">
-                {stage.label}
-                <span className="pipeline-column__count">{grouped[stage.id].length}</span>
-              </h2>
-              <div className="pipeline-column__list">
-                {grouped[stage.id].length === 0 ? (
-                  <p className="pipeline-column__empty">None</p>
-                ) : (
-                  grouped[stage.id].map((item) => (
-                    <PipelineCard key={item.id} item={item} onPress={() => openItem(item)} />
-                  ))
-                )}
-              </div>
-            </section>
-          ))}
+        <div key={activeStage} className="pipeline-stage-panel pipeline-stage-panel--animate">
+          <h2 className="pipeline-stage-panel__heading">
+            {activeLabel}
+            <span className="pipeline-stage-panel__count">{grouped[activeStage].length}</span>
+          </h2>
+          {grouped[activeStage].length === 0 ? (
+            <div className="pipeline-stage-panel__empty">
+              <p>No leads in {activeLabel.toLowerCase()}</p>
+            </div>
+          ) : (
+            <div className="pipeline-stage-panel__list">
+              {grouped[activeStage].map((lead) => (
+                <PipelineLeadCard
+                  key={lead.id}
+                  lead={lead}
+                  onEdit={() => openLeadSheet(lead)}
+                  onRefresh={handleRefresh}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

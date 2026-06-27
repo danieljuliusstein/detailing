@@ -1,8 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { CaretDown, Trash } from '@phosphor-icons/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { CaretDown } from '@phosphor-icons/react'
 import BottomSheet from '@/components/BottomSheet'
+import {
+  FloatingAffixField,
+  FloatingField,
+  FormProgressBar,
+  PillGroup,
+  SheetFooter,
+} from '@/components/forms'
 import { costPerUnitFromPurchase } from '@/lib/supplies-logic'
 import { isSupplyPurchase } from '@/lib/supply-purchase-logic'
 import {
@@ -12,11 +19,19 @@ import {
   updateSupplyPurchase,
 } from '@/lib/api'
 import { fmtDetailed } from '@/lib/calculations'
+import { computeFormProgress } from '@/lib/form-progress'
+import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { BusinessExpense, Supply, SupplyKind, SupplyPurchaseInput } from '@/lib/types'
 
 const CHEMICAL_UNITS = ['oz', 'gal', 'ml', 'L'] as const
 const CONSUMABLE_UNITS = ['each', 'box', 'pack'] as const
 const NEW_SUPPLY = '__new__'
+
+const KIND_PILLS: { value: SupplyKind; label: string }[] = [
+  { value: 'chemical', label: 'Chemical' },
+  { value: 'consumable', label: 'Consumable' },
+]
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -56,11 +71,7 @@ function SupplyPicker({ catalog, supplyKey, onSelect }: SupplyPickerProps) {
   if (supplyKey && !open) {
     return (
       <div className="inv-supply-picker">
-        <button
-          type="button"
-          className="inv-supply-picker-trigger"
-          onClick={() => setOpen(true)}
-        >
+        <button type="button" className="inv-supply-picker-trigger" onClick={() => setOpen(true)}>
           <span>{displayLabel}</span>
           <CaretDown size={14} color="#8e8e93" />
         </button>
@@ -79,7 +90,7 @@ function SupplyPicker({ catalog, supplyKey, onSelect }: SupplyPickerProps) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {open && (
+      {open ? (
         <div className="inv-supply-picker-dropdown">
           {filtered.map((s) => (
             <button
@@ -95,11 +106,9 @@ function SupplyPicker({ catalog, supplyKey, onSelect }: SupplyPickerProps) {
               </span>
             </button>
           ))}
-          {filtered.length === 0 && search.trim() !== '' && (
-            <div style={{ padding: '12px 14px', fontSize: 13, color: '#8e8e93' }}>
-              No supplies match
-            </div>
-          )}
+          {filtered.length === 0 && search.trim() !== '' ? (
+            <div style={{ padding: '12px 14px', fontSize: 13, color: '#8e8e93' }}>No supplies match</div>
+          ) : null}
           <button
             type="button"
             className="inv-supply-picker-option inv-supply-picker-option--new"
@@ -109,7 +118,7 @@ function SupplyPicker({ catalog, supplyKey, onSelect }: SupplyPickerProps) {
             <span className="inv-supply-picker-option-name">+ Add new supply</span>
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -120,12 +129,10 @@ interface SupplyPurchaseSheetProps {
   onSaved?: () => void
 }
 
-export default function SupplyPurchaseSheet({
-  expense,
-  onClose,
-  onSaved,
-}: SupplyPurchaseSheetProps) {
+export default function SupplyPurchaseSheet({ expense, onClose, onSaved }: SupplyPurchaseSheetProps) {
   const isEdit = Boolean(expense)
+  const formRef = useRef<HTMLDivElement>(null)
+  const unitRef = useRef<HTMLSelectElement>(null)
   const [catalog, setCatalog] = useState<Supply[]>([])
   const [date, setDate] = useState(todayIso())
   const [supplyKey, setSupplyKey] = useState('')
@@ -139,13 +146,21 @@ export default function SupplyPurchaseSheet({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const { handleWriteError } = useActionToast()
 
   const isNewSupply = supplyKey === NEW_SUPPLY
+  const unitOptions = kind === 'consumable' ? CONSUMABLE_UNITS : CHEMICAL_UNITS
+  const unitPills = unitOptions.map((u) => ({ value: u, label: u }))
+
+  const progress = computeFormProgress(
+    [date, name, quantity, amount, vendor, notes],
+    1,
+    supplyKey ? 1 : 0,
+  )
 
   useEffect(() => {
     getSupplies().then((list) => {
-      const purchasable = list.filter((s) => s.kind === 'chemical' || s.kind === 'consumable')
-      setCatalog(purchasable)
+      setCatalog(list.filter((s) => s.kind === 'chemical' || s.kind === 'consumable'))
     })
   }, [])
 
@@ -186,7 +201,10 @@ export default function SupplyPurchaseSheet({
     }
   }, [supplyKey, catalog, isNewSupply])
 
-  const unitOptions = kind === 'consumable' ? CONSUMABLE_UNITS : CHEMICAL_UNITS
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+    syncSelectFloatingLabel(unitRef.current)
+  }, [date, name, quantity, amount, vendor, notes, unit, expense])
 
   const costPreview = useMemo(() => {
     const q = Number(quantity)
@@ -259,8 +277,9 @@ export default function SupplyPurchaseSheet({
       }
       setSaved(true)
       onSaved?.()
-      setTimeout(onClose, 600)
+      setTimeout(onClose, 1500)
     } catch (err) {
+      if (handleWriteError(err)) return
       setError(err instanceof Error ? err.message : 'Could not save purchase.')
     } finally {
       setSaving(false)
@@ -276,191 +295,142 @@ export default function SupplyPurchaseSheet({
       onSaved?.()
       onClose()
     } catch (err) {
+      if (handleWriteError(err)) return
       setError(err instanceof Error ? err.message : 'Could not delete purchase.')
     } finally {
       setSaving(false)
     }
   }
 
+  const canSave = Boolean(name.trim() && Number(quantity) > 0 && Number(amount) > 0)
+
   return (
     <BottomSheet
+      variant="premium"
       title={isEdit ? 'Edit supply purchase' : 'Buy supplies'}
       subtitle="Expense hits P&L this month and stock is added to inventory"
       ariaLabel="Buy supplies"
-      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
-        <div className="inv-sheet-actions inv-sheet-actions--split">
-          {isEdit ? (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={handleDelete}
-              disabled={saving}
-              aria-label="Delete purchase"
-              style={{ gridColumn: '1 / -1' }}
-            >
-              <Trash size={18} color="var(--red)" />
-            </button>
-          ) : null}
-          <button type="button" className="inv-sheet-save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Log purchase'}
-          </button>
-          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-        </div>
+        <SheetFooter
+          saveLabel={isEdit ? 'Save changes' : 'Log purchase'}
+          ready={canSave}
+          done={saved}
+          saving={saving}
+          layout="split"
+          onSave={() => void handleSave()}
+          onCancel={onClose}
+          onDelete={isEdit ? () => void handleDelete() : undefined}
+        />
       }
     >
-        <div className="inv-sheet-section">
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="purchase-date">Date</label>
+      {!isEdit ? <FormProgressBar progress={progress} /> : null}
+
+      <div ref={formRef} className="premium-sheet__form">
+        <FloatingField id="purchase-date" label="Date" filled={Boolean(date)}>
+          <input
+            id="purchase-date"
+            type="date"
+            className={`f-input${date ? ' hv' : ''}`}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        {!isEdit ? (
+          <div className="form-pill-block">
+            <p className="form-pill-block__label">Supply</p>
+            <SupplyPicker catalog={catalog} supplyKey={supplyKey} onSelect={setSupplyKey} />
+          </div>
+        ) : null}
+
+        {(isNewSupply || isEdit) ? (
+          <FloatingField id="purchase-name" label="Name" filled={name.trim().length > 0}>
             <input
-              id="purchase-date"
-              type="date"
-              className="inv-field-input"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              id="purchase-name"
+              className={`f-input${name.trim() ? ' hv' : ''}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder=" "
+              disabled={isEdit && expense ? isSupplyPurchase(expense) : false}
             />
-          </div>
+          </FloatingField>
+        ) : null}
 
-          {!isEdit && (
-            <div className="inv-field">
-              <label className="inv-field-label">Supply</label>
-              <SupplyPicker catalog={catalog} supplyKey={supplyKey} onSelect={setSupplyKey} />
-            </div>
-          )}
+        {isNewSupply && !isEdit ? (
+          <>
+            <PillGroup
+              label="Kind"
+              options={KIND_PILLS}
+              value={kind}
+              onChange={(k) => {
+                setKind(k)
+                setUnit(k === 'consumable' ? 'each' : 'oz')
+              }}
+            />
+            <PillGroup label="Unit" options={unitPills} value={unit} onChange={setUnit} />
+          </>
+        ) : null}
 
-          {(isNewSupply || isEdit) && (
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="purchase-name">Name</label>
-              <input
-                id="purchase-name"
-                className="inv-field-input"
-                placeholder="Car wash soap"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={isEdit && isSupplyPurchase(expense!)}
-              />
-            </div>
-          )}
+        <div className="f-form-divider" />
 
-          {isNewSupply && !isEdit && (
-            <div className="inv-field-row">
-              <div className="inv-field">
-                <label className="inv-field-label" htmlFor="purchase-kind">Kind</label>
-                <div className="inv-select-wrap">
-                  <select
-                    id="purchase-kind"
-                    className="inv-field-input"
-                    value={kind}
-                    onChange={(e) => {
-                      const k = e.target.value as SupplyKind
-                      setKind(k)
-                      setUnit(k === 'consumable' ? 'each' : 'oz')
-                    }}
-                  >
-                    <option value="chemical">Chemical</option>
-                    <option value="consumable">Consumable</option>
-                  </select>
-                  <CaretDown className="inv-select-wrap__icon" size={16} weight="bold" aria-hidden />
-                </div>
-              </div>
-              <div className="inv-field">
-                <label className="inv-field-label" htmlFor="purchase-unit">Unit</label>
-                <div className="inv-select-wrap">
-                  <select
-                    id="purchase-unit"
-                    className="inv-field-input"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                  >
-                    {unitOptions.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                  <CaretDown className="inv-select-wrap__icon" size={16} weight="bold" aria-hidden />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="inv-sheet-divider" />
-
-        <div className="inv-sheet-section">
-          <div className="inv-field-row">
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="purchase-qty">Quantity bought</label>
-              <input
-                id="purchase-qty"
-                type="number"
-                inputMode="decimal"
-                className="inv-field-input"
-                placeholder="128"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </div>
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="purchase-cost">Total cost</label>
-              <div className="inv-input-affix inv-input-affix--pre">
-                <span className="inv-input-affix__pre">$</span>
-                <input
-                  id="purchase-cost"
-                  type="number"
-                  inputMode="decimal"
-                  className="inv-field-input"
-                  placeholder="80"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-              {costPreview > 0 && (
-                <p className="inv-computed-cost">
-                  Cost: {fmtDetailed(costPreview)}/{unit || 'unit'}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="inv-sheet-divider" />
-
-        <div className="inv-sheet-section">
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="purchase-vendor">
-              Vendor
-              <span className="inv-field-label-optional">(optional)</span>
-            </label>
+        <div className="premium-sheet__grid2">
+          <FloatingField id="purchase-qty" label="Quantity bought" filled={quantity.trim().length > 0}>
             <input
-              id="purchase-vendor"
-              className="inv-field-input"
-              placeholder="Chemical Guys"
-              value={vendor}
-              onChange={(e) => setVendor(e.target.value)}
+              id="purchase-qty"
+              type="number"
+              inputMode="decimal"
+              className={`f-input${quantity.trim() ? ' hv' : ''}`}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder=" "
             />
-          </div>
+          </FloatingField>
 
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="purchase-notes">
-              Notes
-              <span className="inv-field-label-optional">(optional)</span>
-            </label>
-            <textarea
-              id="purchase-notes"
-              className="inv-field-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. bought the gallon size..."
+          <div>
+            <FloatingAffixField
+              id="purchase-cost"
+              label="Total cost"
+              type="number"
+              inputMode="decimal"
+              value={amount}
+              filled={amount.trim().length > 0}
+              onChange={(e) => setAmount(e.target.value)}
             />
+            {costPreview > 0 ? (
+              <p className="inv-computed-cost">
+                Cost: {fmtDetailed(costPreview)}/{unit || 'unit'}
+              </p>
+            ) : null}
           </div>
-
-          {error && <p className="inv-field-hint" style={{ color: '#fca5a5' }}>{error}</p>}
-          {saved && <p className="inv-computed-cost">Saved</p>}
         </div>
+
+        <div className="f-form-divider" />
+
+        <FloatingField id="purchase-vendor" label="Vendor" filled={vendor.trim().length > 0} optional>
+          <input
+            id="purchase-vendor"
+            className={`f-input${vendor.trim() ? ' hv' : ''}`}
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="purchase-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
+          <textarea
+            id="purchase-notes"
+            className={`f-textarea${notes.trim() ? ' hv' : ''}`}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder=" "
+            rows={3}
+          />
+        </FloatingField>
+
+        {error ? <p className="inv-field-hint" style={{ color: '#fca5a5' }}>{error}</p> : null}
+      </div>
     </BottomSheet>
   )
 }

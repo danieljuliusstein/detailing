@@ -15,6 +15,8 @@ import type {
   PhotoMeta,
   Quote,
   QuoteWithRelations,
+  Lead,
+  LeadWithRelations,
   Supply,
   SupplyKind,
   SupplyUsage,
@@ -57,12 +59,14 @@ function relationId(v: unknown): string {
 
 export function pbPackageToApp(r: PbRecord): Package {
   const returnDays = num(r.expected_return_days)
+  const duration = num(r.duration_minutes)
   return {
     id: r.id,
     name: String(r.name ?? ''),
     base_price: num(r.base_price),
     description: str(r.description),
     expected_return_days: returnDays > 0 ? returnDays : 90,
+    duration_minutes: duration > 0 ? duration : 120,
     default_supplies: jsonArray(r.default_supplies),
     active: bool(r.active, true),
   }
@@ -108,6 +112,37 @@ export function pbQuoteToAppWithRelations(r: PbRecord): QuoteWithRelations {
     ...quote,
     client: expand.client_id ? pbClientToApp(expand.client_id) : undefined,
     package: expand.package_id ? pbPackageToApp(expand.package_id) : undefined,
+  }
+}
+
+export function pbLeadToApp(r: PbRecord): Lead {
+  return {
+    id: r.id,
+    name: String(r.name ?? ''),
+    phone: str(r.phone),
+    email: str(r.email),
+    source: (str(r.source) as Lead['source']) ?? 'other',
+    vehicle_type: (r.vehicle_type as Lead['vehicle_type']) ?? 'sedan',
+    package_id: str(relationId(r.package_id)) || undefined,
+    service_interest: str(r.service_interest),
+    quote_amount: typeof r.quote_amount === 'number' ? r.quote_amount : undefined,
+    stage: (r.stage as Lead['stage']) ?? 'inquiry',
+    client_id: str(relationId(r.client_id)) || undefined,
+    quote_id: str(relationId(r.quote_id)) || undefined,
+    job_id: str(relationId(r.job_id)) || undefined,
+    notes: str(r.notes),
+    created: r.created,
+  }
+}
+
+export function pbLeadToAppWithRelations(r: PbRecord): LeadWithRelations {
+  const expand = r.expand ?? {}
+  const lead = pbLeadToApp(r)
+  return {
+    ...lead,
+    package: expand.package_id ? pbPackageToApp(expand.package_id) : undefined,
+    quote: expand.quote_id ? pbQuoteToApp(expand.quote_id) : undefined,
+    client: expand.client_id ? pbClientToApp(expand.client_id) : undefined,
   }
 }
 
@@ -247,7 +282,7 @@ export function appJobEditToPb(updates: {
   return payload
 }
 
-export function pbSupplyToApp(r: PbRecord): Supply {
+export function pbSupplyToApp(r: PbRecord, imageUrl?: string): Supply {
   const kind = str(r.kind) as SupplyKind | undefined
   return {
     id: r.id,
@@ -259,7 +294,7 @@ export function pbSupplyToApp(r: PbRecord): Supply {
     supplier: str(r.supplier),
     kind: kind && ['chemical', 'consumable', 'other'].includes(kind) ? kind : 'other',
     notes: str(r.notes),
-    image_url: str(r.image_url),
+    image_url: imageUrl,
   }
 }
 
@@ -272,7 +307,6 @@ export function appSupplyToPb(input: {
   supplier?: string
   kind?: SupplyKind
   notes?: string
-  image_url?: string
 }) {
   return {
     name: input.name,
@@ -283,11 +317,10 @@ export function appSupplyToPb(input: {
     supplier: input.supplier ?? '',
     kind: input.kind ?? 'other',
     notes: input.notes ?? '',
-    image_url: input.image_url ?? '',
   }
 }
 
-export function pbEquipmentToApp(r: PbRecord): Equipment {
+export function pbEquipmentToApp(r: PbRecord, imageUrl?: string): Equipment {
   return {
     id: r.id,
     name: String(r.name ?? ''),
@@ -296,7 +329,7 @@ export function pbEquipmentToApp(r: PbRecord): Equipment {
     supplier: str(r.supplier),
     notes: str(r.notes),
     status: (str(r.status) as Equipment['status']) ?? 'active',
-    image_url: str(r.image_url),
+    image_url: imageUrl,
   }
 }
 
@@ -307,7 +340,6 @@ export function appEquipmentToPb(input: {
   supplier?: string
   notes?: string
   status?: Equipment['status']
-  image_url?: string
 }) {
   return {
     name: input.name,
@@ -316,7 +348,6 @@ export function appEquipmentToPb(input: {
     supplier: input.supplier ?? '',
     notes: input.notes ?? '',
     status: input.status ?? 'active',
-    image_url: input.image_url ?? '',
   }
 }
 

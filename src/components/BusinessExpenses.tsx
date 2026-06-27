@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { useSettingsBack } from '@/hooks/useSettingsBack'
 import BusinessExpenseSheet from '@/components/business/BusinessExpenseSheet'
 import SupplyPurchaseSheet from '@/components/business/SupplyPurchaseSheet'
 import { getBusinessExpenses, getEquipment } from '@/lib/api'
@@ -28,6 +29,7 @@ function formatRowDate(date: string): string {
 
 export default function BusinessExpenses() {
   const router = useRouter()
+  const goBack = useSettingsBack()
   const [expenses, setExpenses] = useState<BusinessExpense[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [editing, setEditing] = useState<BusinessExpense | null>(null)
@@ -76,7 +78,7 @@ export default function BusinessExpenses() {
   return (
     <div className="screen page-content">
       <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20, gap: 12 }}>
-        <BackButton onClick={() => router.back()} />
+        <BackButton onClick={goBack} />
         <div style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>Business expenses</div>
         <button
           type="button"

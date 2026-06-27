@@ -82,13 +82,14 @@ Used by: `Dashboard`, `JobsList`, `ClientsList`, `Reports`, settings, etc.
 
 ---
 
-## Removed / dead (Phase 1)
+## Removed / dead (Phase 1 — June 2026)
 
 | Item | Resolution |
 |------|------------|
-| `home/home.css` | Import removed from `globals.css`; `HomeScreen.tsx` unrouted — file kept for reference |
-| `JobsRevenueChart.tsx` | Deleted; `.jobs-chart-*` / `.jobs-filter-chip` CSS removed from globals |
-| Stray greens `#16a34a`, `#4caf50`, `#3dc97a` | Replaced with `var(--green)` except `--inv-ok` |
+| `home/home.css` | **Deleted** with unrouted `HomeScreen.tsx` |
+| `JobsRevenueChart.tsx` | **Deleted**; `lib/jobs-revenue.ts` kept for Reports revenue aggregation |
+| Stray greens `#16a34a`, `#4caf50` | Replaced with `var(--green)` / `var(--cl-accent)`; guarded by `css-accent-guard.test.ts` |
+| `--inv-ok: #3dc97a` | Kept in globals (inventory semantic, not UI accent) |
 
 ---
 

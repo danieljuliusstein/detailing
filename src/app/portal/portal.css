@@ -12,7 +12,7 @@
   --portal-text-secondary: var(--cl-muted);
   --portal-text-muted: var(--cl-hint);
   --portal-accent: var(--cl-accent);
-  --portal-accent-hover: #1ea34f;
+  --portal-accent-hover: color-mix(in srgb, var(--cl-accent) 88%, #000);
   --portal-warning-bg: #fffbeb;
   --portal-warning-border: #fcd34d;
   --portal-warning-text: #92400e;

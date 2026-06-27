@@ -9,6 +9,9 @@ import * as invLocal from './invoices-local'
 import * as invPb from './invoices-pocketbase'
 import * as quotesLocal from './quotes-local'
 import * as quotesPb from './quotes-pocketbase'
+import * as leadsLocal from './leads-local'
+import * as leadsPb from './leads-pocketbase'
+import * as timeBlocksPb from './time-blocks-pocketbase'
 import * as local from './local'
 import * as overheadLocal from './overhead-local'
 import * as overheadPb from './overhead-pocketbase'
@@ -40,9 +43,11 @@ import * as equipmentPb from './equipment-pocketbase'
 import * as suppliesLocal from './supplies-local'
 import * as suppliesPb from './supplies-pocketbase'
 import { compressJobPhoto } from '../compress-job-photo'
+import { compressInventoryPhoto } from '../compress-inventory-photo'
 import { notifyFinancialDataChanged } from '../financial-data-events'
 import { getBusinessExpensesMerged } from './business-expenses-merge'
 import { clearWriteDegraded, executeWrite } from './write-router'
+import { assertCanWrite } from '../write-guard'
 import {
   getPLReportFromJobs,
   getPLReportBundleFromJobs,
@@ -74,6 +79,10 @@ import type {
   Quote,
   QuoteInput,
   QuoteWithRelations,
+  Lead,
+  LeadInput,
+  LeadStage,
+  LeadWithRelations,
   Equipment,
   EquipmentInput,
   QuickJobData,
@@ -179,10 +188,12 @@ export async function getAllPackages(): Promise<Package[]> {
 }
 
 export async function createPackage(input: PackageInput): Promise<Package> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase' ? pb.createPackage(input) : local.createPackage(input)
 }
 
 export async function updatePackage(id: string, input: Partial<PackageInput>): Promise<Package | null> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase' ? pb.updatePackage(id, input) : local.updatePackage(id, input)
 }
 
@@ -199,10 +210,12 @@ export async function getClient(id: string): Promise<Client | null> {
 }
 
 export async function createClient(input: ClientInput): Promise<Client> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase' ? pb.createClient(input) : local.createClient(input)
 }
 
 export async function updateClient(id: string, input: Partial<ClientInput>): Promise<Client | null> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase' ? pb.updateClient(id, input) : local.updateClient(id, input)
 }
 
@@ -389,18 +402,21 @@ export async function getQuote(id: string): Promise<QuoteWithRelations | null> {
 }
 
 export async function createQuote(input: QuoteInput): Promise<Quote> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase'
     ? quotesPb.createQuote(input)
     : quotesLocal.createQuote(input)
 }
 
 export async function markQuoteSent(quoteId: string): Promise<Quote | null> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase'
     ? quotesPb.updateQuoteStatus(quoteId, 'sent')
     : quotesLocal.updateQuoteStatus(quoteId, 'sent')
 }
 
 export async function acceptQuote(quoteId: string): Promise<{ quote: Quote; jobId: string } | null> {
+  assertCanWrite()
   const result =
     (await resolveBackend()) === 'pocketbase'
       ? await quotesPb.acceptQuote(quoteId)
@@ -410,9 +426,76 @@ export async function acceptQuote(quoteId: string): Promise<{ quote: Quote; jobI
 }
 
 export async function declineQuote(quoteId: string): Promise<Quote | null> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase'
     ? quotesPb.updateQuoteStatus(quoteId, 'declined')
     : quotesLocal.updateQuoteStatus(quoteId, 'declined')
+}
+
+export async function getLeads(): Promise<LeadWithRelations[]> {
+  return (await resolveBackend()) === 'pocketbase' ? leadsPb.getLeads() : leadsLocal.getLeads()
+}
+
+export async function getLead(id: string): Promise<LeadWithRelations | null> {
+  return (await resolveBackend()) === 'pocketbase' ? leadsPb.getLead(id) : leadsLocal.getLead(id)
+}
+
+export async function createLead(input: LeadInput): Promise<Lead> {
+  assertCanWrite()
+  return (await resolveBackend()) === 'pocketbase' ? leadsPb.createLead(input) : leadsLocal.createLead(input)
+}
+
+export async function updateLead(id: string, input: Partial<LeadInput>): Promise<Lead | null> {
+  assertCanWrite()
+  return (await resolveBackend()) === 'pocketbase' ? leadsPb.updateLead(id, input) : leadsLocal.updateLead(id, input)
+}
+
+export async function updateLeadStage(id: string, stage: LeadStage): Promise<Lead | null> {
+  assertCanWrite()
+  return (await resolveBackend()) === 'pocketbase'
+    ? leadsPb.updateLeadStage(id, stage)
+    : leadsLocal.updateLeadStage(id, stage)
+}
+
+export async function deleteLead(id: string): Promise<boolean> {
+  assertCanWrite()
+  return (await resolveBackend()) === 'pocketbase' ? leadsPb.deleteLead(id) : leadsLocal.deleteLead(id)
+}
+
+export async function getTimeBlocks(fromDate: string, toDate: string) {
+  if ((await resolveBackend()) !== 'pocketbase') return []
+  return timeBlocksPb.getTimeBlocks(fromDate, toDate)
+}
+
+export async function createTimeBlock(input: import('../types').TimeBlockInput) {
+  assertCanWrite()
+  if ((await resolveBackend()) !== 'pocketbase') {
+    throw new Error('Time blocks require PocketBase')
+  }
+  return timeBlocksPb.createTimeBlock(input)
+}
+
+export async function deleteTimeBlock(id: string) {
+  assertCanWrite()
+  if ((await resolveBackend()) !== 'pocketbase') return false
+  return timeBlocksPb.deleteTimeBlock(id)
+}
+
+export async function createQuoteForLead(leadId: string): Promise<Quote> {
+  assertCanWrite()
+  return (await resolveBackend()) === 'pocketbase'
+    ? leadsPb.createQuoteForLead(leadId)
+    : leadsLocal.createQuoteForLead(leadId)
+}
+
+export async function convertLeadToJob(
+  leadId: string,
+  options?: import('./leads-pocketbase').ConvertLeadToJobOptions
+): Promise<{ jobId: string; clientId: string }> {
+  assertCanWrite()
+  return (await resolveBackend()) === 'pocketbase'
+    ? leadsPb.convertLeadToJob(leadId, options)
+    : leadsLocal.convertLeadToJob(leadId, options)
 }
 
 export async function getSupplies(): Promise<Supply[]> {
@@ -446,6 +529,35 @@ export async function updateSupply(id: string, input: Partial<SupplyInput>): Pro
     local: () => suppliesLocal.updateSupply(id, input),
     pocketbase: () => suppliesPb.updateSupply(id, input),
     buildQueue: (supply) => (supply ? { type: 'updateSupply', params: { id, input } } : null),
+  })
+}
+
+export async function uploadSupplyPhoto(id: string, file: File): Promise<Supply | null> {
+  const prepared = await compressInventoryPhoto(file)
+  const resolved = await resolveBackend()
+  const dataUrlPromise = readFileAsDataUrl(prepared)
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => suppliesLocal.uploadSupplyPhoto(id, prepared),
+    pocketbase: () => suppliesPb.uploadSupplyPhoto(id, prepared),
+    buildQueue: async (supply) =>
+      supply
+        ? {
+            type: 'uploadSupplyPhoto',
+            params: { id, dataUrl: await dataUrlPromise, filename: prepared.name },
+          }
+        : null,
+  })
+}
+
+export async function clearSupplyPhoto(id: string): Promise<Supply | null> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => suppliesLocal.clearSupplyPhoto(id),
+    pocketbase: () => suppliesPb.clearSupplyPhoto(id),
+    buildQueue: (supply) =>
+      supply ? { type: 'clearSupplyPhoto', params: { id } } : null,
   })
 }
 
@@ -497,6 +609,35 @@ export async function updateEquipment(
     local: () => equipmentLocal.updateEquipment(id, input),
     pocketbase: () => equipmentPb.updateEquipment(id, input),
     buildQueue: (item) => (item ? { type: 'updateEquipment', params: { id, input } } : null),
+  })
+}
+
+export async function uploadEquipmentPhoto(id: string, file: File): Promise<Equipment | null> {
+  const prepared = await compressInventoryPhoto(file)
+  const resolved = await resolveBackend()
+  const dataUrlPromise = readFileAsDataUrl(prepared)
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => equipmentLocal.uploadEquipmentPhoto(id, prepared),
+    pocketbase: () => equipmentPb.uploadEquipmentPhoto(id, prepared),
+    buildQueue: async (item) =>
+      item
+        ? {
+            type: 'uploadEquipmentPhoto',
+            params: { id, dataUrl: await dataUrlPromise, filename: prepared.name },
+          }
+        : null,
+  })
+}
+
+export async function clearEquipmentPhoto(id: string): Promise<Equipment | null> {
+  const resolved = await resolveBackend()
+  return executeWrite({
+    resolvedBackend: resolved,
+    local: () => equipmentLocal.clearEquipmentPhoto(id),
+    pocketbase: () => equipmentPb.clearEquipmentPhoto(id),
+    buildQueue: (item) =>
+      item ? { type: 'clearEquipmentPhoto', params: { id } } : null,
   })
 }
 
@@ -727,6 +868,7 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
 }
 
 export async function updateVehicle(id: string, input: Partial<VehicleInput>): Promise<Vehicle | null> {
+  assertCanWrite()
   return (await resolveBackend()) === 'pocketbase'
     ? vehiclesPb.updateVehicle(id, input)
     : vehiclesLocal.updateVehicle(id, input)

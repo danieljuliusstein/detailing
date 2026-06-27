@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CalendarBlank,
@@ -13,12 +13,16 @@ import {
   Plus,
 } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { FloatingAffixField, FloatingField, SheetSubmitButton } from '@/components/forms'
 import JobExpensesSheet, { type JobExpenseDraft } from '@/components/jobs/JobExpensesSheet'
 import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import { getSupplies } from '@/lib/api'
 import './QuickAddJob.css'
 import { fmt } from '@/lib/calculations'
 import { deriveInitials } from '@/lib/client-relationship-logic'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
+import { loadSettingsAsync } from '@/lib/settings'
 import type { ClientWithStats, Package, QuickJobData, Supply, SupplyUsage, VehicleType } from '@/lib/types'
 import { VEHICLE_TYPE_OPTIONS } from '@/lib/vehicle-type-icons'
 
@@ -46,6 +50,8 @@ export default function QuickAddJob({
   onSave,
 }: QuickAddJobProps) {
   const router = useRouter()
+  const { handleWriteError } = useActionToast()
+  const formRef = useRef<HTMLDivElement>(null)
 
   const [clientSearch, setClientSearch] = useState('')
   const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null)
@@ -72,6 +78,11 @@ export default function QuickAddJob({
   const [pendingSupplies, setPendingSupplies] = useState<SupplyUsage[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [travelRatePerMile, setTravelRatePerMile] = useState<number | undefined>()
+
+  useEffect(() => {
+    void loadSettingsAsync().then((s) => setTravelRatePerMile(s.travel_rate_per_mile))
+  }, [])
 
   useEffect(() => {
     if (initialClient) {
@@ -79,6 +90,10 @@ export default function QuickAddJob({
       setClientSearch('')
     }
   }, [initialClient])
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [revenue, tip, notes])
 
   const filteredClients = clients.filter((c) => {
     const q = clientSearch.toLowerCase()
@@ -124,6 +139,7 @@ export default function QuickAddJob({
       const job = await onSave(buildPayload(supplies_used))
       router.push(`/jobs/${job.id}`)
     } catch (err) {
+      if (handleWriteError(err)) return
       setSaveError(err instanceof Error ? err.message : 'Could not save job.')
     } finally {
       setSaving(false)
@@ -142,6 +158,11 @@ export default function QuickAddJob({
     }
     if (revenue <= 0) {
       setSaveError('Enter revenue greater than zero.')
+      return
+    }
+    const appSettings = await loadSettingsAsync()
+    if (!appSettings.track_job_supplies) {
+      await performSave()
       return
     }
     const supplies = await getSupplies()
@@ -346,70 +367,58 @@ export default function QuickAddJob({
           </div>
         </section>
 
-        {/* 4. Revenue */}
-        <section id="nj-revenue" className="new-job-section">
-          <div className="new-job-label">Revenue &amp; Tip</div>
-          <div className="new-job-money-grid">
-            <div>
-              <div className="new-job-money-sublabel">Revenue</div>
-              <div className="new-job-money-box">
-                <span className="new-job-money-sign new-job-money-sign--green">$</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  className="new-job-money-input"
-                  placeholder="0"
-                  value={revenue || ''}
-                  onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))}
-                />
-              </div>
+        <div ref={formRef} className="page-form">
+          {/* 4. Revenue */}
+          <section id="nj-revenue" className="new-job-section">
+            <div className="page-form__grid2">
+              <FloatingAffixField
+                id="nj-revenue"
+                label="Revenue"
+                filled={revenue > 0}
+                type="number"
+                inputMode="decimal"
+                value={revenue || ''}
+                onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))}
+              />
+              <FloatingAffixField
+                id="nj-tip"
+                label="Tip"
+                filled={tip > 0}
+                type="number"
+                inputMode="decimal"
+                value={tip || ''}
+                onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))}
+              />
             </div>
-            <div>
-              <div className="new-job-money-sublabel">Tip</div>
-              <div className="new-job-money-box">
-                <span className="new-job-money-sign">$</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  className="new-job-money-input"
-                  placeholder="0"
-                  value={tip || ''}
-                  onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        {/* 5. Notes */}
-        <section id="nj-notes" className="new-job-section">
-          <div className="new-job-label">
-            Notes <span className="new-job-optional">OPTIONAL</span>
-          </div>
-          <div className="new-job-notes-box">
-            <textarea
-              className="new-job-notes-input"
-              placeholder="e.g. client wants interior only, paint correction on driver side..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-            />
-          </div>
-        </section>
+          {/* 5. Notes */}
+          <section id="nj-notes" className="new-job-section">
+            <FloatingField id="nj-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
+              <textarea
+                id="nj-notes"
+                className={`f-textarea${notes.trim() ? ' hv' : ''}`}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder=" "
+              />
+            </FloatingField>
+          </section>
+        </div>
 
         {saveError && <p className="new-job-error" role="alert" aria-live="assertive">{saveError}</p>}
       </div>
 
       <footer className="new-job-footer">
-        <button
-          type="button"
-          className={`btn-primary${!isValid ? ' new-job-save-btn--muted' : ''}`}
-          style={{ flex: 1 }}
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? 'Saving…' : 'Save job'}
-        </button>
+        <div style={{ flex: 1 }}>
+          <SheetSubmitButton
+            label={saving ? 'Saving…' : 'Save job'}
+            ready={isValid}
+            disabled={saving}
+            onClick={() => void handleSave()}
+          />
+        </div>
         <button
           type="button"
           className="btn-ghost new-job-expenses-btn"
@@ -423,6 +432,7 @@ export default function QuickAddJob({
       {expenseSheetOpen && (
         <JobExpensesSheet
           value={expenses}
+          travelRatePerMile={travelRatePerMile}
           onSave={setExpenses}
           onClose={() => setExpenseSheetOpen(false)}
         />

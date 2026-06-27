@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { apiUnauthorized, verifyApiSecret } from '@/lib/server/api-auth'
-import { createPortalToken } from '@/lib/server/portal-tokens'
+import { createPortalToken, getRequestAppBaseUrl } from '@/lib/server/portal-tokens'
 
 export async function POST(request: Request) {
   if (!verifyApiSecret(request)) return apiUnauthorized()
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
       scope,
       jobId,
       quoteId,
+      appBaseUrl: await getRequestAppBaseUrl(),
     })
 
     return NextResponse.json(result)

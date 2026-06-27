@@ -272,7 +272,7 @@ export default function InventoryPage() {
                 vendor: input.supplier,
               })
             }
-            await reload()
+            return created
           }}
           onSaveEdit={async (id, input) => {
             const prev = catalog.find((s) => s.id === id)
@@ -281,7 +281,6 @@ export default function InventoryPage() {
             const updated = await getSupplies()
             const next = updated.find((s) => s.id === id)
             if (next && isLowStock(next) && !wasLow) notifyLowStock(next.name)
-            await reload()
           }}
           onRestock={async (id, quantity, totalCost) => {
             const supply = catalog.find((s) => s.id === id)
@@ -297,8 +296,8 @@ export default function InventoryPage() {
             } else {
               await restockSupply(id, { quantity, total_cost: totalCost || undefined })
             }
-            await reload()
           }}
+          onAfterSave={reload}
           onDelete={handleSupplyDelete}
           onClose={() => {
             setEditingSupply(null)
@@ -330,12 +329,12 @@ export default function InventoryPage() {
                 equipment_id: created.id,
               })
             }
-            await reload()
+            return created
           }}
           onSaveEdit={async (id, input) => {
             await updateEquipment(id, input)
-            await reload()
           }}
+          onAfterSave={reload}
           onDelete={handleEquipmentDelete}
           onClose={() => {
             setEditingEquipment(null)

@@ -13,6 +13,7 @@ interface BottomSheetProps {
   title: string
   subtitle?: string
   ariaLabel?: string
+  variant?: 'default' | 'premium'
   sheetClassName?: string
   onClose: () => void
   children: React.ReactNode
@@ -26,6 +27,7 @@ export default function BottomSheet({
   title,
   subtitle,
   ariaLabel,
+  variant = 'default',
   sheetClassName,
   onClose,
   children,
@@ -89,6 +91,14 @@ export default function BottomSheet({
 
   if (typeof document === 'undefined') return null
 
+  const sheetClasses = [
+    'inv-sheet',
+    variant === 'premium' ? 'premium-sheet' : '',
+    sheetClassName ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return createPortal(
     <div className="inv-sheet-root" role="dialog" aria-modal="true" aria-label={ariaLabel ?? title}>
       <button
@@ -99,7 +109,7 @@ export default function BottomSheet({
         style={{ opacity: overlayOpacity, transition: dragging ? 'none' : 'opacity 0.2s ease' }}
       />
       <div
-        className={`inv-sheet${sheetClassName ? ` ${sheetClassName}` : ''}`}
+        className={sheetClasses}
         style={{
           transform: `translateY(${dragY}px)`,
           transition: dragging ? 'none' : 'transform 0.25s ease',

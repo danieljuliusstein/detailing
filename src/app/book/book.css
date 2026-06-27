@@ -231,6 +231,127 @@
   margin-left: 4px;
 }
 
+.book-day-chips-wrap {
+  margin-bottom: 4px;
+}
+
+.book-day-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.book-day-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.book-day-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  padding: 10px 8px;
+  background: var(--book-raised);
+  border: 0.5px solid var(--book-border);
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--book-text);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.book-day-chip--active {
+  background: var(--book-green-bg, var(--cl-accent-bg));
+  border-color: var(--book-green, var(--cl-accent));
+}
+
+.book-day-chip__weekday {
+  font-size: 11px;
+  color: var(--book-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.book-day-chip__day {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.book-day-chip__month {
+  font-size: 11px;
+  color: var(--book-muted);
+}
+
+.book-day-more {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--book-green, var(--cl-accent));
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.book-day-more-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.book-datetime-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: var(--book-raised);
+  border: 0.5px solid var(--book-border);
+  border-radius: 12px;
+}
+
+.book-datetime-summary__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--book-text);
+  min-width: 0;
+}
+
+.book-datetime-summary__change {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--book-green, var(--cl-accent));
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.book-slots-empty {
+  margin: 0 0 12px;
+  padding: 16px;
+  font-size: 14px;
+  color: var(--book-muted);
+  text-align: center;
+  background: var(--book-raised);
+  border: 0.5px dashed var(--book-border);
+  border-radius: 12px;
+}
+
 .book-datetime-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

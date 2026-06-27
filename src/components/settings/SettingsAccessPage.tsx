@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CaretRight } from '@phosphor-icons/react'
+import { Button } from '@/components/ui'
 import {
   clearLocalDeviceData,
   clearOfflineQueue,
@@ -19,6 +20,7 @@ import {
   type SyncStatus,
 } from '@/lib/api'
 import { buildLocalExport, downloadJson, runNotificationsCheck, triggerServerBackup } from '@/lib/export-data'
+import { getPocketBaseAuthToken } from '@/lib/pb-auth'
 import { saveSettingsAsync } from '@/lib/settings'
 import SettingsDetailShell from './SettingsDetailShell'
 import { useSettingsDraft } from './SettingsDraftProvider'
@@ -69,9 +71,9 @@ function DeveloperToolsPanel({
             <p className="settings-msg settings-msg--warn">
               Showing data stored on this device only. Connect to PocketBase to load your cloud jobs and clients.
             </p>
-            <button type="button" className="btn-ghost" onClick={onReconnectCloud}>
+            <Button type="button" variant="ghost" onClick={onReconnectCloud}>
               Reconnect to cloud
-            </button>
+            </Button>
           </>
         ) : null}
         {migration ? (
@@ -94,9 +96,9 @@ function DeveloperToolsPanel({
           </div>
         ) : null}
         {migrationMsg ? <p className="settings-msg">{migrationMsg}</p> : null}
-        <button
+        <Button
           type="button"
-          className="btn-ghost"
+          variant="ghost"
           onClick={onMigrate}
           disabled={
             migrating ||
@@ -112,22 +114,22 @@ function DeveloperToolsPanel({
                 migration.localJobCount <= migration.pocketBaseJobCount
               ? 'Migration complete'
               : 'Migrate local data to PocketBase'}
-        </button>
-        <button type="button" className="btn-ghost" onClick={onSyncNow} disabled={syncing || !syncStatus?.pendingWrites}>
+        </Button>
+        <Button type="button" variant="ghost" onClick={onSyncNow} disabled={syncing || !syncStatus?.pendingWrites}>
           {syncing ? 'Syncing…' : 'Sync pending changes'}
-        </button>
+        </Button>
         {syncStatus && syncStatus.pendingWrites > 0 ? (
-          <button type="button" className="btn-ghost settings-btn-danger" onClick={onClearQueue}>
+          <Button type="button" variant="ghost" className="settings-btn-danger" onClick={onClearQueue}>
             Clear sync queue
-          </button>
+          </Button>
         ) : null}
-        <button type="button" className="btn-ghost" onClick={onRunCron}>
+        <Button type="button" variant="ghost" onClick={onRunCron}>
           Run notification check now
-        </button>
+        </Button>
         {cronMsg ? <p className="settings-msg">{cronMsg}</p> : null}
-        <button type="button" className="btn-ghost settings-btn-muted" onClick={onClearLocal}>
+        <Button type="button" variant="ghost" className="settings-btn-muted" onClick={onClearLocal}>
           Clear local device data
-        </button>
+        </Button>
       </div>
     </details>
   )
@@ -146,6 +148,10 @@ export default function SettingsAccessPage() {
   const [syncing, setSyncing] = useState(false)
   const [migrationMsg, setMigrationMsg] = useState<string | null>(null)
   const [cronMsg, setCronMsg] = useState<string | null>(null)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
 
   const refreshSync = async () => {
     const [b, m, s] = await Promise.all([getActiveBackend(), getMigrationStatus(), getSyncStatus()])
@@ -247,6 +253,35 @@ export default function SettingsAccessPage() {
     window.location.reload()
   }
 
+  const handleDeleteAccount = async () => {
+    if (!settings) return
+    setDeleting(true)
+    setDeleteMsg(null)
+    try {
+      const token = getPocketBaseAuthToken()
+      if (!token) throw new Error('Not signed in')
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          businessName: deleteConfirmName,
+          confirmed: deleteConfirmed,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Delete failed')
+      router.replace('/auth')
+      window.location.reload()
+    } catch (e) {
+      setDeleteMsg(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!ready || !settings) {
     return (
       <div className="screen page-content settings-screen settings-screen--loading">
@@ -258,20 +293,16 @@ export default function SettingsAccessPage() {
   return (
     <SettingsDetailShell title="Access and data" showSave={false}>
       <div className="settings-panel settings-panel--flush">
-        <button type="button" className="settings-row-link" onClick={() => router.push('/settings/change-pin')}>
-          <span>Change PIN</span>
-          <CaretRight size={16} color="var(--text-dim)" />
-        </button>
         <div className="settings-divider" />
         <p className="settings-status-line">
           Last backup: {settings.last_backup_at ? new Date(settings.last_backup_at).toLocaleDateString() : 'Never'}
         </p>
-        <button type="button" className="btn-ghost" onClick={() => void handleBackup()} disabled={backingUp}>
+        <Button type="button" variant="ghost" onClick={() => void handleBackup()} disabled={backingUp}>
           {backingUp ? 'Backing up…' : 'Backup now (PocketBase)'}
-        </button>
-        <button type="button" className="btn-ghost" onClick={handleExport}>
+        </Button>
+        <Button type="button" variant="ghost" onClick={handleExport}>
           Export all data (local JSON)
-        </button>
+        </Button>
         {backupMsg ? <p className="settings-msg">{backupMsg}</p> : null}
         <div className="settings-divider" />
         <Link href="/privacy" className="settings-row-link settings-row-link--plain">
@@ -295,6 +326,42 @@ export default function SettingsAccessPage() {
           onClearLocal={() => void handleClearLocal()}
         />
       </div>
+
+      <section className="card settings-delete-account">
+        <h2 className="settings-delete-account__title">Delete account</h2>
+        <p className="settings-panel__lead">
+          Permanently delete your organization, jobs, clients, and settings. This cannot be undone.
+        </p>
+        <Button type="button" variant="ghost" onClick={handleExport}>
+          Export all data first (recommended)
+        </Button>
+        <label className="settings-delete-account__field">
+          <span>Type your business name to confirm: <strong>{settings.business_name}</strong></span>
+          <input
+            className="f-input"
+            value={deleteConfirmName}
+            onChange={(e) => setDeleteConfirmName(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <label className="settings-delete-account__check">
+          <input
+            type="checkbox"
+            checked={deleteConfirmed}
+            onChange={(e) => setDeleteConfirmed(e.target.checked)}
+          />
+          <span>I understand this is permanent</span>
+        </label>
+        <Button
+          type="button"
+          variant="danger"
+          disabled={deleting || deleteConfirmName.trim() !== settings.business_name.trim() || !deleteConfirmed}
+          onClick={() => void handleDeleteAccount()}
+        >
+          {deleting ? 'Deleting…' : 'Delete account permanently'}
+        </Button>
+        {deleteMsg ? <p className="settings-msg settings-msg--error">{deleteMsg}</p> : null}
+      </section>
     </SettingsDetailShell>
   )
 }

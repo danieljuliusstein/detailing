@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { validatePortalToken, getRequestAppBaseUrl } from '@/lib/server/portal-tokens'
+import { validatePortalToken } from '@/lib/server/portal-tokens'
 import { authenticateServerPocketBase } from '@/lib/server/pocketbase-admin'
-import { getStripe, isStripeConfigured } from '@/lib/server/stripe'
+import { resolveConnectDestination } from '@/lib/server/stripe-connect'
+import { getStripe, isStripeConfigured, stripeAppOrigin } from '@/lib/server/stripe'
 
 type CheckoutResult =
   | { ok: true; url: string }
   | { ok: false; error: string; status: number }
 
-async function createPortalCheckout(token: string): Promise<CheckoutResult> {
+async function createPortalCheckout(request: Request, token: string): Promise<CheckoutResult> {
   if (!isStripeConfigured()) {
     return { ok: false, error: 'Online payments are not enabled', status: 503 }
   }
@@ -37,7 +38,21 @@ async function createPortalCheckout(token: string): Promise<CheckoutResult> {
       return { ok: false, error: 'Nothing to pay', status: 400 }
     }
 
-    const baseUrl = await getRequestAppBaseUrl()
+    const orgId = String(inv.organization_id ?? record.organization_id ?? '').trim()
+    if (!orgId) {
+      return { ok: false, error: 'Invalid invoice', status: 400 }
+    }
+
+    const connectAccountId = await resolveConnectDestination(orgId)
+    if (!connectAccountId) {
+      return {
+        ok: false,
+        error: 'Online payments are not set up for this business yet',
+        status: 503,
+      }
+    }
+
+    const baseUrl = stripeAppOrigin(request)
     const portalUrl = `${baseUrl}/portal/${token}`
 
     const session = await stripe.checkout.sessions.create({
@@ -56,9 +71,14 @@ async function createPortalCheckout(token: string): Promise<CheckoutResult> {
           quantity: 1,
         },
       ],
+      payment_intent_data: {
+        transfer_data: {
+          destination: connectAccountId,
+        },
+      },
       metadata: {
         invoice_id: String(inv.id),
-        organization_id: String(inv.organization_id ?? record.organization_id ?? ''),
+        organization_id: orgId,
         portal_token: token,
       },
       success_url: `${portalUrl}?paid=1`,
@@ -80,13 +100,12 @@ async function createPortalCheckout(token: string): Promise<CheckoutResult> {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params
-  const result = await createPortalCheckout(token)
-  const baseUrl = await getRequestAppBaseUrl()
-  const portalUrl = `${baseUrl}/portal/${token}`
+  const result = await createPortalCheckout(request, token)
+  const portalUrl = `${new URL(request.url).origin}/portal/${token}`
 
   if (!result.ok) {
     return NextResponse.redirect(`${portalUrl}?pay_error=${encodeURIComponent(result.error)}`)
@@ -96,11 +115,11 @@ export async function GET(
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params
-  const result = await createPortalCheckout(token)
+  const result = await createPortalCheckout(request, token)
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status })
   }

@@ -1,4 +1,7 @@
-const DEFAULT_LOGO = '/api/business-logo'
+'use client'
+
+import { useState } from 'react'
+import { hasCustomBusinessLogo, resolveBusinessLogoSrc } from '@/lib/business-logo'
 
 interface BusinessLogoProps {
   logoUrl?: string | null
@@ -7,7 +10,21 @@ interface BusinessLogoProps {
 }
 
 export default function BusinessLogo({ logoUrl, size = 64, className = '' }: BusinessLogoProps) {
-  const src = logoUrl?.trim() || DEFAULT_LOGO
+  const [loadFailed, setLoadFailed] = useState(false)
+  const src = resolveBusinessLogoSrc(logoUrl)
+  const showPlaceholder = !src || loadFailed
+
+  if (showPlaceholder) {
+    return (
+      <span
+        className={`business-logo-wrap business-logo-wrap--placeholder ${className}`.trim()}
+        style={{ width: size, height: size }}
+        aria-hidden="true"
+      >
+        <span className="business-logo-placeholder-label">Logo</span>
+      </span>
+    )
+  }
 
   return (
     <span
@@ -20,11 +37,7 @@ export default function BusinessLogo({ logoUrl, size = 64, className = '' }: Bus
         src={src}
         alt=""
         className="business-logo"
-        onError={(e) => {
-          const img = e.currentTarget
-          if (img.src.endsWith('/logo.png')) return
-          img.src = '/logo.png'
-        }}
+        onError={() => setLoadFailed(true)}
       />
     </span>
   )

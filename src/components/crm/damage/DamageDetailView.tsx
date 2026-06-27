@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Image as ImageIcon } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { FloatingField, SheetSubmitButton } from '@/components/forms'
 import { deleteDamageDoc, updateDamageDocNote } from '@/lib/api'
 import { formatCapturedAt, formatDamageDate } from '@/lib/damage-docs'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import type { DamageRecord } from '@/lib/types'
 
 interface DamageDetailViewProps {
@@ -24,9 +26,15 @@ export default function DamageDetailView({
   photoTotal = 1,
 }: DamageDetailViewProps) {
   const router = useRouter()
+  const formRef = useRef<HTMLDivElement>(null)
   const [editing, setEditing] = useState(false)
   const [note, setNote] = useState(damage.note)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!editing) return
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [editing, note])
 
   const handleDelete = () => {
     if (!window.confirm('Delete this damage record? This cannot be undone.')) return
@@ -81,21 +89,29 @@ export default function DamageDetailView({
         </div>
 
         {editing ? (
-          <div className="card" style={{ marginBottom: 12 }}>
-            <div className="field-label">Note</div>
-            <textarea
-              className="field-input field-input--multiline"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={4}
-            />
+          <div ref={formRef} className="page-form-card page-form" style={{ marginBottom: 12 }}>
+            <FloatingField id="damage-edit-note" label="Note" filled={note.trim().length > 0} optional textarea>
+              <textarea
+                id="damage-edit-note"
+                className={`f-textarea${note.trim() ? ' hv' : ''}`}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder=" "
+                rows={4}
+              />
+            </FloatingField>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="btn-secondary" onClick={() => setEditing(false)} disabled={busy}>
                 Cancel
               </button>
-              <button type="button" className="btn-primary" style={{ flex: 1 }} onClick={handleSaveNote} disabled={busy}>
-                Save note
-              </button>
+              <div className="page-form-save" style={{ flex: 1, margin: 0 }}>
+                <SheetSubmitButton
+                  label={busy ? 'Saving…' : 'Save note'}
+                  ready
+                  disabled={busy}
+                  onClick={() => void handleSaveNote()}
+                />
+              </div>
             </div>
           </div>
         ) : (

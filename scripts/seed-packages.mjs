@@ -11,10 +11,10 @@ const PB_PASSWORD = process.env.PB_PASSWORD || process.env.NEXT_PUBLIC_PB_PASSWO
 const ORG_SLUG = process.env.ORG_SLUG?.trim()
 
 const PACKAGES = [
-  { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry' },
-  { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail' },
-  { name: 'Paint Correction', base_price: 450, active: true, description: 'Single-stage paint correction' },
-  { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application' },
+  { name: 'Basic Wash', base_price: 80, active: true, description: 'Exterior wash and dry', duration_minutes: 90 },
+  { name: 'Full Detail', base_price: 320, active: true, description: 'Interior + exterior full detail', duration_minutes: 240 },
+  { name: 'Paint Correction', base_price: 450, active: true, description: 'Single-stage paint correction', duration_minutes: 300 },
+  { name: 'Ceramic Coat', base_price: 800, active: true, description: 'Ceramic coating application', duration_minutes: 360 },
 ]
 
 async function main() {

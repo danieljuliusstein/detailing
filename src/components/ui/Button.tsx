@@ -1,23 +1,41 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-type ButtonVariant = 'primary' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'ghost' | 'secondary' | 'danger'
 
-const variantClass: Record<ButtonVariant, string> = {
+const VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: 'btn-primary',
   ghost: 'btn-ghost',
+  secondary: 'btn-secondary',
   danger: 'btn-danger',
 }
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
+  fullWidth?: boolean
+  loading?: boolean
   children: ReactNode
 }
 
-export default function Button({ variant = 'primary', className = '', children, ...props }: ButtonProps) {
-  const classes = [variantClass[variant], className].filter(Boolean).join(' ')
+export default function Button({
+  variant = 'primary',
+  fullWidth = true,
+  loading = false,
+  className = '',
+  disabled,
+  children,
+  ...props
+}: ButtonProps) {
+  const classes = [
+    VARIANT_CLASS[variant],
+    fullWidth ? '' : 'ui-btn--auto',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <button type="button" className={classes} {...props}>
-      {children}
+    <button className={classes} disabled={disabled || loading} {...props}>
+      {loading ? 'Loading…' : children}
     </button>
   )
 }

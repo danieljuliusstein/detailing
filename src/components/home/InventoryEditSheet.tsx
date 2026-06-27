@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Trash } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 import BottomSheet from '@/components/BottomSheet'
+import { FloatingAffixField, FloatingField, PillGroup, SheetFooter } from '@/components/forms'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import {
   categoryLabel,
   formatUpdatedDate,
@@ -10,6 +11,11 @@ import {
   type InventoryCategory,
   type InventoryStatus,
 } from '@/lib/home-inventory'
+
+const STATUS_PILLS: { value: InventoryStatus; label: string }[] = [
+  { value: 'ok', label: 'OK' },
+  { value: 'low', label: 'Low' },
+]
 
 interface InventoryEditSheetProps {
   item: HomeInventoryItem | null
@@ -33,6 +39,7 @@ export default function InventoryEditSheet({
   onDelete,
   onClose,
 }: InventoryEditSheetProps) {
+  const formRef = useRef<HTMLDivElement>(null)
   const [name, setName] = useState('')
   const [status, setStatus] = useState<InventoryStatus>('ok')
   const [notes, setNotes] = useState('')
@@ -48,6 +55,10 @@ export default function InventoryEditSheet({
     setNotes(item?.notes ?? '')
     setPriceEstimate(item?.priceEstimate != null ? String(item.priceEstimate) : '')
   }, [item, isNew])
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [name, notes, priceEstimate, item, isNew])
 
   if (!item && !isNew) return null
 
@@ -68,97 +79,59 @@ export default function InventoryEditSheet({
 
   return (
     <BottomSheet
+      variant="premium"
       title={isNew ? `Add ${categoryLabel(category).toLowerCase()}` : name || 'Edit item'}
       subtitle={subtitle}
-      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
-        <div className="inv-sheet-actions inv-sheet-actions--split">
-          {!isNew ? (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={onDelete}
-              aria-label="Delete item"
-              style={{ gridColumn: '1 / -1', width: '100%' }}
-            >
-              <Trash size={18} weight="bold" color="#f87171" />
-            </button>
-          ) : null}
-          <button type="button" className="inv-sheet-save inv-sheet-save--outline" onClick={handleSave}>
-            {isNew ? 'Add item' : 'Save changes'}
-          </button>
-          <button type="button" className="inv-sheet-cancel" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
+        <SheetFooter
+          saveLabel={isNew ? 'Add item' : 'Save changes'}
+          ready={name.trim().length > 0}
+          layout="split"
+          onSave={handleSave}
+          onCancel={onClose}
+          onDelete={!isNew ? onDelete : undefined}
+        />
       }
     >
-      <div className="inv-sheet-section">
-        <div className="inv-field">
-          <label className="inv-field-label" htmlFor="inv-edit-name">
-            Name
-          </label>
+      <div ref={formRef} className="premium-sheet__form">
+        <FloatingField id="inv-edit-name" label="Name" filled={name.trim().length > 0}>
           <input
             id="inv-edit-name"
-            className="inv-field-input"
+            className={`f-input${name.trim() ? ' hv' : ''}`}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Item name"
+            placeholder=" "
+            autoFocus
           />
-        </div>
+        </FloatingField>
 
-        {hasStatus && (
-          <div className="inv-field">
-            <span className="inv-field-label">Status</span>
-            <div className="inv-status-toggle">
-              <button
-                type="button"
-                className={`inv-status-btn${status === 'ok' ? ' inv-status-btn--ok' : ''}`}
-                onClick={() => setStatus('ok')}
-              >
-                ✓ OK
-              </button>
-              <button
-                type="button"
-                className={`inv-status-btn${status === 'low' ? ' inv-status-btn--low' : ''}`}
-                onClick={() => setStatus('low')}
-              >
-                ⚠ LOW
-              </button>
-            </div>
-          </div>
-        )}
+        {hasStatus ? (
+          <PillGroup label="Status" options={STATUS_PILLS} value={status} onChange={setStatus} />
+        ) : null}
 
-        {isWishlist && (
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="inv-edit-price">
-              Price
-            </label>
-            <input
-              id="inv-edit-price"
-              className="inv-field-input"
-              type="number"
-              min={0}
-              value={priceEstimate}
-              onChange={(e) => setPriceEstimate(e.target.value)}
-              placeholder="e.g. 300"
-            />
-          </div>
-        )}
+        {isWishlist ? (
+          <FloatingAffixField
+            id="inv-edit-price"
+            label="Price"
+            type="number"
+            min={0}
+            value={priceEstimate}
+            filled={priceEstimate.trim().length > 0}
+            onChange={(e) => setPriceEstimate(e.target.value)}
+          />
+        ) : null}
 
-        <div className="inv-field">
-          <label className="inv-field-label" htmlFor="inv-edit-notes">
-            Notes <span className="inv-field-label-optional">(optional)</span>
-          </label>
+        <FloatingField id="inv-edit-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
           <textarea
             id="inv-edit-notes"
-            className="inv-field-textarea"
+            className={`f-textarea${notes.trim() ? ' hv' : ''}`}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. almost out, need 1 gallon jug..."
+            placeholder=" "
+            rows={3}
           />
-        </div>
+        </FloatingField>
       </div>
     </BottomSheet>
   )

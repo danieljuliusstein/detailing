@@ -1,12 +1,10 @@
-import { DEFAULT_AUTO_TEMPLATES, type AutoMessageTemplate, type MessageChannel, type SentMessageChannel } from '../messages'
+import { DEFAULT_AUTO_TEMPLATES, type AutoMessageTemplate } from '../messages'
 import { authenticateServerPocketBase } from './pocketbase-admin'
 import { createPortalToken, getAppBaseUrl } from './portal-tokens'
-import { sendSms, isTwilioConfigured } from './twilio'
 import { Resend } from 'resend'
 
 export interface MessageSendContext {
   clientName: string
-  clientPhone?: string
   clientEmail?: string
   packageName: string
   jobDate: string
@@ -45,14 +43,6 @@ export async function mergeTemplateBody(
     .replace(/\{\{review_link\}\}/g, reviewLink)
 }
 
-export function resolveChannel(channel: MessageChannel, ctx: MessageSendContext): SentMessageChannel | null {
-  if (channel === 'sms') return ctx.clientPhone?.trim() ? 'sms' : null
-  if (channel === 'email') return ctx.clientEmail?.trim() ? 'email' : null
-  if (ctx.clientPhone?.trim()) return 'sms'
-  if (ctx.clientEmail?.trim()) return 'email'
-  return null
-}
-
 export async function loadAutoMessageTemplatesForOrg(orgId: string): Promise<AutoMessageTemplate[]> {
   const pb = await authenticateServerPocketBase()
   const orgEsc = orgId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -65,10 +55,8 @@ export async function loadAutoMessageTemplatesForOrg(orgId: string): Promise<Aut
     return DEFAULT_AUTO_TEMPLATES.map((t) => ({ ...t }))
   }
   return DEFAULT_AUTO_TEMPLATES.map((def) => {
-    const saved = (raw as Partial<AutoMessageTemplate>[]).find((p) => p.id === def.id)
-    return saved
-      ? { ...def, enabled: saved.enabled ?? def.enabled, channel: saved.channel ?? def.channel }
-      : { ...def }
+    const saved = (raw as { id?: string; enabled?: boolean }[]).find((p) => p.id === def.id)
+    return saved ? { ...def, enabled: saved.enabled ?? def.enabled } : { ...def }
   })
 }
 
@@ -82,7 +70,7 @@ export async function saveAutoMessageTemplatesForOrg(
     filter: `organization_id = "${orgEsc}"`,
     limit: 1,
   })
-  const payload = templates.map(({ id, enabled, channel }) => ({ id, enabled, channel }))
+  const payload = templates.map(({ id, enabled }) => ({ id, enabled }))
   if (records.length === 0) {
     await pb.collection('app_settings').create({
       organization_id: orgId,
@@ -118,7 +106,6 @@ async function logSentMessage(input: {
   organizationId: string
   clientId: string
   templateId: string
-  channel: SentMessageChannel
   preview: string
   body: string
   status: 'sent' | 'failed'
@@ -130,7 +117,7 @@ async function logSentMessage(input: {
     organization_id: input.organizationId,
     client_id: input.clientId,
     template_id: input.templateId,
-    channel: input.channel,
+    channel: 'email',
     preview: input.preview.slice(0, 160),
     body: input.body,
     status: input.status,
@@ -163,24 +150,23 @@ export async function sendAutoMessage(
   if (!template.enabled) return false
   if (await messageAlreadySent(ctx.organizationId, template.id, referenceId)) return false
 
-  const channel = resolveChannel(template.channel, ctx)
-  if (!channel) {
+  const email = ctx.clientEmail?.trim()
+  if (!email) {
     await logSentMessage({
       organizationId: ctx.organizationId,
       clientId: ctx.clientId,
       templateId: template.id,
-      channel: 'sms',
       preview: '',
       body: '',
       status: 'failed',
-      error: 'No contact channel available',
+      error: 'Client has no email on file',
       referenceId,
     })
     return false
   }
 
   let portalUrl: string | undefined
-  if (ctx.jobId && (template.smsBody.includes('{{portal_link}}') || template.emailBody.includes('{{portal_link}}'))) {
+  if (ctx.jobId && template.emailBody.includes('{{portal_link}}')) {
     try {
       const { url } = await createPortalToken({
         clientId: ctx.clientId,
@@ -193,41 +179,21 @@ export async function sendAutoMessage(
     }
   }
 
-  const body =
-    channel === 'sms'
-      ? await mergeTemplateBody(template.smsBody, ctx, portalUrl)
-      : await mergeTemplateBody(template.emailBody, ctx, portalUrl)
-
-  let ok = false
-  let error: string | undefined
-
-  if (channel === 'sms') {
-    if (!isTwilioConfigured()) {
-      error = 'Twilio not configured'
-    } else {
-      const result = await sendSms(ctx.clientPhone!, body)
-      ok = result.ok
-      if (!result.ok) error = result.error
-    }
-  } else {
-    const result = await sendEmail(ctx.clientEmail!, `${template.name} — ${ctx.packageName}`, body)
-    ok = result.ok
-    error = result.error
-  }
+  const body = await mergeTemplateBody(template.emailBody, ctx, portalUrl)
+  const result = await sendEmail(email, `${template.name} — ${ctx.packageName}`, body)
 
   await logSentMessage({
     organizationId: ctx.organizationId,
     clientId: ctx.clientId,
     templateId: template.id,
-    channel,
     preview: body.slice(0, 120),
     body,
-    status: ok ? 'sent' : 'failed',
-    error,
+    status: result.ok ? 'sent' : 'failed',
+    error: result.error,
     referenceId,
   })
 
-  return ok
+  return result.ok
 }
 
 function dateOffset(days: number): string {
@@ -255,7 +221,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
 
     const orgEsc = orgId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
-    // Appointment reminder — tomorrow's scheduled jobs
     const reminderTemplate = byId.appointment_reminder
     if (reminderTemplate?.enabled) {
       const jobs = await pb.collection('jobs').getFullList({
@@ -268,7 +233,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
         if (!client) continue
         const ctx: MessageSendContext = {
           clientName: String(client.name ?? 'Client'),
-          clientPhone: client.phone ? String(client.phone) : undefined,
           clientEmail: client.email ? String(client.email) : undefined,
           packageName: pkg ? String(pkg.name) : 'Detail',
           jobDate: String(job.date),
@@ -283,7 +247,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
       }
     }
 
-    // Job completion — completed today
     const completionTemplate = byId.job_completion
     if (completionTemplate?.enabled) {
       const jobs = await pb.collection('jobs').getFullList({
@@ -296,7 +259,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
         if (!client) continue
         const ctx: MessageSendContext = {
           clientName: String(client.name ?? 'Client'),
-          clientPhone: client.phone ? String(client.phone) : undefined,
           clientEmail: client.email ? String(client.email) : undefined,
           packageName: pkg ? String(pkg.name) : 'Detail',
           jobDate: String(job.date),
@@ -311,7 +273,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
       }
     }
 
-    // Review request — completed yesterday
     const reviewTemplate = byId.review_request
     if (reviewTemplate?.enabled) {
       const jobs = await pb.collection('jobs').getFullList({
@@ -324,7 +285,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
         if (!client) continue
         const ctx: MessageSendContext = {
           clientName: String(client.name ?? 'Client'),
-          clientPhone: client.phone ? String(client.phone) : undefined,
           clientEmail: client.email ? String(client.email) : undefined,
           packageName: pkg ? String(pkg.name) : 'Detail',
           jobDate: String(job.date),
@@ -338,7 +298,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
       }
     }
 
-    // Follow-up — last completed job on or before 30 days ago per client
     const followTemplate = byId.follow_up
     if (followTemplate?.enabled) {
       const clients = await pb.collection('clients').getFullList({
@@ -358,7 +317,6 @@ export async function runAutoMessagesCron(): Promise<{ sent: number; failed: num
         const pkg = lastJob.expand?.package_id
         const ctx: MessageSendContext = {
           clientName: String(client.name ?? 'Client'),
-          clientPhone: client.phone ? String(client.phone) : undefined,
           clientEmail: client.email ? String(client.email) : undefined,
           packageName: pkg ? String(pkg.name) : 'Detail',
           jobDate: String(lastJob.date),

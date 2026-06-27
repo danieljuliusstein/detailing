@@ -41,8 +41,8 @@ export default function PrivacyPage() {
               address, vehicle type, and appointment details submitted on the booking page.
             </li>
             <li>
-              <strong>Device data:</strong> a device PIN is stored locally on your phone to unlock
-              the app; push notification tokens if you enable alerts.
+              <strong>Device data:</strong> push notification tokens if you enable alerts; local
+              app preferences on your device.
             </li>
           </ul>
         </section>
@@ -63,8 +63,7 @@ export default function PrivacyPage() {
           <h2>Storage &amp; security</h2>
           <p>
             Cloud data is stored in PocketBase on secured infrastructure. Each business account is
-            isolated by organization. Operators should use a strong password and device PIN.
-            Offline copies may exist on your device until synced.
+            isolated by organization. Operators should use a strong password. Offline copies may exist on your device until synced.
           </p>
         </section>
 
@@ -72,7 +71,8 @@ export default function PrivacyPage() {
           <h2>Retention &amp; deletion</h2>
           <p>
             Business data is kept while your account is active. Operators can export data from
-            Settings. To delete your account and associated organization data, contact support.
+            Settings → Access and data. To delete your account and associated organization data, go to
+            Settings → Access and data → Delete account.
             Customers should contact their detailer to update or remove booking information.
           </p>
         </section>

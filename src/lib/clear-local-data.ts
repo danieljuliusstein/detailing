@@ -19,7 +19,7 @@ function removeKeyVariants(base: string): void {
   localStorage.removeItem(scopedStorageKey(base))
 }
 
-/** Wipe per-device caches (jobs, clients, inventory). Keeps PIN and settings. */
+/** Wipe per-device caches (jobs, clients, inventory). Keeps local settings preferences. */
 export async function clearLocalDeviceData(): Promise<void> {
   if (typeof window === 'undefined') return
 

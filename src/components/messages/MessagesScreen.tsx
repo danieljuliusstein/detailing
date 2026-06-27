@@ -41,7 +41,7 @@ export default function MessagesScreen() {
   }, [])
 
   const handleTemplateUpdate = useCallback(
-    (id: string, patch: Partial<Pick<AutoMessageTemplate, 'enabled' | 'channel'>>) => {
+    (id: string, patch: Partial<Pick<AutoMessageTemplate, 'enabled'>>) => {
       persistTemplates(
         templates.map((t) => (t.id === id ? { ...t, ...patch } : t))
       )

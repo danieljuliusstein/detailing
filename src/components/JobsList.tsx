@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Car, ClipboardText, MagnifyingGlass, Plus } from '@phosphor-icons/react'
+import AuthEmptyState from '@/components/AuthEmptyState'
+import { useAuthEmptyState } from '@/hooks/useAuthEmptyState'
 import CurrencyAmount from '@/components/ui/CurrencyAmount'
 import {
   filterJobsList,
@@ -29,6 +31,7 @@ function capitalize(s: string) {
 
 export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
   const router = useRouter()
+  const { isLoggedOut } = useAuthEmptyState()
   const [search, setSearch] = useState('')
   const [chip, setChip] = useState<JobsListFilter>('all')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -38,28 +41,36 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
 
   const periodLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
+  const handleAddJob = () => {
+    if (isLoggedOut) router.push('/auth')
+    else router.push('/jobs/new')
+  }
+
   return (
     <div className="screen page-content body">
       <header className="page-header">
         <div>
           <h1>Jobs</h1>
           <p>
-            {jobs.length} total · {periodLabel}
+            {isLoggedOut ? 'Sign in to load jobs' : `${jobs.length} total · ${periodLabel}`}
           </p>
         </div>
-        <button
-          type="button"
-          className="icon-btn green"
-          aria-label="Add job"
-          onClick={() => router.push('/jobs/new')}
-        >
-          <Plus size={18} weight="bold" aria-hidden="true" />
-        </button>
+        {!isLoggedOut ? (
+          <button
+            type="button"
+            className="icon-btn green"
+            aria-label="Add job"
+            onClick={handleAddJob}
+          >
+            <Plus size={18} weight="bold" aria-hidden="true" />
+          </button>
+        ) : null}
       </header>
 
-      <div className="search">
-        <MagnifyingGlass size={16} aria-hidden="true" />
+      <div className="search premium-search">
+        <MagnifyingGlass size={16} className="premium-search__icon" aria-hidden="true" />
         <input
+          className="premium-search__input"
           placeholder="Search jobs..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -80,11 +91,17 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
         ))}
       </div>
 
-      {sections.length === 0 ? (
+      {isLoggedOut ? (
+        <AuthEmptyState
+          icon={<ClipboardText size={26} weight="duotone" />}
+          title="Sign in to see your jobs"
+          subtitle="Your job history and schedule sync after you sign in."
+        />
+      ) : sections.length === 0 ? (
         <div className="empty-state">
           <ClipboardText size={26} weight="duotone" aria-hidden="true" />
           <p>No jobs found</p>
-          <button type="button" className="empty-cta" onClick={() => router.push('/jobs/new')}>
+          <button type="button" className="empty-cta" onClick={handleAddJob}>
             Add a job
           </button>
         </div>
@@ -97,41 +114,40 @@ export default function JobsList({ jobs }: { jobs: JobWithRelations[] }) {
           return (
             <div key={section.key}>
               <p className="sec">{section.label}</p>
-              {visible.map((job) => {
-                const tone = jobListIconTone(job)
-                const subtitle = `${job.package?.name ?? 'Service'} · ${capitalize(job.vehicle_type)} · ${capitalize(job.location_type)}`
-
-                return (
-                  <div
-                    key={job.id}
-                    className="job-card"
-                    onClick={() => router.push(`/jobs/${job.id}`)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && router.push(`/jobs/${job.id}`)}
-                  >
-                    <div className={`job-icon ${tone}`}>
-                      <Car size={16} weight="duotone" aria-hidden="true" />
-                    </div>
-                    <div className="job-body">
-                      <div className="job-name">{job.client?.name ?? 'Unknown'}</div>
-                      <div className="job-meta">{subtitle}</div>
-                      <span className={jobListStatusClass(job)}>{jobListStatusLabel(job)}</span>
-                    </div>
-                    <div className="job-right">
-                      <CurrencyAmount value={job.revenue} variant="revenue" className="job-amount" />
-                      <div className="job-date">{jobListRightTime(job)}</div>
-                    </div>
+              {visible.map((job) => (
+                <div
+                  key={job.id}
+                  className="job-card"
+                  onClick={() => router.push(`/jobs/${job.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && router.push(`/jobs/${job.id}`)}
+                >
+                  <div className={`job-icon ${jobListIconTone(job)}`}>
+                    <Car size={16} weight="duotone" aria-hidden="true" />
                   </div>
-                )
-              })}
+                  <div className="job-body">
+                    <div className="job-name">{job.client?.name ?? 'Client'}</div>
+                    <div className="job-meta">
+                      {job.package?.name ?? 'Detail'} · {capitalize(job.vehicle_type ?? 'vehicle')}
+                    </div>
+                    <span className={jobListStatusClass(job)}>{jobListStatusLabel(job)}</span>
+                  </div>
+                  <div className="job-right">
+                    <div className="job-amount">
+                      <CurrencyAmount value={job.revenue} />
+                    </div>
+                    <div className="job-date">{jobListRightTime(job)}</div>
+                  </div>
+                </div>
+              ))}
               {hidden > 0 && (
                 <button
                   type="button"
                   className="more-pill"
                   onClick={() => setExpanded((e) => ({ ...e, [section.key]: true }))}
                 >
-                  + {hidden} more job{hidden > 1 ? 's' : ''} {section.key === 'month' ? 'this month' : ''}
+                  + {hidden} more
                 </button>
               )}
             </div>

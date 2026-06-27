@@ -1,7 +1,9 @@
+import { businessLogoApiUrl, DEFAULT_BUSINESS_LOGO_PATH, pocketBaseRecordHasLogo } from '../business-logo'
 import { getPocketBase, isPocketBaseConfigured } from '../pocketbase'
 import { checkPocketBaseHealth } from '../pocketbase'
 import { authenticatePocketBase } from '../pb-auth'
 import { requireOrganizationId } from '../tenant'
+import { normalizeBookingSchedule } from '../booking-availability'
 import type { AppSettings } from '../settings'
 import type { PbRecord } from './mappers'
 import { tenantFilter, withOrganization, settingsRecordIdKey } from './tenant-pocketbase'
@@ -31,8 +33,17 @@ function notificationsFromRecord(raw: unknown): AppSettings['notifications'] {
   }
 }
 
-function recordToSettings(record: PbRecord, logoUrl?: string): AppSettings {
+function recordToSettings(
+  record: PbRecord,
+  logoUrl?: string,
+  fallback?: Partial<AppSettings>,
+): AppSettings {
   const notifications = notificationsFromRecord(record.notifications)
+  const bookingSchedule = record.booking_schedule
+    ? normalizeBookingSchedule(record.booking_schedule)
+    : fallback?.booking_schedule
+      ? normalizeBookingSchedule(fallback.booking_schedule)
+      : undefined
   return {
     business_name: String(record.business_name ?? ''),
     business_phone: String(record.business_phone ?? ''),
@@ -42,6 +53,13 @@ function recordToSettings(record: PbRecord, logoUrl?: string): AppSettings {
     notifications,
     last_backup_at: record.last_backup_at ? String(record.last_backup_at) : undefined,
     logo_url: logoUrl,
+    accent_color: record.accent_color ? String(record.accent_color) : null,
+    booking_schedule: bookingSchedule,
+    travel_rate_per_mile:
+      typeof record.travel_rate_per_mile === 'number' && record.travel_rate_per_mile > 0
+        ? record.travel_rate_per_mile
+        : undefined,
+    track_job_supplies: record.track_job_supplies === true,
     pb_record_id: record.id,
   }
 }
@@ -68,13 +86,8 @@ export async function loadSettingsFromPocketBase(): Promise<AppSettings | null> 
       localStorage.setItem(settingsRecordIdKey(orgId), record.id)
     }
 
-    let logoUrl: string | undefined
-    const logo = record.logo
-    if (typeof logo === 'string' && logo) {
-      logoUrl = `/api/business-logo?slug=${encodeURIComponent(await resolveOrgSlug(orgId))}`
-    } else {
-      logoUrl = '/logo.png'
-    }
+    const slug = await resolveOrgSlug(orgId)
+    const logoUrl = logoUrlForRecord(record, slug)
 
     return recordToSettings(record, logoUrl)
   } catch {
@@ -91,6 +104,34 @@ async function resolveOrgSlug(orgId: string): Promise<string> {
   }
 }
 
+function logoUrlForRecord(record: PbRecord, slug: string): string {
+  if (!pocketBaseRecordHasLogo(record.logo)) return DEFAULT_BUSINESS_LOGO_PATH
+  return businessLogoApiUrl(slug, record.updated)
+}
+
+/** Resolve the tenant's app_settings row — localStorage id can be stale after migrations. */
+async function resolveAppSettingsRecordId(orgId: string): Promise<string | null> {
+  const storedId =
+    typeof window !== 'undefined' ? localStorage.getItem(settingsRecordIdKey(orgId)) : null
+
+  if (storedId) {
+    try {
+      const row = await pb().collection('app_settings').getOne<PbRecord>(storedId, {
+        fields: 'id,organization_id',
+      })
+      if (String(row.organization_id ?? '') === orgId) return storedId
+    } catch {
+      // stale or inaccessible — fall through to tenant query
+    }
+  }
+
+  const existing = await pb().collection('app_settings').getFullList<PbRecord>({
+    filter: tenantFilter(),
+    limit: 1,
+  })
+  return existing[0]?.id ?? null
+}
+
 export async function saveSettingsToPocketBase(
   settings: AppSettings,
   logoFile?: File | null,
@@ -99,8 +140,7 @@ export async function saveSettingsToPocketBase(
   if (!(await canSyncSettings())) throw new Error('PocketBase not available')
 
   const orgId = requireOrganizationId()
-  const storedId =
-    typeof window !== 'undefined' ? localStorage.getItem(settingsRecordIdKey(orgId)) : null
+  const recordId = await resolveAppSettingsRecordId(orgId)
   const notifications = { ...settings.notifications }
 
   const payload: Record<string, unknown> = {
@@ -111,56 +151,65 @@ export async function saveSettingsToPocketBase(
     invoice_terms_footer: settings.invoice_terms_footer,
     notifications,
   }
+  if (settings.accent_color !== undefined) {
+    payload.accent_color = settings.accent_color?.trim() || ''
+  }
+  if (settings.booking_schedule !== undefined) {
+    payload.booking_schedule = normalizeBookingSchedule(settings.booking_schedule)
+  }
+  if (settings.travel_rate_per_mile !== undefined) {
+    payload.travel_rate_per_mile = settings.travel_rate_per_mile ?? 0
+  }
+  if (settings.track_job_supplies !== undefined) {
+    payload.track_job_supplies = settings.track_job_supplies
+  }
   if (settings.last_backup_at) {
     payload.last_backup_at = settings.last_backup_at.slice(0, 10)
   }
 
   let record: PbRecord
 
-  if (logoFile) {
+  if (logoFile && recordId) {
+    const formData = new FormData()
+    formData.append('logo', logoFile)
+    record = await pb().collection('app_settings').update<PbRecord>(recordId, formData)
+  } else if (logoFile) {
     const formData = new FormData()
     for (const [key, value] of Object.entries(payload)) {
-      if (key === 'notifications') {
+      if (key === 'notifications' || key === 'booking_schedule') {
         formData.append(key, JSON.stringify(value))
+      } else if (typeof value === 'boolean') {
+        formData.append(key, value ? 'true' : 'false')
       } else {
         formData.append(key, String(value ?? ''))
       }
     }
     formData.append('logo', logoFile)
 
-    if (storedId) {
-      record = await pb().collection('app_settings').update<PbRecord>(storedId, formData)
+    if (recordId) {
+      record = await pb().collection('app_settings').update<PbRecord>(recordId, formData)
     } else {
       formData.append('organization_id', orgId)
       record = await pb().collection('app_settings').create<PbRecord>(formData)
     }
   } else if (options?.clearLogo) {
     const clearPayload = { ...payload, logo: null }
-    if (storedId) {
-      record = await pb().collection('app_settings').update<PbRecord>(storedId, clearPayload)
+    if (recordId) {
+      record = await pb().collection('app_settings').update<PbRecord>(recordId, clearPayload)
     } else {
-      const existing = await pb().collection('app_settings').getFullList<PbRecord>({
-        filter: tenantFilter(),
-        limit: 1,
-      })
-      if (existing.length > 0) {
-        record = await pb().collection('app_settings').update<PbRecord>(existing[0].id, clearPayload)
-      } else {
-        record = await pb().collection('app_settings').create<PbRecord>(withOrganization(clearPayload))
-      }
+      record = await pb().collection('app_settings').create<PbRecord>(withOrganization(clearPayload))
     }
-  } else if (storedId) {
-    record = await pb().collection('app_settings').update<PbRecord>(storedId, payload)
+  } else if (recordId) {
+    record = await pb().collection('app_settings').update<PbRecord>(recordId, payload)
   } else {
-    const existing = await pb().collection('app_settings').getFullList<PbRecord>({
-      filter: tenantFilter(),
-      limit: 1,
-    })
-    if (existing.length > 0) {
-      record = await pb().collection('app_settings').update<PbRecord>(existing[0].id, payload)
-    } else {
-      record = await pb().collection('app_settings').create<PbRecord>(withOrganization(payload))
-    }
+    record = await pb().collection('app_settings').create<PbRecord>(withOrganization(payload))
+  }
+
+  // Ensure JSON fields are fully populated on the returned record.
+  try {
+    record = await pb().collection('app_settings').getOne<PbRecord>(record.id)
+  } catch {
+    // use update/create response
   }
 
   if (typeof window !== 'undefined') {
@@ -168,8 +217,7 @@ export async function saveSettingsToPocketBase(
   }
 
   const slug = await resolveOrgSlug(orgId)
-  const logo = record.logo
-  const logoUrl = typeof logo === 'string' && logo ? `/api/business-logo?slug=${encodeURIComponent(slug)}` : '/logo.png'
+  const logoUrl = logoUrlForRecord(record, slug)
 
   const trimmedName = settings.business_name.trim()
   if (trimmedName) {
@@ -180,5 +228,5 @@ export async function saveSettingsToPocketBase(
     }
   }
 
-  return recordToSettings(record, logoUrl)
+  return recordToSettings(record, logoUrl, settings)
 }

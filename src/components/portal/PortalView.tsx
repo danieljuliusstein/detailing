@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import type { PortalPayload } from '@/lib/server/portal-data'
 import type { PortalScope } from '@/lib/portal-client'
+import { brandCssVars } from '@/lib/brand-color'
 import PortalFooter from './PortalFooter'
 import PortalPhotosFooter from './PortalPhotosFooter'
 import { usePortalTheme } from './usePortalTheme'
@@ -55,7 +56,10 @@ export default function PortalView({ payload, token }: PortalViewProps) {
         : undefined
 
   return (
-    <div className={`portal-root client-light-root${isPhotosScope ? ' portal-root--photos' : ''}`}>
+    <div
+      className={`portal-root client-light-root${isPhotosScope ? ' portal-root--photos' : ''}`}
+      style={brandCssVars(business.accentColor)}
+    >
       <PortalHeader business={business} />
 
       <div className="portal-body">

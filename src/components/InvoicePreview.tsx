@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Envelope, FilePdf, PaperPlaneTilt, Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
@@ -14,20 +14,17 @@ import {
 import { PAYMENT_METHODS } from '@/lib/invoices'
 import { downloadInvoicePdf } from '@/lib/pdf/downloadInvoicePdf'
 import { createShareLink } from '@/lib/portal-client'
+import { getAuthFetchHeaders } from '@/lib/pb-auth'
+import { FloatingAffixField, FloatingField, SheetSubmitButton } from '@/components/forms'
 import InvoiceDocumentBody from '@/components/invoice/InvoiceDocumentBody'
+import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
 import { loadSettings, loadSettingsAsync, type AppSettings } from '@/lib/settings'
 import type { JobWithRelations } from '@/lib/types'
 
-const invoiceStatusBadge: Record<string, string> = {
-  draft: 'badge-draft',
-  sent: 'badge-pending',
-  partial: 'badge-pending',
-  paid: 'badge-paid',
-  overdue: 'badge-overdue',
-}
-
 export default function InvoicePreview({ job: initialJob }: { job: JobWithRelations }) {
   const router = useRouter()
+  const paymentFormRef = useRef<HTMLDivElement>(null)
+  const payMethodRef = useRef<HTMLSelectElement>(null)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [job, setJob] = useState(initialJob)
   const [busy, setBusy] = useState(false)
@@ -35,6 +32,7 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
   const [payAmount, setPayAmount] = useState(0)
   const [payMethod, setPayMethod] = useState<string>(PAYMENT_METHODS[0])
   const [message, setMessage] = useState('')
+  const [sendDone, setSendDone] = useState(false)
   const [portalUrl, setPortalUrl] = useState<string | undefined>()
 
   const invoice = job.invoice
@@ -43,6 +41,12 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
   useEffect(() => {
     loadSettingsAsync().then(setSettings)
   }, [])
+
+  useEffect(() => {
+    if (!showPayment) return
+    syncPrefilledFloatingLabels(paymentFormRef.current)
+    syncSelectFloatingLabel(payMethodRef.current)
+  }, [showPayment, payAmount, payMethod])
 
   useEffect(() => {
     if (!invoice?.id || !job.client_id) return
@@ -93,7 +97,7 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
         }
         const res = await fetch('/api/invoices/send', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthFetchHeaders() },
           body: JSON.stringify({
             to: job.client.email,
             clientName: job.client.name,
@@ -110,6 +114,8 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
       } else {
         setMessage('Invoice marked as sent')
       }
+      setSendDone(true)
+      window.setTimeout(() => setSendDone(false), 2000)
       await refresh()
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Send failed')
@@ -179,11 +185,10 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
   const status = invoice.status
 
   return (
-    <div className="screen page-content">
-      <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20, gap: 12 }}>
+    <div className="screen page-content invoice-screen">
+      <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 16, gap: 12 }}>
         <BackButton onClick={() => router.back()} />
         <div style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>Invoice</div>
-        <span className={`badge ${invoiceStatusBadge[status] ?? 'badge-draft'}`}>{status}</span>
       </div>
 
       <div className="card invoice-doc-card invoice-doc-card-wrap">
@@ -191,32 +196,57 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
       </div>
 
       {showPayment && (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <div ref={paymentFormRef} className="page-form-card page-form" style={{ marginBottom: 16 }}>
           <div className="section-title">Log payment</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <input type="number" className="input" placeholder="Amount" value={payAmount || ''} onChange={(e) => setPayAmount(Number(e.target.value))} />
-            <select className="input" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
-              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <FloatingAffixField
+              id="pay-amount"
+              label="Amount"
+              filled={payAmount > 0}
+              type="number"
+              value={payAmount || ''}
+              onChange={(e) => setPayAmount(Number(e.target.value))}
+            />
+            <FloatingField id="pay-method" label="Method" filled={Boolean(payMethod)}>
+              <select
+                ref={payMethodRef}
+                id="pay-method"
+                className={`f-select${payMethod ? ' hv' : ''}`}
+                value={payMethod}
+                onChange={(e) => {
+                  setPayMethod(e.target.value)
+                  syncSelectFloatingLabel(payMethodRef.current)
+                }}
+              >
+                {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </FloatingField>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <button className="btn-primary" onClick={handleAddPayment} disabled={busy}>Save</button>
+            <div className="page-form-save" style={{ margin: 0 }}>
+              <SheetSubmitButton
+                label="Save"
+                ready={payAmount > 0}
+                disabled={busy}
+                onClick={() => void handleAddPayment()}
+              />
+            </div>
             <button className="btn-ghost" onClick={() => setShowPayment(false)}>Cancel</button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+      <div className="invoice-screen__actions">
         <button className="btn-ghost" onClick={handlePdf} disabled={busy} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <FilePdf size={18} /> PDF
         </button>
-        <button className="btn-ghost" onClick={handleSend} disabled={busy || status === 'paid'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <Envelope size={18} /> {status === 'draft' ? 'Send' : 'Resend'}
+        <button className="btn-ghost" onClick={handleSend} disabled={busy || sendDone || status === 'paid'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <Envelope size={18} /> {busy ? 'Sending…' : sendDone ? 'Sent' : status === 'draft' ? 'Send' : 'Resend'}
         </button>
       </div>
 
       {invoice.balance_due > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div className="invoice-screen__actions">
           <button className="btn-ghost" onClick={() => { setPayAmount(invoice.balance_due); setShowPayment(true) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Plus size={16} /> Partial pay
           </button>
@@ -226,7 +256,7 @@ export default function InvoicePreview({ job: initialJob }: { job: JobWithRelati
         </div>
       )}
 
-      {message && <div style={{ fontSize: 13, color: 'var(--green)', textAlign: 'center', marginTop: 8 }}>{message}</div>}
+      {message && <div className="invoice-screen__message">{message}</div>}
     </div>
   )
 }

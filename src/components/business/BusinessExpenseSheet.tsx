@@ -1,25 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ArrowSquareOut, CaretDown, Trash } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowSquareOut } from '@phosphor-icons/react'
 import BottomSheet from '@/components/BottomSheet'
+import {
+  FloatingAffixField,
+  FloatingField,
+  FormProgressBar,
+  PillGroup,
+  SheetFooter,
+} from '@/components/forms'
 import {
   createBusinessExpense,
   deleteBusinessExpense,
   updateBusinessExpense,
 } from '@/lib/api'
+import { computeFormProgress } from '@/lib/form-progress'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { BusinessExpense, BusinessExpenseCategory, BusinessExpenseInput } from '@/lib/types'
 
-const CATEGORIES: BusinessExpenseCategory[] = [
-  'legal',
-  'licensing',
-  'taxes',
-  'insurance',
-  'vehicle',
-  'marketing',
-  'software',
-  'equipment',
-  'other',
+const CATEGORY_PILLS: { value: BusinessExpenseCategory; label: string }[] = [
+  { value: 'legal', label: 'Legal' },
+  { value: 'licensing', label: 'Licensing' },
+  { value: 'taxes', label: 'Taxes' },
+  { value: 'insurance', label: 'Insurance' },
+  { value: 'vehicle', label: 'Vehicle' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'software', label: 'Software' },
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'other', label: 'Other' },
 ]
 
 function todayIso(): string {
@@ -42,6 +52,7 @@ export default function BusinessExpenseSheet({
   onSaved,
 }: BusinessExpenseSheetProps) {
   const isEdit = Boolean(expense)
+  const formRef = useRef<HTMLDivElement>(null)
   const [date, setDate] = useState(todayIso())
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
@@ -50,6 +61,10 @@ export default function BusinessExpenseSheet({
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+  const { handleWriteError } = useActionToast()
+
+  const progress = computeFormProgress([date, name, amount, vendor, notes], 1, 1)
 
   useEffect(() => {
     if (!expense) {
@@ -69,6 +84,10 @@ export default function BusinessExpenseSheet({
     setNotes(expense.notes ?? '')
   }, [expense])
 
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [date, name, amount, vendor, notes, expense])
+
   const buildInput = (): BusinessExpenseInput | null => {
     const trimmed = name.trim()
     const parsed = Number(amount)
@@ -87,6 +106,7 @@ export default function BusinessExpenseSheet({
     const input = buildInput()
     if (!input) return
     setSaving(true)
+    setError('')
     try {
       if (isEdit && expense) {
         await updateBusinessExpense(expense.id, input)
@@ -95,7 +115,10 @@ export default function BusinessExpenseSheet({
       }
       setSaved(true)
       onSaved?.()
-      setTimeout(onClose, 600)
+      setTimeout(onClose, 1500)
+    } catch (err) {
+      if (handleWriteError(err)) return
+      setError(err instanceof Error ? err.message : 'Could not save expense.')
     } finally {
       setSaving(false)
     }
@@ -104,151 +127,117 @@ export default function BusinessExpenseSheet({
   const handleDelete = async () => {
     if (!expense || !confirm('Delete this business expense?')) return
     setSaving(true)
+    setError('')
     try {
       await deleteBusinessExpense(expense.id)
       onSaved?.()
       onClose()
+    } catch (err) {
+      if (handleWriteError(err)) return
+      setError(err instanceof Error ? err.message : 'Could not delete expense.')
     } finally {
       setSaving(false)
     }
   }
 
+  const canSave = Boolean(name.trim() && Number(amount) > 0)
+
   return (
     <BottomSheet
+      variant="premium"
       title={isEdit ? 'Edit expense' : 'Log business expense'}
       subtitle="Dated one-time payment — shows in P&L for that month only"
       ariaLabel="Business expense"
-      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
-        <div className="inv-sheet-actions inv-sheet-actions--split">
-          {isEdit ? (
-            <button
-              type="button"
-              className="inv-sheet-delete"
-              onClick={handleDelete}
-              disabled={saving}
-              aria-label="Delete expense"
-              style={{ gridColumn: '1 / -1' }}
-            >
-              <Trash size={18} color="var(--red)" />
-            </button>
-          ) : null}
-          <button type="button" className="inv-sheet-save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Log expense'}
-          </button>
-          <button type="button" className="inv-sheet-cancel" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-        </div>
+        <SheetFooter
+          saveLabel={isEdit ? 'Save changes' : 'Log expense'}
+          ready={canSave}
+          done={saved}
+          saving={saving}
+          layout="split"
+          onSave={() => void handleSave()}
+          onCancel={onClose}
+          onDelete={isEdit ? () => void handleDelete() : undefined}
+        />
       }
     >
-        {isEdit && expense?.equipment_id && linkedEquipmentName && onViewEquipment && (
-          <div className="inv-sheet-section">
-            <div className="inv-expense-link-panel">
-              <p className="inv-expense-link-panel__title">Linked inventory item</p>
-              <p className="inv-expense-link-panel__meta">{linkedEquipmentName}</p>
-              <button type="button" className="inv-expense-link-panel__btn" onClick={onViewEquipment}>
-                <ArrowSquareOut size={14} weight="bold" aria-hidden />
-                View in inventory
-              </button>
-            </div>
-          </div>
-        )}
+      {error ? <div className="error-banner" style={{ marginBottom: 12 }}>{error}</div> : null}
 
-        <div className={`inv-sheet-section${isEdit && expense?.equipment_id ? '' : ''}`}>
-          <div className="inv-field-row">
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="expense-date">Date</label>
-              <input
-                id="expense-date"
-                type="date"
-                className="inv-field-input"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-            <div className="inv-field">
-              <label className="inv-field-label" htmlFor="expense-amount">Amount</label>
-              <div className="inv-input-affix inv-input-affix--pre">
-                <span className="inv-input-affix__pre">$</span>
-                <input
-                  id="expense-amount"
-                  type="number"
-                  inputMode="decimal"
-                  className="inv-field-input"
-                  placeholder="85"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="expense-name">Name</label>
-            <input
-              id="expense-name"
-              className="inv-field-input"
-              placeholder="LLC annual renewal"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="expense-category">Category</label>
-            <div className="inv-select-wrap">
-              <select
-                id="expense-category"
-                className="inv-field-input"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as BusinessExpenseCategory)}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <CaretDown className="inv-select-wrap__icon" size={16} weight="bold" aria-hidden />
-            </div>
+      {isEdit && expense?.equipment_id && linkedEquipmentName && onViewEquipment ? (
+        <div className="premium-sheet__section">
+          <div className="inv-expense-link-panel">
+            <p className="inv-expense-link-panel__title">Linked inventory item</p>
+            <p className="inv-expense-link-panel__meta">{linkedEquipmentName}</p>
+            <button type="button" className="inv-expense-link-panel__btn" onClick={onViewEquipment}>
+              <ArrowSquareOut size={14} weight="bold" aria-hidden />
+              View in inventory
+            </button>
           </div>
         </div>
+      ) : null}
 
-        <div className="inv-sheet-divider" />
+      {!isEdit ? <FormProgressBar progress={progress} /> : null}
 
-        <div className="inv-sheet-section">
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="expense-vendor">
-              Vendor
-              <span className="inv-field-label-optional">(optional)</span>
-            </label>
+      <div ref={formRef} className="premium-sheet__form">
+        <div className="premium-sheet__grid2">
+          <FloatingField id="expense-date" label="Date" filled={Boolean(date)}>
             <input
-              id="expense-vendor"
-              className="inv-field-input"
-              placeholder="State filing office"
-              value={vendor}
-              onChange={(e) => setVendor(e.target.value)}
+              id="expense-date"
+              type="date"
+              className={`f-input${date ? ' hv' : ''}`}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              placeholder=" "
             />
-          </div>
+          </FloatingField>
 
-          <div className="inv-field">
-            <label className="inv-field-label" htmlFor="expense-notes">
-              Notes
-              <span className="inv-field-label-optional">(optional)</span>
-            </label>
-            <textarea
-              id="expense-notes"
-              className="inv-field-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any extra details..."
-            />
-          </div>
-
-          {saved && <p className="inv-computed-cost">Saved</p>}
+          <FloatingAffixField
+            id="expense-amount"
+            label="Amount"
+            type="number"
+            inputMode="decimal"
+            value={amount}
+            filled={amount.trim().length > 0}
+            onChange={(e) => setAmount(e.target.value)}
+          />
         </div>
+
+        <FloatingField id="expense-name" label="Name" filled={name.trim().length > 0}>
+          <input
+            id="expense-name"
+            className={`f-input${name.trim() ? ' hv' : ''}`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <PillGroup label="Category" options={CATEGORY_PILLS} value={category} onChange={setCategory} />
+
+        <div className="f-form-divider" />
+
+        <FloatingField id="expense-vendor" label="Vendor" filled={vendor.trim().length > 0} optional>
+          <input
+            id="expense-vendor"
+            className={`f-input${vendor.trim() ? ' hv' : ''}`}
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
+
+        <FloatingField id="expense-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
+          <textarea
+            id="expense-notes"
+            className={`f-textarea${notes.trim() ? ' hv' : ''}`}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder=" "
+            rows={3}
+          />
+        </FloatingField>
+      </div>
     </BottomSheet>
   )
 }

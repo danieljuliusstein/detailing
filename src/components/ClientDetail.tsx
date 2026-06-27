@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CaretRight, Car, FileText, PencilSimple, Phone, ChatText, Envelope, Trash } from '@phosphor-icons/react'
+import { CaretRight, Car, FileText, MapPin, PencilSimple, Phone, ChatText, Envelope, Trash } from '@phosphor-icons/react'
 import { VehicleTypeIcon } from '@/lib/vehicle-type-icons'
 import BackButton from '@/components/BackButton'
 import { fmt, mapJobStatusForDisplay } from '@/lib/calculations'
 import { vehicleDisplayName } from '@/lib/damage-docs'
 import { JOB_STATUS_CONFIG } from '@/lib/job-status-display'
 import { deleteClient } from '@/lib/api'
+import { openMapsDirections } from '@/lib/maps-url'
 import type { Client, JobWithRelations, Vehicle } from '@/lib/types'
 
 interface ClientDetailProps {
@@ -54,6 +55,17 @@ export default function ClientDetail({ client, jobs, vehicles, totalRevenue }: C
           {client.phone && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{client.phone}</div>}
           {client.email && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{client.email}</div>}
           {client.address && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{client.address}</div>}
+          {client.address && (
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ marginTop: 8, fontSize: 12, padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() => openMapsDirections(client.address!)}
+            >
+              <MapPin size={14} />
+              Directions
+            </button>
+          )}
         </div>
         <button
           onClick={() => router.push(`/clients/${client.id}/edit`)}

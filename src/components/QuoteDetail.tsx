@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Check, FilePdf, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
 import ShareLinkActions from '@/components/portal/ShareLinkActions'
+import { SHARE_LINK_PRESETS } from '@/lib/share-link-presets'
 import {
   acceptQuote,
   declineQuote,
@@ -30,6 +31,7 @@ export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelati
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [sentDone, setSentDone] = useState(false)
 
   useEffect(() => {
     void loadSettingsAsync().then(setSettings)
@@ -46,6 +48,8 @@ export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelati
     try {
       await markQuoteSent(quote.id)
       await refresh()
+      setSentDone(true)
+      window.setTimeout(() => setSentDone(false), 2000)
       setMessage('Marked as sent — share link below to email client')
     } finally {
       setBusy(false)
@@ -117,16 +121,15 @@ export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelati
       </div>
 
       {quote.client && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div className="section-title">Client portal link</div>
+        <div className="card job-detail-phase" style={{ marginBottom: 12 }}>
+          <div className="section-title">{SHARE_LINK_PRESETS.quote.sectionTitle}</div>
           <ShareLinkActions
             clientId={quote.client_id}
             clientEmail={quote.client.email}
             clientName={quote.client.name}
             quoteId={quote.id}
-            scope="quote"
-            emailSubject={`Estimate ${quote.quote_number} from ${settings?.business_name ?? 'your detailer'}`}
-            emailMessage="Review and accept your estimate using the secure link below."
+            context="quote"
+            quoteNumber={quote.quote_number}
           />
         </div>
       )}
@@ -135,8 +138,8 @@ export default function QuoteDetail({ quote: initial }: { quote: QuoteWithRelati
         <button type="button" className="btn-ghost" disabled={busy} onClick={handlePdf} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <FilePdf size={18} /> PDF
         </button>
-        <button type="button" className="btn-ghost" disabled={busy || quote.status !== 'draft'} onClick={handleSend} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <PaperPlaneTilt size={18} /> Mark sent
+        <button type="button" className="btn-ghost" disabled={busy || sentDone || quote.status !== 'draft'} onClick={handleSend} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <PaperPlaneTilt size={18} /> {busy ? 'Sending…' : sentDone ? 'Sent' : 'Mark sent'}
         </button>
       </div>
 

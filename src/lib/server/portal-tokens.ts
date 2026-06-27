@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import { authenticateServerPocketBase } from './pocketbase-admin'
+import { authenticateServerAdmin } from './pocketbase-admin'
 
 export type PortalScope = 'job' | 'photos' | 'invoice' | 'quote' | 'full'
 
@@ -26,13 +26,21 @@ function expiresAt(days = 90): string {
 }
 
 async function resolveClientOrgId(
-  pb: Awaited<ReturnType<typeof authenticateServerPocketBase>>,
+  pb: Awaited<ReturnType<typeof authenticateServerAdmin>>,
   clientId: string,
 ): Promise<string> {
-  const client = await pb.collection('clients').getOne(clientId)
-  const orgId = String(client.organization_id ?? '')
-  if (!orgId) throw new Error('Client has no organization')
-  return orgId
+  try {
+    const client = await pb.collection('clients').getOne(clientId)
+    const orgId = String(client.organization_id ?? '')
+    if (!orgId) throw new Error('Client is missing an organization')
+    return orgId
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ''
+    if (message.includes("wasn't found") || message.includes('not found')) {
+      throw new Error('Client not found — refresh and try again')
+    }
+    throw err
+  }
 }
 
 export function getAppBaseUrl(): string {
@@ -62,8 +70,9 @@ export async function createPortalToken(input: {
   scope: PortalScope
   jobId?: string
   quoteId?: string
+  appBaseUrl?: string
 }): Promise<{ token: string; url: string; expiresAt: string; id: string }> {
-  const pb = await authenticateServerPocketBase()
+  const pb = await authenticateServerAdmin()
   const token = generateToken()
   const exp = expiresAt()
   const organizationId = await resolveClientOrgId(pb, input.clientId)
@@ -81,18 +90,20 @@ export async function createPortalToken(input: {
 
   const record = await pb.collection('portal_tokens').create<PortalTokenRecord>(payload)
 
+  const baseUrl = (input.appBaseUrl ?? getAppBaseUrl()).replace(/\/$/, '')
+
   return {
     id: record.id,
     token,
     expiresAt: exp,
-    url: `${getAppBaseUrl()}/portal/${token}`,
+    url: `${baseUrl}/portal/${token}`,
   }
 }
 
 export async function validatePortalToken(token: string): Promise<PortalTokenRecord | null> {
   if (!token || token.length < 16) return null
 
-  const pb = await authenticateServerPocketBase()
+  const pb = await authenticateServerAdmin()
   try {
     const records = await pb.collection('portal_tokens').getFullList<PortalTokenRecord>({
       filter: `token = "${token.replace(/"/g, '\\"')}"`,
@@ -114,7 +125,7 @@ export async function revokePortalToken(token: string): Promise<boolean> {
   const record = await validatePortalToken(token)
   if (!record) return false
 
-  const pb = await authenticateServerPocketBase()
+  const pb = await authenticateServerAdmin()
   await pb.collection('portal_tokens').update(record.id, { revoked: true })
   return true
 }

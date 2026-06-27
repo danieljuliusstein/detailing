@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         report={report}
         periodLabel={periodLabel}
         businessName={businessName}
-        logoDataUri={logoDataUri}
+        logoDataUri={logoDataUri ?? undefined}
       />
     )
 

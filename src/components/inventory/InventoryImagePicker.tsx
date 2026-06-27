@@ -1,41 +1,68 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, Image as ImageIcon, X } from '@phosphor-icons/react'
+import { compressInventoryPhoto } from '@/lib/compress-inventory-photo'
 
 interface Props {
-  imageUrl: string | null
-  onChange: (url: string | null) => void
+  /** Existing photo URL (PocketBase file URL or local data URL). */
+  previewUrl: string | null
+  onChange: (file: File | null) => void
+  onClearExisting?: () => void
   label?: string
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-export default function InventoryImagePicker({ imageUrl, onChange, label = 'Product photo' }: Props) {
+export default function InventoryImagePicker({
+  previewUrl,
+  onChange,
+  onClearExisting,
+  label = 'Product photo',
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+  const [localPreview, setLocalPreview] = useState<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (localPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(localPreview)
+      }
+    }
+  }, [localPreview])
+
+  useEffect(() => {
+    setLocalPreview(null)
+  }, [previewUrl])
 
   const pick = async (file: File | undefined) => {
     if (!file) return
-    const dataUrl = await readFileAsDataUrl(file)
-    onChange(dataUrl)
+    const prepared = await compressInventoryPhoto(file)
+    setLocalPreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(prepared)
+    })
+    onChange(prepared)
   }
+
+  const handleClear = () => {
+    setLocalPreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return null
+    })
+    onChange(null)
+    onClearExisting?.()
+  }
+
+  const displaySrc = localPreview ?? previewUrl
 
   return (
     <div className="inv-image-picker">
       <p className="inv-field-label">{label.toUpperCase()}</p>
       <div className="inv-image-picker__row">
         <div className="inv-image-picker__preview">
-          {imageUrl ? (
+          {displaySrc ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="" />
+            <img src={displaySrc} alt="" />
           ) : (
             <ImageIcon size={22} weight="duotone" color="#636366" aria-hidden />
           )}
@@ -49,12 +76,12 @@ export default function InventoryImagePicker({ imageUrl, onChange, label = 'Prod
             <ImageIcon size={16} weight="duotone" aria-hidden />
             Choose photo
           </button>
-          {imageUrl && (
-            <button type="button" className="inv-image-picker__remove" onClick={() => onChange(null)}>
+          {displaySrc ? (
+            <button type="button" className="inv-image-picker__remove" onClick={handleClear}>
               <X size={14} aria-hidden />
               Remove
             </button>
-          )}
+          ) : null}
         </div>
       </div>
       <input

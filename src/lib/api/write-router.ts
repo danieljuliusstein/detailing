@@ -1,5 +1,6 @@
 import { enqueue, type QueueOperation } from '../offline-queue'
 import { isPocketBaseConfigured } from '../pocketbase'
+import { assertCanWrite } from '../write-guard'
 
 let writeDegraded = false
 
@@ -19,6 +20,7 @@ interface WriteTarget<T> {
 }
 
 export async function executeWrite<T>(target: WriteTarget<T>): Promise<T> {
+  assertCanWrite()
   const shouldQueue = isPocketBaseConfigured()
 
   if (target.resolvedBackend === 'local') {

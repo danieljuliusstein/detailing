@@ -1,16 +1,14 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 
-type CardVariant = 'default' | 'pressable'
-
-export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: CardVariant
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  pressable?: boolean
   children: ReactNode
 }
 
-export default function Card({ variant = 'default', className = '', children, ...props }: CardProps) {
-  const base = variant === 'pressable' ? 'card-pressable' : 'card'
+export default function Card({ pressable = false, className = '', children, ...props }: CardProps) {
+  const base = pressable ? 'card card-pressable' : 'card'
   return (
-    <div className={[base, className].filter(Boolean).join(' ')} {...props}>
+    <div className={`${base}${className ? ` ${className}` : ''}`} {...props}>
       {children}
     </div>
   )

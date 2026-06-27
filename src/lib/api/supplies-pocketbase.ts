@@ -1,5 +1,6 @@
 import { ensurePocketBaseAuth } from '../pb-auth'
 import { getPocketBase } from '../pocketbase'
+import { pocketBasePhotoFilename } from '../inventory-photo-url'
 import { isLowStock } from '../supplies-logic'
 import { appSupplyToPb, pbSupplyToApp, type PbRecord } from './mappers'
 import { tenantFilter, withOrganization } from './tenant-pocketbase'
@@ -12,15 +13,21 @@ function pb() {
   return client
 }
 
+function supplyPhotoUrl(record: PbRecord): string | undefined {
+  const filename = pocketBasePhotoFilename(record.photo)
+  if (!filename) return undefined
+  return pb().files.getURL(record, filename)
+}
+
 export async function getSupplies(): Promise<Supply[]> {
   const records = await pb().collection('supplies').getFullList<PbRecord>({ sort: 'name' })
-  return records.map(pbSupplyToApp)
+  return records.map((r) => pbSupplyToApp(r, supplyPhotoUrl(r)))
 }
 
 export async function getSupply(id: string): Promise<Supply | null> {
   try {
     const record = await pb().collection('supplies').getOne<PbRecord>(id)
-    return pbSupplyToApp(record)
+    return pbSupplyToApp(record, supplyPhotoUrl(record))
   } catch {
     return null
   }
@@ -32,8 +39,10 @@ export async function getLowInventorySupplies(): Promise<Supply[]> {
 }
 
 export async function createSupply(input: SupplyInput): Promise<Supply> {
-  const record = await pb().collection('supplies').create<PbRecord>(withOrganization(appSupplyToPb(input)))
-  return pbSupplyToApp(record)
+  const record = await pb().collection('supplies').create<PbRecord>(
+    withOrganization(appSupplyToPb(input)),
+  )
+  return pbSupplyToApp(record, supplyPhotoUrl(record))
 }
 
 export async function updateSupply(id: string, input: Partial<SupplyInput>): Promise<Supply | null> {
@@ -42,7 +51,27 @@ export async function updateSupply(id: string, input: Partial<SupplyInput>): Pro
     if (!current) return null
     const merged = { ...current, ...input }
     const record = await pb().collection('supplies').update<PbRecord>(id, appSupplyToPb(merged))
-    return pbSupplyToApp(record)
+    return pbSupplyToApp(record, supplyPhotoUrl(record))
+  } catch {
+    return null
+  }
+}
+
+export async function uploadSupplyPhoto(id: string, file: File): Promise<Supply | null> {
+  try {
+    const formData = new FormData()
+    formData.append('photo', file)
+    const record = await pb().collection('supplies').update<PbRecord>(id, formData)
+    return pbSupplyToApp(record, supplyPhotoUrl(record))
+  } catch {
+    return null
+  }
+}
+
+export async function clearSupplyPhoto(id: string): Promise<Supply | null> {
+  try {
+    const record = await pb().collection('supplies').update<PbRecord>(id, { photo: null })
+    return pbSupplyToApp(record, undefined)
   } catch {
     return null
   }
@@ -78,7 +107,7 @@ export async function restockSupply(id: string, input: RestockInput): Promise<Su
       current.quantity_on_hand,
       current.cost_per_unit,
       input.quantity,
-      input.total_cost
+      input.total_cost,
     )
   }
 
@@ -93,6 +122,14 @@ export async function deductSupplies(suppliesUsed: { supply_id: string; quantity
       quantity_on_hand: Math.max(0, supply.quantity_on_hand - usage.quantity_used),
     })
   }
+}
+
+/** Convert a data URL from the offline queue into a File for PocketBase upload. */
+export async function dataUrlToFile(dataUrl: string, filename = 'product.jpg'): Promise<File> {
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
+  const type = blob.type || 'image/jpeg'
+  return new File([blob], filename, { type })
 }
 
 const DEFAULT_SUPPLIES: SupplyInput[] = [

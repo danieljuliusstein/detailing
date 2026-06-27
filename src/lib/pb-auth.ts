@@ -59,6 +59,17 @@ export async function authenticatePocketBase(): Promise<boolean> {
   return ensurePocketBaseAuth()
 }
 
+export function getPocketBaseAuthToken(): string | null {
+  const pb = getPocketBase()
+  if (!pb?.authStore.isValid) return null
+  return pb.authStore.token
+}
+
+export function getAuthFetchHeaders(): HeadersInit {
+  const token = getPocketBaseAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export function clearPocketBaseAuth(): void {
   const pb = getPocketBase()
   if (pb) {

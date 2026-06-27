@@ -1,4 +1,5 @@
 import { getCurrentOrganizationId } from './tenant'
+import { getAuthFetchHeaders } from './pb-auth'
 
 const PUSH_ENABLED_KEY = 'push_notifications_enabled'
 
@@ -59,8 +60,8 @@ export async function subscribeToPush(): Promise<{ ok: boolean; error?: string }
 
   const res = await fetch('/api/push/subscribe', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subscription: subscription.toJSON(), organizationId }),
+    headers: { 'Content-Type': 'application/json', ...getAuthFetchHeaders() },
+    body: JSON.stringify({ subscription: subscription.toJSON() }),
   })
 
   if (!res.ok) {
@@ -79,11 +80,10 @@ export async function unsubscribeFromPush(): Promise<void> {
   const subscription = await registration.pushManager.getSubscription()
 
   if (subscription) {
-    const organizationId = getCurrentOrganizationId()
     await fetch('/api/push/subscribe', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: subscription.endpoint, organizationId }),
+      headers: { 'Content-Type': 'application/json', ...getAuthFetchHeaders() },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
     })
     await subscription.unsubscribe()
   }

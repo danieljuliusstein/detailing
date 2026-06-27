@@ -50,3 +50,7 @@ pocketbase/pb.zip
 
 # Accidental iCloud duplicate service workers
 public/sw\ *.js
+
+# Marketing captures (commit stock photos + scripts; ignore raw/export)
+marketing/raw/
+marketing/export/

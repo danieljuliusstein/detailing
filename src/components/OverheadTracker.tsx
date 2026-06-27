@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { FloatingAffixField, FloatingField, SheetSubmitButton } from '@/components/forms'
+import { useSettingsBack } from '@/hooks/useSettingsBack'
 import { createOverheadExpense, deleteOverheadExpense, getMonthlyOverheadTotal, getOverheadExpenses } from '@/lib/api'
 import { fmtDetailed } from '@/lib/calculations'
+import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
 import type { BillingCycle, OverheadCategory, OverheadExpense } from '@/lib/types'
 
 const CATEGORIES: OverheadCategory[] = ['vehicle', 'insurance', 'equipment', 'software', 'marketing', 'other']
@@ -18,7 +20,10 @@ const cycleLabel: Record<BillingCycle, string> = {
 }
 
 export default function OverheadTracker() {
-  const router = useRouter()
+  const goBack = useSettingsBack()
+  const formRef = useRef<HTMLDivElement>(null)
+  const categoryRef = useRef<HTMLSelectElement>(null)
+  const cycleRef = useRef<HTMLSelectElement>(null)
   const [expenses, setExpenses] = useState<OverheadExpense[]>([])
   const [monthlyTotal, setMonthlyTotal] = useState(0)
   const [showAdd, setShowAdd] = useState(false)
@@ -33,6 +38,13 @@ export default function OverheadTracker() {
     setMonthlyTotal(total)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (!showAdd) return
+    syncPrefilledFloatingLabels(formRef.current)
+    syncSelectFloatingLabel(categoryRef.current)
+    syncSelectFloatingLabel(cycleRef.current)
+  }, [showAdd, name, amount, category, cycle])
 
   const handleAdd = async () => {
     if (!name.trim() || amount <= 0) return
@@ -52,7 +64,7 @@ export default function OverheadTracker() {
   return (
     <div className="screen page-content">
       <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20, gap: 12 }}>
-        <BackButton onClick={() => router.back()} />
+        <BackButton onClick={goBack} />
         <div style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>Overhead</div>
         <button
           onClick={() => setShowAdd(!showAdd)}
@@ -71,19 +83,67 @@ export default function OverheadTracker() {
       </div>
 
       {showAdd && (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <div ref={formRef} className="page-form-card page-form" style={{ marginBottom: 16 }}>
           <div className="section-title">New expense</div>
-          <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ marginBottom: 8 }} />
-          <input type="number" className="input money" placeholder="Amount" value={amount || ''} onChange={(e) => setAmount(Number(e.target.value))} style={{ marginBottom: 8 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <select className="input" value={category} onChange={(e) => setCategory(e.target.value as OverheadCategory)}>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="input" value={cycle} onChange={(e) => setCycle(e.target.value as BillingCycle)}>
-              {CYCLES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+
+          <FloatingField id="overhead-name" label="Name" filled={name.trim().length > 0}>
+            <input
+              id="overhead-name"
+              className={`f-input${name.trim() ? ' hv' : ''}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+
+          <FloatingAffixField
+            id="overhead-amount"
+            label="Amount"
+            filled={amount > 0}
+            type="number"
+            value={amount || ''}
+            onChange={(e) => setAmount(Number(e.target.value))}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <FloatingField id="overhead-category" label="Category" filled={Boolean(category)}>
+              <select
+                ref={categoryRef}
+                id="overhead-category"
+                className={`f-select${category ? ' hv' : ''}`}
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value as OverheadCategory)
+                  syncSelectFloatingLabel(categoryRef.current)
+                }}
+              >
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </FloatingField>
+
+            <FloatingField id="overhead-cycle" label="Billing cycle" filled={Boolean(cycle)}>
+              <select
+                ref={cycleRef}
+                id="overhead-cycle"
+                className={`f-select${cycle ? ' hv' : ''}`}
+                value={cycle}
+                onChange={(e) => {
+                  setCycle(e.target.value as BillingCycle)
+                  syncSelectFloatingLabel(cycleRef.current)
+                }}
+              >
+                {CYCLES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </FloatingField>
           </div>
-          <button className="btn-primary" onClick={handleAdd} style={{ width: '100%' }}>Add expense</button>
+
+          <div className="page-form-save">
+            <SheetSubmitButton
+              label="Add expense"
+              ready={name.trim().length > 0 && amount > 0}
+              onClick={() => void handleAdd()}
+            />
+          </div>
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { loadData, newId, saveData } from '../storage'
+import { syncLeadForQuoteJob } from './leads-local'
 import type { Quote, QuoteInput, QuoteWithRelations } from '../types'
 
 function nextQuoteNumber(): string {
@@ -88,6 +89,7 @@ export function acceptQuote(quoteId: string): { quote: Quote; jobId: string } | 
   data.jobs.push(job)
   data.quotes[idx] = { ...quote, status: 'accepted', job_id: job.id }
   saveData(data)
+  syncLeadForQuoteJob(quoteId, job.id)
   return { quote: data.quotes[idx], jobId: job.id }
 }
 

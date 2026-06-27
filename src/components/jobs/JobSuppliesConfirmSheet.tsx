@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Warning } from '@phosphor-icons/react'
 import BottomSheet from '@/components/BottomSheet'
+import { SheetFooter } from '@/components/forms'
 import JobSuppliesPicker, { totalSupplyUsageCost } from '@/components/jobs/JobSuppliesPicker'
 import { fmtDetailed } from '@/lib/calculations'
 import { resolveSuppliesUsed } from '@/lib/supplies-logic'
@@ -46,38 +47,37 @@ export default function JobSuppliesConfirmSheet({
 
   return (
     <BottomSheet
+      variant="premium"
       title="Log supplies used"
       subtitle="Confirm or adjust supplies for this job before saving"
       ariaLabel="Confirm supplies used"
-      sheetClassName="inv-sheet--form"
       onClose={onClose}
       footer={
-        <div className="inv-sheet-actions inv-sheet-actions--stacked">
-          <button type="button" className="inv-sheet-save" onClick={() => onConfirm(value)}>
-            Confirm &amp; save
-          </button>
-          <button type="button" className="inv-sheet-cancel" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
+        <SheetFooter
+          layout="stacked"
+          saveLabel="Confirm & save"
+          ready
+          onSave={() => onConfirm(value)}
+          onCancel={onClose}
+        />
       }
     >
-      <div className="inv-sheet-section">
+      <div className="premium-sheet__section">
         <JobSuppliesPicker supplies={supplies} value={value} onChange={setValue} />
 
-        {lowWarnings.length > 0 && (
+        {lowWarnings.length > 0 ? (
           <div className="usage-projection-banner">
             <Warning className="usage-projection-banner__icon" size={16} weight="fill" />
             <p className="usage-projection-banner__text">{lowWarnings.join(' · ')}</p>
           </div>
-        )}
+        ) : null}
 
-        {totalCost > 0 && (
+        {totalCost > 0 ? (
           <div className="usage-cost-row">
             <p className="usage-cost-row__label">Estimated supply cost</p>
             <p className="usage-cost-row__value">{fmtDetailed(totalCost)}</p>
           </div>
-        )}
+        ) : null}
       </div>
     </BottomSheet>
   )

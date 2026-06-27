@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Briefcase, FileText, Flask, Receipt } from '@phosphor-icons/react'
+import { Briefcase, FileText, Flask, Funnel, Receipt } from '@phosphor-icons/react'
 import { useQuickAction } from '@/providers/QuickActionContext'
+import { useAuth } from '@/providers/AuthProvider'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
 
 interface ActionItem {
@@ -16,16 +17,34 @@ interface ActionItem {
 
 export default function QuickActionMenu() {
   const router = useRouter()
-  const { menuOpen, closeMenu, openExpenseSheet, openSupplyPurchaseSheet } = useQuickAction()
-  const firstActionRef = useRef<HTMLButtonElement>(null)
+  const { isLoggedIn } = useAuth()
+  const { menuOpen, closeMenu, openExpenseSheet, openSupplyPurchaseSheet, openLeadSheet } =
+    useQuickAction()
+
+  const requireSignIn = () => {
+    closeMenu()
+    router.push('/auth')
+  }
 
   const actions: ActionItem[] = [
+    {
+      id: 'new-lead',
+      label: 'New lead',
+      subtitle: 'Capture an inquiry before they are a client',
+      Icon: Funnel,
+      onSelect: () => {
+        if (!isLoggedIn) return requireSignIn()
+        closeMenu()
+        openLeadSheet()
+      },
+    },
     {
       id: 'new-job',
       label: 'New job',
       subtitle: 'Schedule a detail and log revenue',
       Icon: Briefcase,
       onSelect: () => {
+        if (!isLoggedIn) return requireSignIn()
         closeMenu()
         router.push('/jobs/new')
       },
@@ -35,14 +54,20 @@ export default function QuickActionMenu() {
       label: 'Log business expense',
       subtitle: 'One-time payment like LLC renewal',
       Icon: Receipt,
-      onSelect: openExpenseSheet,
+      onSelect: () => {
+        if (!isLoggedIn) return requireSignIn()
+        openExpenseSheet()
+      },
     },
     {
       id: 'buy-supplies',
       label: 'Buy supplies',
       subtitle: 'Chemicals and consumables → expense + inventory',
       Icon: Flask,
-      onSelect: openSupplyPurchaseSheet,
+      onSelect: () => {
+        if (!isLoggedIn) return requireSignIn()
+        openSupplyPurchaseSheet()
+      },
     },
     {
       id: 'new-quote',
@@ -50,6 +75,7 @@ export default function QuickActionMenu() {
       subtitle: 'Send a price estimate to a client',
       Icon: FileText,
       onSelect: () => {
+        if (!isLoggedIn) return requireSignIn()
         closeMenu()
         router.push('/quotes/new')
       },
@@ -59,10 +85,7 @@ export default function QuickActionMenu() {
   useEffect(() => {
     if (!menuOpen) return
     lockBodyScroll()
-    firstActionRef.current?.focus()
-    return () => {
-      unlockBodyScroll()
-    }
+    return () => unlockBodyScroll()
   }, [menuOpen])
 
   useEffect(() => {
@@ -87,12 +110,11 @@ export default function QuickActionMenu() {
       <div className="quick-action-sheet" role="menu" aria-label="Quick actions">
         <div className="quick-action-sheet-handle" />
         <div className="quick-action-sheet-title">Quick actions</div>
-        {actions.map((action, index) => {
+        {actions.map((action) => {
           const { Icon } = action
           return (
             <button
               key={action.id}
-              ref={index === 0 ? firstActionRef : undefined}
               type="button"
               role="menuitem"
               className="quick-action-row"

@@ -124,6 +124,7 @@ export function createPackage(input: import('../types').PackageInput): Package {
     base_price: input.base_price,
     description: input.description,
     expected_return_days: input.expected_return_days ?? 90,
+    duration_minutes: input.duration_minutes ?? 120,
     default_supplies: input.default_supplies,
     active: input.active !== false,
   }
@@ -145,6 +146,8 @@ export function updatePackage(id: string, input: Partial<import('../types').Pack
     description: input.description !== undefined ? input.description : current.description,
     expected_return_days:
       input.expected_return_days !== undefined ? input.expected_return_days : current.expected_return_days,
+    duration_minutes:
+      input.duration_minutes !== undefined ? input.duration_minutes : current.duration_minutes,
     default_supplies: input.default_supplies !== undefined ? input.default_supplies : current.default_supplies,
     active: input.active !== undefined ? input.active : current.active,
   }

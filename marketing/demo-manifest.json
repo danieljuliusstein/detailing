@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-06-27T19:43:01.246Z",
+  "orgSlug": "atlas-detailing",
+  "orgId": "peuifhl41e6j1b7",
+  "appUrl": "http://127.0.0.1:3000",
+  "businessName": "Summit Mobile Detail",
+  "ids": {
+    "paidJobId": "2c26knyv3umj5k8",
+    "photoJobId": "2c26knyv3umj5k8",
+    "inProgressJobId": "thxt4rlsreivjhg",
+    "clientMarcusId": "hcenxxc1fkworrx",
+    "clientSarahId": "jmnyl3k7ht48wbs",
+    "clientId": "hcenxxc1fkworrx",
+    "sentInvoiceId": "4yzhmsapxkdh4kw",
+    "paidInvoiceId": "b3ba9mo6xodtjx8",
+    "fullDetailPackageId": "2fj5lxt7frqht9o"
+  },
+  "routes": {
+    "home": "/",
+    "jobs": "/jobs",
+    "jobDetail": "/jobs/2c26knyv3umj5k8",
+    "jobPhotos": "/jobs/2c26knyv3umj5k8/photos",
+    "client": "/clients/hcenxxc1fkworrx",
+    "reports": "/reports",
+    "pipeline": "/pipeline",
+    "booking": "/book/atlas-detailing",
+    "bookingDeep": "/book/atlas-detailing?package=2fj5lxt7frqht9o&date=2026-06-28",
+    "settingsBusiness": "/settings/business",
+    "portal": "/portal/SHHssl90ghZfYd8LbgUf_KEpf6yMNdjI"
+  },
+  "portalToken": "SHHssl90ghZfYd8LbgUf_KEpf6yMNdjI",
+  "portalUrl": "http://127.0.0.1:3000/portal/SHHssl90ghZfYd8LbgUf_KEpf6yMNdjI",
+  "capture": {
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "deviceScaleFactor": 3
+    },
+    "authEmail": "detailing@example.com"
+  }
+}

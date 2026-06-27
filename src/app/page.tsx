@@ -6,6 +6,7 @@ import {
   getDashboardData,
   getJobs,
   getJobsForDate,
+  getLeads,
   getPackages,
   getSupplies,
 } from '@/lib/api'
@@ -15,13 +16,15 @@ import {
   buildInventoryAlert,
   buildTodayJobCard,
 } from '@/lib/home-dashboard'
-import type { RecentJobRow, WeekDay } from '@/lib/types'
+import { computeMilestoneState, hasUnviewedMilestones } from '@/lib/milestones'
+import type { JobWithRelations, LeadWithRelations, RecentJobRow, WeekDay } from '@/lib/types'
 
 export default function HomePage() {
   const [ready, setReady] = useState(false)
   const [weekDays, setWeekDays] = useState<WeekDay[]>([])
   const [todayJobRows, setTodayJobRows] = useState<RecentJobRow[]>([])
-  const [jobs, setJobs] = useState<Awaited<ReturnType<typeof getJobs>>>([])
+  const [jobs, setJobs] = useState<JobWithRelations[]>([])
+  const [leads, setLeads] = useState<LeadWithRelations[]>([])
   const [inventoryAlert, setInventoryAlert] = useState<ReturnType<typeof buildInventoryAlert>>(null)
   const [clientCount, setClientCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -29,11 +32,12 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false
 
-    Promise.all([getDashboardData(), getJobs(), getSupplies(), getPackages(), getClients()])
-      .then(async ([data, allJobs, supplyList, packageList, clients]) => {
+    Promise.all([getDashboardData(), getJobs(), getLeads(), getSupplies(), getPackages(), getClients()])
+      .then(async ([data, allJobs, allLeads, supplyList, packageList, clients]) => {
         if (cancelled) return
         setWeekDays(data.weekDays)
         setJobs(allJobs)
+        setLeads(allLeads)
         setClientCount(clients.length)
 
         const today = data.weekDays.find((d) => d.isToday)?.date ?? data.weekDays[0]?.date ?? ''
@@ -59,6 +63,11 @@ export default function HomePage() {
   }, [])
 
   const upcomingJobs = useMemo(() => buildComingUpJobs(jobs, 3), [jobs])
+
+  const hasUnviewedMilestone = useMemo(() => {
+    const { milestones } = computeMilestoneState(jobs, leads)
+    return hasUnviewedMilestones(milestones)
+  }, [jobs, leads])
 
   if (loadError) {
     return (
@@ -87,6 +96,7 @@ export default function HomePage() {
       jobs={jobs}
       inventoryAlert={inventoryAlert}
       clientCount={clientCount}
+      hasUnviewedMilestone={hasUnviewedMilestone}
     />
   )
 }

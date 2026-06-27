@@ -1,32 +1,67 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { destroyProductTour, shouldAutoStartTour, startProductTour } from '@/lib/product-tour'
+import TourWelcomeModal from '@/components/TourWelcomeModal'
+import { useAuth } from '@/providers/AuthProvider'
+import {
+  TOUR_REPLAY_EVENT,
+  destroyProductTour,
+  dismissTourWelcome,
+  shouldAutoStartTour,
+  shouldShowTourWelcome,
+  skipProductTour,
+  startProductTour,
+} from '@/lib/product-tour'
 
 export default function ProductTour() {
   const pathname = usePathname()
-  const startedRef = useRef(false)
+  const { needsOnboarding } = useAuth()
+  const startingRef = useRef(false)
+  const [welcomeOpen, setWelcomeOpen] = useState(false)
+
+  const runTour = useCallback(() => {
+    if (startingRef.current) return
+    startingRef.current = true
+    setWelcomeOpen(false)
+    dismissTourWelcome()
+    void startProductTour().finally(() => {
+      startingRef.current = false
+    })
+  }, [])
+
+  const handleSkip = useCallback(() => {
+    setWelcomeOpen(false)
+    skipProductTour()
+  }, [])
 
   useEffect(() => {
-    if (pathname !== '/') {
-      startedRef.current = false
+    const tryStart = () => {
+      if (pathname !== '/' || needsOnboarding || startingRef.current || !shouldAutoStartTour()) return
+
+      if (shouldShowTourWelcome()) {
+        setWelcomeOpen(true)
+        return
+      }
+
+      runTour()
+    }
+
+    if (pathname !== '/' || needsOnboarding) {
+      startingRef.current = false
+      setWelcomeOpen(false)
+      destroyProductTour()
       return
     }
 
-    if (!shouldAutoStartTour() || startedRef.current) return
-
-    startedRef.current = true
-    const timer = window.setTimeout(() => {
-      void startProductTour().then((started) => {
-        if (!started) startedRef.current = false
-      })
-    }, 500)
+    const timer = window.setTimeout(tryStart, 600)
+    window.addEventListener(TOUR_REPLAY_EVENT, tryStart)
 
     return () => {
       window.clearTimeout(timer)
+      window.removeEventListener(TOUR_REPLAY_EVENT, tryStart)
     }
-  }, [pathname])
+  }, [pathname, needsOnboarding, runTour])
 
   useEffect(() => {
     return () => {
@@ -34,5 +69,7 @@ export default function ProductTour() {
     }
   }, [])
 
-  return null
+  if (!welcomeOpen) return null
+
+  return <TourWelcomeModal onStart={runTour} onSkip={handleSkip} />
 }

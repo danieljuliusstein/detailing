@@ -1,16 +1,34 @@
 'use client'
 
 import { CalendarBlank, MapPin } from '@phosphor-icons/react'
+import AuthEmptyState from '@/components/AuthEmptyState'
 import { todayJobDetailsLine, type TodayJobCardData } from '@/lib/home-dashboard'
 
 interface TodayJobCardProps {
   job: TodayJobCardData | null
+  isLoggedOut?: boolean
   onDirections: (address: string) => void
   onStart: (jobId: string) => void
   onAddJob: () => void
 }
 
-export default function TodayJobCard({ job, onDirections, onStart, onAddJob }: TodayJobCardProps) {
+export default function TodayJobCard({
+  job,
+  isLoggedOut = false,
+  onDirections,
+  onStart,
+  onAddJob,
+}: TodayJobCardProps) {
+  if (isLoggedOut) {
+    return (
+      <AuthEmptyState
+        icon={<CalendarBlank size={28} weight="duotone" />}
+        title="Sign in to see today's jobs"
+        subtitle="Your schedule loads from your account after you sign in."
+      />
+    )
+  }
+
   if (!job) {
     return (
       <div className="today-job-card today-job-card--empty">
@@ -56,7 +74,7 @@ export default function TodayJobCard({ job, onDirections, onStart, onAddJob }: T
           className="today-job-card__btn today-job-card__btn--start"
           onClick={() => onStart(job.id)}
         >
-          {job.jobStatus === 'in_progress' ? 'View job' : 'Start job'}
+          Open job
         </button>
       </div>
     </div>

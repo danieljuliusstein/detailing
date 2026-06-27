@@ -1,11 +1,19 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, ChatCircle, Funnel, Gear } from '@phosphor-icons/react'
+import { Car, ChatCircle, Funnel, Gear, Trophy } from '@phosphor-icons/react'
 import InventoryAlertCard from '@/components/home/InventoryAlertCard'
+import ProfileCompleteCard from '@/components/home/ProfileCompleteCard'
+import TodayJobCard from '@/components/home/TodayJobCard'
+import { useProfileCompletion } from '@/hooks/useProfileCompletion'
+import { useAuthEmptyState } from '@/hooks/useAuthEmptyState'
 import { fmt } from '@/lib/calculations'
+import { DEFAULT_BOOKING_SCHEDULE, weekdayFromIsoDate } from '@/lib/booking-availability'
+import { getTimeBlocks } from '@/lib/api'
 import {
   buildHomeWeekStats,
+  buildTodayJobCard,
   formatStartTimeLabel,
   homeJobIconTone,
   homeJobStatusClass,
@@ -13,6 +21,8 @@ import {
   type ComingUpJobData,
   type InventoryAlertData,
 } from '@/lib/home-dashboard'
+import { openMapsDirections } from '@/lib/maps-url'
+import { loadSettingsAsync } from '@/lib/settings'
 import type { JobWithRelations, RecentJobRow, WeekDay } from '@/lib/types'
 
 function greeting() {
@@ -84,6 +94,7 @@ export interface DashboardProps {
   jobs: JobWithRelations[]
   inventoryAlert: InventoryAlertData | null
   clientCount: number
+  hasUnviewedMilestone?: boolean
 }
 
 export default function Dashboard({
@@ -93,14 +104,46 @@ export default function Dashboard({
   jobs,
   inventoryAlert,
   clientCount,
+  hasUnviewedMilestone = false,
 }: DashboardProps) {
   const router = useRouter()
+  const { isLoggedOut } = useAuthEmptyState()
+  const profileCompletion = useProfileCompletion()
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set())
   const weekStats = buildHomeWeekStats(jobs, weekDays)
   const todayStr = weekDays.find((d) => d.isToday)?.date ?? new Date().toISOString().split('T')[0]
+  const todayJob = useMemo(() => buildTodayJobCard(todayJobRows), [todayJobRows])
+  const moreTodayJobs = useMemo(
+    () => (todayJob ? todayJobRows.filter((j) => j.id !== todayJob.id) : todayJobRows),
+    [todayJobRows, todayJob],
+  )
+
+  useEffect(() => {
+    if (weekDays.length === 0) return
+    const from = weekDays[0].date
+    const to = weekDays[weekDays.length - 1].date
+    let cancelled = false
+    void Promise.all([loadSettingsAsync(), getTimeBlocks(from, to)]).then(([settings, blocks]) => {
+      if (cancelled) return
+      const schedule = settings.booking_schedule ?? DEFAULT_BOOKING_SCHEDULE
+      const blocked = new Set<string>()
+      for (const day of weekDays) {
+        const weekday = weekdayFromIsoDate(day.date)
+        if (!schedule.work_days.includes(weekday)) blocked.add(day.date)
+      }
+      for (const block of blocks) {
+        if (block.all_day) blocked.add(block.date)
+      }
+      setBlockedDates(blocked)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [weekDays])
 
   return (
     <div className="screen page-content body">
-      <header className="page-header" data-tour="home">
+      <header className="page-header">
         <div>
           <h1 className="lg">{greeting()}</h1>
           <p>{todayLabel()}</p>
@@ -108,8 +151,18 @@ export default function Dashboard({
         <div className="page-header-actions">
           <button
             type="button"
+            className={`icon-btn${hasUnviewedMilestone ? ' icon-btn--milestone' : ''}`}
+            aria-label={hasUnviewedMilestone ? 'New milestone — view progress' : 'Your progress'}
+            onClick={() => router.push('/settings/progress')}
+          >
+            <Trophy size={18} weight="regular" aria-hidden="true" />
+            {hasUnviewedMilestone ? <span className="milestone-dot" aria-hidden="true" /> : null}
+          </button>
+          <button
+            type="button"
             className="icon-btn"
             aria-label="Lead pipeline"
+            data-tour="header-pipeline"
             onClick={() => router.push('/pipeline')}
           >
             <Funnel size={18} weight="regular" aria-hidden="true" />
@@ -124,36 +177,54 @@ export default function Dashboard({
           </button>
           <button
             type="button"
-            className="icon-btn"
-            aria-label="Settings"
+            className={`icon-btn${profileCompletion && !profileCompletion.isComplete ? ' icon-btn--profile-incomplete' : ''}`}
+            aria-label={
+              profileCompletion && !profileCompletion.isComplete
+                ? 'Complete your profile — open settings'
+                : 'Settings'
+            }
             data-tour="settings"
             onClick={() => router.push('/settings')}
           >
             <Gear size={18} weight="regular" aria-hidden="true" />
+            {profileCompletion && !profileCompletion.isComplete ? (
+              <span className="profile-dot" aria-hidden="true" />
+            ) : null}
           </button>
         </div>
       </header>
 
-      <div className="stat-grid stat-grid--dashboard">
+      {profileCompletion && !profileCompletion.isComplete && !isLoggedOut ? (
+        <ProfileCompleteCard completion={profileCompletion} />
+      ) : null}
+
+      <div data-tour="week-strip">
+      <div className={`stat-grid stat-grid--dashboard${isLoggedOut ? ' stat-grid--logged-out' : ''}`}>
         <div className="stat-card">
           <div className="stat-label">This week</div>
-          <div className="stat-value">{weekStats.jobsThisWeek} jobs</div>
-          <div className="stat-sub">{weekStats.jobsRemaining} remaining</div>
+          <div className="stat-value">{isLoggedOut ? '—' : `${weekStats.jobsThisWeek} jobs`}</div>
+          <div className={`stat-sub${isLoggedOut ? ' stat-sub--sign-in' : ''}`}>
+            {isLoggedOut ? 'Sign in' : `${weekStats.jobsRemaining} remaining`}
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Earned</div>
-          <div className="stat-value">{fmt(weekStats.earnedThisWeek)}</div>
-          {weekStats.earnedDeltaPct != null && (
+          <div className="stat-value">{isLoggedOut ? '—' : fmt(weekStats.earnedThisWeek)}</div>
+          {isLoggedOut ? (
+            <div className="stat-sub stat-sub--sign-in">Sign in</div>
+          ) : weekStats.earnedDeltaPct != null ? (
             <div className="stat-sub">
               {weekStats.earnedDeltaPct >= 0 ? '+' : ''}
               {weekStats.earnedDeltaPct}% vs last wk
             </div>
-          )}
+          ) : null}
         </div>
         <div className="stat-card">
           <div className="stat-label">Clients</div>
-          <div className="stat-value">{clientCount}</div>
-          <div className="stat-sub">on file</div>
+          <div className="stat-value">{isLoggedOut ? '—' : clientCount}</div>
+          <div className={`stat-sub${isLoggedOut ? ' stat-sub--sign-in' : ''}`}>
+            {isLoggedOut ? 'Sign in' : 'on file'}
+          </div>
         </div>
       </div>
 
@@ -167,7 +238,7 @@ export default function Dashboard({
           <button
             key={day.date}
             type="button"
-            className={`day${day.isToday ? ' today' : ''}`}
+            className={`day${day.isToday ? ' today' : ''}${blockedDates.has(day.date) ? ' day--blocked' : ''}`}
             onClick={() => router.push(`/jobs?date=${day.date}`)}
           >
             <div className="day-name">{day.label}</div>
@@ -176,20 +247,24 @@ export default function Dashboard({
           </button>
         ))}
       </div>
+      </div>
 
+      <div data-tour="today-jobs">
       <p className="sec">Today&apos;s jobs</p>
-      {todayJobRows.length === 0 ? (
-        <div className="empty-state">
-          <p>No jobs scheduled for today</p>
-          <button type="button" className="empty-cta" onClick={() => router.push('/jobs/new')}>
-            Schedule a job
-          </button>
-        </div>
-      ) : (
-        todayJobRows.map((job) => (
-          <HomeJobRow key={job.id} job={job} onPress={() => router.push(`/jobs/${job.id}`)} />
-        ))
-      )}
+      <TodayJobCard
+        job={todayJob}
+        isLoggedOut={isLoggedOut}
+        onDirections={openMapsDirections}
+        onStart={(jobId) => router.push(`/jobs/${jobId}`)}
+        onAddJob={() => {
+          if (isLoggedOut) router.push('/auth')
+          else router.push('/jobs/new')
+        }}
+      />
+      {moreTodayJobs.map((job) => (
+        <HomeJobRow key={job.id} job={job} onPress={() => router.push(`/jobs/${job.id}`)} />
+      ))}
+      </div>
 
       {upcomingJobs.length > 0 && (
         <>

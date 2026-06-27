@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { hasCustomBusinessLogo } from './business-logo'
 import { streamBusinessLogo } from './server/portal-data'
 
 const DEFAULT_LOGO_PATH = join(process.cwd(), 'public', 'logo.png')
@@ -17,10 +18,12 @@ function slugFromLogoUrl(logoUrl?: string | null): string | undefined {
   }
 }
 
-/** Resolve business logo to a data URI for @react-pdf/renderer (falls back to app mark). */
-export async function resolveInvoiceLogoDataUri(logoUrl?: string | null): Promise<string> {
+/** Resolve business logo to a data URI for @react-pdf/renderer. Null when no custom logo uploaded. */
+export async function resolveInvoiceLogoDataUri(logoUrl?: string | null): Promise<string | null> {
+  if (!hasCustomBusinessLogo(logoUrl)) return null
+
   const slug = slugFromLogoUrl(logoUrl)
-  if (logoUrl?.includes('/api/business-logo') || logoUrl?.includes('/api/portal/business-logo') || !logoUrl?.trim()) {
+  if (logoUrl?.includes('/api/business-logo') || logoUrl?.includes('/api/portal/business-logo')) {
     const streamed = await streamBusinessLogo(slug)
     if (streamed) {
       const buf = Buffer.from(streamed.bytes)
@@ -37,10 +40,15 @@ export async function resolveInvoiceLogoDataUri(logoUrl?: string | null): Promis
         return `data:${contentType};base64,${buf.toString('base64')}`
       }
     } catch {
-      // fall through to default
+      return null
     }
   }
 
+  return null
+}
+
+/** Legacy fallback — app mark only (avoid on customer-facing invoices). */
+export async function resolveDefaultAppLogoDataUri(): Promise<string> {
   const buf = readFileSync(DEFAULT_LOGO_PATH)
   return `data:image/png;base64,${buf.toString('base64')}`
 }

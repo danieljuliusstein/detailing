@@ -1,32 +1,24 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-export type BadgeStatus =
-  | 'draft'
-  | 'pending'
-  | 'paid'
-  | 'overdue'
-  | 'scheduled'
-  | 'completed'
+type BadgeTone = 'green' | 'yellow' | 'amber' | 'blue' | 'gray' | 'draft'
 
-const statusClass: Record<BadgeStatus, string> = {
+const TONE_CLASS: Record<BadgeTone, string> = {
+  green: 'badge-status badge-status--green',
+  yellow: 'badge-status badge-status--yellow',
+  amber: 'badge-status badge-status--amber',
+  blue: 'badge-status badge-status--blue',
+  gray: 'badge-status badge-status--gray',
   draft: 'badge-draft',
-  pending: 'badge-pending',
-  paid: 'badge-paid',
-  overdue: 'badge-overdue',
-  scheduled: 'badge-scheduled',
-  completed: 'badge-draft',
 }
 
-export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  status?: BadgeStatus
+interface BadgeProps {
+  tone?: BadgeTone
   children: ReactNode
+  className?: string
 }
 
-export default function Badge({ status, className = '', children, ...props }: BadgeProps) {
-  const classes = ['badge', status ? statusClass[status] : '', className].filter(Boolean).join(' ')
+export default function Badge({ tone = 'gray', children, className = '' }: BadgeProps) {
   return (
-    <span className={classes} {...props}>
-      {children}
-    </span>
+    <span className={`${TONE_CLASS[tone]}${className ? ` ${className}` : ''}`}>{children}</span>
   )
 }

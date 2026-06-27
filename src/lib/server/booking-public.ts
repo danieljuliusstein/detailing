@@ -1,18 +1,51 @@
+import { businessLogoApiUrl, pocketBaseRecordHasLogo } from '../business-logo'
 import { authenticateServerAdmin } from './pocketbase-admin'
 import { escapeFilterValue, appJobCreateToPb, pbClientToApp, pbJobToApp, pbPackageToApp, type PbRecord } from '../api/mappers'
-import { BOOKING_SLOT_TIMES, type AvailabilitySlot, type PublicBookingInput, type PublicBusinessInfo, type PublicPackage } from '../booking-public'
-
-function slotLabel(time: string): string {
-  const [h, m] = time.split(':').map(Number)
-  const dt = new Date()
-  dt.setHours(h, m ?? 0, 0, 0)
-  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-}
+import {
+  computeAvailability,
+  DEFAULT_BOOKING_SCHEDULE,
+  DEFAULT_PACKAGE_DURATION_MINUTES,
+  normalizeBookingSchedule,
+  type AvailabilityBlock,
+  type AvailabilityJob,
+  type AvailabilitySlot,
+} from '../booking-availability'
+import type { PublicBookingInput, PublicBusinessInfo, PublicPackage } from '../booking-public'
+export type { PublicBookingInput, PublicBusinessInfo, PublicPackage }
 
 function orgFilter(organizationId: string, extra?: string): string {
   const orgEsc = escapeFilterValue(organizationId)
   const base = `organization_id = "${orgEsc}"`
   return extra ? `${base} && (${extra})` : base
+}
+
+async function loadOrgSettings(pb: Awaited<ReturnType<typeof authenticateServerAdmin>>, organizationId: string) {
+  const records = await pb.collection('app_settings').getFullList<PbRecord>({
+    filter: orgFilter(organizationId),
+    limit: 1,
+  })
+  const record = records[0]
+  return {
+    schedule: normalizeBookingSchedule(record?.booking_schedule ?? DEFAULT_BOOKING_SCHEDULE),
+    travel_rate_per_mile:
+      typeof record?.travel_rate_per_mile === 'number' ? record.travel_rate_per_mile : undefined,
+  }
+}
+
+async function loadPackageDurationMinutes(
+  pb: Awaited<ReturnType<typeof authenticateServerAdmin>>,
+  organizationId: string,
+  packageId?: string,
+): Promise<number> {
+  if (!packageId) return DEFAULT_PACKAGE_DURATION_MINUTES
+  try {
+    const pkg = await pb.collection('packages').getOne<PbRecord>(packageId)
+    if (String(pkg.organization_id) !== organizationId) return DEFAULT_PACKAGE_DURATION_MINUTES
+    const mins = Number(pkg.duration_minutes)
+    return mins > 0 ? mins : DEFAULT_PACKAGE_DURATION_MINUTES
+  } catch {
+    return DEFAULT_PACKAGE_DURATION_MINUTES
+  }
 }
 
 export async function getPublicBusinessInfoForOrg(
@@ -26,15 +59,14 @@ export async function getPublicBusinessInfoForOrg(
   })
   if (!records.length) return null
   const record = records[0]
-  const hasLogo = typeof record.logo === 'string' && record.logo
+  const hasLogo = pocketBaseRecordHasLogo(record.logo)
   return {
     name: String(record.business_name ?? ''),
     phone: String(record.business_phone ?? ''),
     email: String(record.business_email ?? ''),
     address: String(record.business_address ?? ''),
-    logoUrl: hasLogo
-      ? `/api/business-logo?slug=${encodeURIComponent(orgSlug)}`
-      : '/logo.png',
+    logoUrl: hasLogo ? businessLogoApiUrl(orgSlug, record.updated) : '/logo.png',
+    accentColor: record.accent_color ? String(record.accent_color) : null,
   }
 }
 
@@ -49,28 +81,56 @@ export async function listPublicPackagesForOrg(organizationId: string): Promise<
     name: p.name,
     base_price: p.base_price,
     description: p.description,
+    duration_minutes: p.duration_minutes,
   }))
 }
 
-export async function getAvailabilityForOrg(organizationId: string, date: string): Promise<AvailabilitySlot[]> {
+export async function getAvailabilityForOrg(
+  organizationId: string,
+  date: string,
+  packageId?: string,
+): Promise<AvailabilitySlot[]> {
   const pb = await authenticateServerAdmin()
+  const { schedule } = await loadOrgSettings(pb, organizationId)
+  const packageDurationMinutes = await loadPackageDurationMinutes(pb, organizationId, packageId)
+
   const escaped = escapeFilterValue(date)
   const jobs = await pb.collection('jobs').getFullList<PbRecord>({
     filter: orgFilter(
       organizationId,
       `date = "${escaped}" && (status = "scheduled" || status = "in_progress")`,
     ),
+    expand: 'package_id',
   })
 
-  const taken = new Set(
-    jobs.map((j) => String(j.start_time ?? '').trim()).filter(Boolean),
-  )
+  const blocks = await pb.collection('time_blocks').getFullList<PbRecord>({
+    filter: orgFilter(organizationId, `date = "${escaped}"`),
+  })
 
-  return BOOKING_SLOT_TIMES.map((time) => ({
-    time,
-    label: slotLabel(time),
-    available: !taken.has(time),
+  const availabilityJobs: AvailabilityJob[] = jobs.map((j) => {
+    const expanded = j.expand?.package_id as PbRecord | undefined
+    const pkgDuration = expanded ? Number(expanded.duration_minutes) : undefined
+    return {
+      start_time: String(j.start_time ?? ''),
+      status: String(j.status ?? ''),
+      duration_minutes: pkgDuration && pkgDuration > 0 ? pkgDuration : undefined,
+    }
+  })
+
+  const availabilityBlocks: AvailabilityBlock[] = blocks.map((b) => ({
+    date: String(b.date ?? ''),
+    start_time: b.start_time ? String(b.start_time) : undefined,
+    end_time: b.end_time ? String(b.end_time) : undefined,
+    all_day: Boolean(b.all_day),
   }))
+
+  return computeAvailability({
+    schedule,
+    date,
+    packageDurationMinutes,
+    jobs: availabilityJobs,
+    blocks: availabilityBlocks,
+  })
 }
 
 export async function createPublicBookingForOrg(organizationId: string, input: PublicBookingInput) {
@@ -114,7 +174,7 @@ export async function createPublicBookingForOrg(organizationId: string, input: P
   }
 
   const client = pbClientToApp(clientRecord)
-  const slots = await getAvailabilityForOrg(organizationId, input.date)
+  const slots = await getAvailabilityForOrg(organizationId, input.date, input.packageId)
   const slot = slots.find((s) => s.time === input.startTime)
   if (!slot?.available) throw new Error('That time slot is no longer available')
 
@@ -136,6 +196,26 @@ export async function createPublicBookingForOrg(organizationId: string, input: P
     organization_id: organizationId,
   })
   const job = pbJobToApp(jobRecord)
+
+  try {
+    await pb.collection('leads').create({
+      organization_id: organizationId,
+      name: client.name,
+      phone: client.phone ?? '',
+      email: client.email ?? '',
+      source: 'website',
+      vehicle_type: input.vehicleType,
+      package_id: input.packageId,
+      quote_amount: packageApp.base_price,
+      stage: 'booked',
+      client_id: client.id,
+      job_id: job.id,
+      service_interest: packageApp.name,
+      notes: input.notes?.trim() ? `Web booking: ${input.notes.trim()}` : 'Web booking',
+    })
+  } catch {
+    // leads collection may be unavailable before migration
+  }
 
   return {
     jobId: job.id,

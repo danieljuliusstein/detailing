@@ -209,9 +209,7 @@ export default function PhotoGallery({ job }: { job: JobWithRelations }) {
                   clientEmail={job.client.email}
                   clientName={job.client.name}
                   jobId={job.id}
-                  scope="photos"
-                  emailSubject={`Your photos from ${job.client.name}`}
-                  emailMessage="View your before and after photos using the secure link below."
+                  context="photos"
                 />
               </div>
             )}

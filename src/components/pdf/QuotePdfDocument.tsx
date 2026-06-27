@@ -1,4 +1,5 @@
-import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { PdfBusinessLogo } from '@/components/pdf/PdfBusinessLogo'
 import { INVOICE_ACCENT } from '@/lib/invoice-layout'
 import type { AppSettings } from '@/lib/settings'
 import type { QuoteWithRelations } from '@/lib/types'
@@ -160,7 +161,7 @@ export default function QuotePdfDocument({
 }: {
   quote: QuoteWithRelations
   settings: AppSettings
-  logoDataUri: string
+  logoDataUri?: string | null
 }) {
   const lineDesc = quote.package?.name ?? 'Detailing service'
   const contextParts = [quote.vehicle_type, quote.location_type].filter(Boolean).join(' · ')
@@ -170,7 +171,7 @@ export default function QuotePdfDocument({
       <Page size="LETTER" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Image src={logoDataUri} style={styles.logo} />
+            <PdfBusinessLogo logoDataUri={logoDataUri} />
             <View>
               <Text style={styles.businessName}>{settings.business_name}</Text>
               {settings.business_phone ? <Text style={styles.muted}>{settings.business_phone}</Text> : null}

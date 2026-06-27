@@ -1,21 +1,14 @@
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import type { InputHTMLAttributes } from 'react'
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  icon?: ReactNode
-  wrapClassName?: string
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  error?: string
 }
 
-export default function Input({ icon, wrapClassName = '', className = 'input', ...props }: InputProps) {
-  if (!icon) {
-    return <input className={className} {...props} />
-  }
-
+export default function Input({ className = '', error, ...props }: InputProps) {
   return (
-    <div className={`book-input-wrap ${wrapClassName}`.trim()}>
-      <span className="book-input-icon" aria-hidden="true">
-        {icon}
-      </span>
-      <input className={className} {...props} />
+    <div className="ui-input-wrap">
+      <input className={`f-input auth-input${className ? ` ${className}` : ''}`} {...props} />
+      {error ? <p className="auth-error">{error}</p> : null}
     </div>
   )
 }

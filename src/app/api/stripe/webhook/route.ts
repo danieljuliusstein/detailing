@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { addPaymentServer, getInvoiceServer } from '@/lib/server/invoices-server'
+import { syncConnectAccountToOrg } from '@/lib/server/stripe-connect'
 import { getStripe, isStripeConfigured } from '@/lib/server/stripe'
 
 export const runtime = 'nodejs'
@@ -28,15 +29,24 @@ export async function POST(request: Request) {
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Invalid signature' },
-      { status: 400 }
+      { status: 400 },
     )
+  }
+
+  if (event.type === 'account.updated') {
+    const account = event.data.object as Stripe.Account
+    const orgId = String(account.metadata?.organization_id ?? '').trim()
+    if (orgId) {
+      await syncConnectAccountToOrg(orgId, account)
+    }
   }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
     const invoiceId = session.metadata?.invoice_id
     if (!invoiceId) {
-      return NextResponse.json({ error: 'Missing invoice metadata' }, { status: 400 })
+      // Subscription checkouts use /api/stripe/operator-webhook — ignore here.
+      return NextResponse.json({ received: true, skipped: 'not_invoice_checkout' })
     }
 
     const invoice = await getInvoiceServer(invoiceId)

@@ -37,6 +37,13 @@ Optional (client manual cron fallback):
 |----------|---------|
 | `NEXT_PUBLIC_INTERNAL_API_SECRET` | Same secret for Settings → run notifications |
 
+Optional (support):
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | Mailto target for Settings → Help & support |
+| `NEXT_PUBLIC_APP_VERSION` | App version label (defaults to `package.json` version at build) |
+
 Deploy. Note your production URL, e.g. `https://detailing-app.vercel.app`.
 
 ## 3. Wire notification cron
@@ -130,21 +137,24 @@ Webhook endpoint: `https://your-app.vercel.app/api/stripe/webhook` — subscribe
 
 Clients open the portal invoice link and click **Pay online** to complete Checkout; payments are recorded on the invoice automatically.
 
-### Twilio (auto-messages SMS)
+### Auto-messages (email)
 
-| Variable | Purpose |
-|----------|---------|
-| `TWILIO_ACCOUNT_SID` | Twilio account |
-| `TWILIO_AUTH_TOKEN` | Twilio auth |
-| `TWILIO_FROM_NUMBER` | E.164 sender (e.g. `+15551234567`) |
+Auto-messages send **email only** via Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`). Clients need an email on file.
 
-Templates are stored in PocketBase `app_settings.auto_messages`. Sent messages log to `sent_messages`. The daily cron (`/api/cron/notifications`) runs appointment reminders, completion texts, review requests, and 30-day follow-ups.
+Templates live in PocketBase `app_settings.auto_messages`. Sent messages log to `sent_messages`. The daily cron (`/api/cron/notifications`) runs appointment reminders, completion emails, review requests, and 30-day follow-ups.
+
+To **text a client manually**, use the **Text** button on their profile (opens your phone’s Messages app — no API cost).
 
 Optional: `NEXT_PUBLIC_REVIEW_URL` for review-request template links.
 
 ### Lead pipeline
 
-Operators open **Lead pipeline** from the home header (funnel icon) at `/pipeline`. Website bookings (`lead_source: website`) and upcoming scheduled jobs appear in New / Scheduled / Completed columns.
+Operators open **Lead pipeline** from the home header (funnel icon) at `/pipeline`.
+
+- **Mobile stepper tabs:** Inquiry → Quoted → Ready to schedule
+- **Single-column list** per active tab (not a desktop kanban)
+- **Website bookings** (`lead_source: website`) land in **Inquiry**
+- **Quote accepted** moves the lead to **Ready to schedule**; convert from there to create a scheduled job
 
 ### Marketing website → booking
 

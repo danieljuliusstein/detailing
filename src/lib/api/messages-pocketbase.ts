@@ -33,10 +33,8 @@ export async function loadAutoMessageTemplatesFromPocketBase(): Promise<AutoMess
       return DEFAULT_AUTO_TEMPLATES.map((t) => ({ ...t }))
     }
     return DEFAULT_AUTO_TEMPLATES.map((def) => {
-      const saved = (raw as Partial<AutoMessageTemplate>[]).find((p) => p.id === def.id)
-      return saved
-        ? { ...def, enabled: saved.enabled ?? def.enabled, channel: saved.channel ?? def.channel }
-        : { ...def }
+      const saved = (raw as { id?: string; enabled?: boolean }[]).find((p) => p.id === def.id)
+      return saved ? { ...def, enabled: saved.enabled ?? def.enabled } : { ...def }
     })
   } catch {
     return null
@@ -46,7 +44,7 @@ export async function loadAutoMessageTemplatesFromPocketBase(): Promise<AutoMess
 export async function saveAutoMessageTemplatesToPocketBase(templates: AutoMessageTemplate[]): Promise<boolean> {
   if (!(await canSync())) return false
   try {
-    const payload = templates.map(({ id, enabled, channel }) => ({ id, enabled, channel }))
+    const payload = templates.map(({ id, enabled }) => ({ id, enabled }))
     const records = await pb().collection('app_settings').getFullList<PbRecord>({
       filter: tenantFilter(),
       limit: 1,

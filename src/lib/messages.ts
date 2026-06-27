@@ -1,6 +1,5 @@
 import { scopedStorageKey } from './tenant'
 
-export type MessageChannel = 'auto' | 'sms' | 'email'
 export type SentMessageStatus = 'sent' | 'failed'
 export type SentMessageChannel = 'sms' | 'email'
 
@@ -9,8 +8,6 @@ export interface AutoMessageTemplate {
   name: string
   trigger: string
   enabled: boolean
-  channel: MessageChannel
-  smsBody: string
   emailBody: string
 }
 
@@ -39,9 +36,6 @@ export const DEFAULT_AUTO_TEMPLATES: AutoMessageTemplate[] = [
     name: 'Appointment reminder',
     trigger: '24 hours before appointment',
     enabled: true,
-    channel: 'sms',
-    smsBody:
-      'Hi {{name}} — reminder: your {{package}} detail is tomorrow at {{time}}. Reply if you need to reschedule.',
     emailBody:
       'Hi {{name}},\n\nThis is a reminder that your {{package}} appointment is scheduled for {{date}} at {{time}}.\n\nView your portal: {{portal_link}}',
   },
@@ -50,8 +44,6 @@ export const DEFAULT_AUTO_TEMPLATES: AutoMessageTemplate[] = [
     name: 'Job completion',
     trigger: 'When job is marked complete',
     enabled: true,
-    channel: 'auto',
-    smsBody: 'Hi {{name}} — your {{package}} is complete. Thanks for choosing us!',
     emailBody:
       'Hi {{name}},\n\nYour {{package}} service is now complete. We hope you love the results!\n\nView photos: {{portal_link}}',
   },
@@ -60,8 +52,6 @@ export const DEFAULT_AUTO_TEMPLATES: AutoMessageTemplate[] = [
     name: 'Review request',
     trigger: '24 hours after completion',
     enabled: false,
-    channel: 'auto',
-    smsBody: 'Hi {{name}} — hope you enjoyed your detail! A quick review helps us grow: {{review_link}}',
     emailBody:
       'Hi {{name}},\n\nThank you for trusting us with your {{package}}. If you have a moment, we would appreciate a review.\n\nLeave a review: {{review_link}}',
   },
@@ -70,41 +60,8 @@ export const DEFAULT_AUTO_TEMPLATES: AutoMessageTemplate[] = [
     name: 'Follow-up',
     trigger: '30 days after last service',
     enabled: false,
-    channel: 'auto',
-    smsBody: 'Hi {{name}} — it has been about a month since your last detail. Ready to book again?',
     emailBody:
       'Hi {{name}},\n\nIt has been about 30 days since your last {{package}}. Reply or book your next visit when you are ready.',
-  },
-]
-
-/** Placeholder sent history for the All Messages tab */
-export const PLACEHOLDER_SENT_MESSAGES: SentMessage[] = [
-  {
-    id: 'sent_001',
-    client_name: 'Sarah K.',
-    preview: 'Hi Sarah — reminder: your Full Detail is tomorrow at 9:00 AM.',
-    body: 'Hi Sarah — reminder: your Full Detail detail is tomorrow at 9:00 AM. Reply if you need to reschedule.',
-    channel: 'sms',
-    sent_at: '2026-06-05T14:22:00.000Z',
-    status: 'sent',
-  },
-  {
-    id: 'sent_002',
-    client_name: 'Marcus Thompson',
-    preview: 'Hi Marcus, your Full Detail service is now complete. We hope you love the results!',
-    body: 'Hi Marcus,\n\nYour Full Detail service is now complete. We hope you love the results!\n\nView photos: https://detailing.app/portal/example',
-    channel: 'email',
-    sent_at: '2026-06-04T18:05:00.000Z',
-    status: 'sent',
-  },
-  {
-    id: 'sent_003',
-    client_name: 'James R.',
-    preview: 'Hi James — hope you enjoyed your detail! A quick review helps us grow.',
-    body: 'Hi James — hope you enjoyed your detail! A quick review helps us grow: https://g.page/review',
-    channel: 'sms',
-    sent_at: '2026-06-03T10:15:00.000Z',
-    status: 'failed',
   },
 ]
 
@@ -113,10 +70,10 @@ export function loadAutoMessageTemplates(): AutoMessageTemplate[] {
   const raw = localStorage.getItem(scopedStorageKey(STORAGE_KEY))
   if (!raw) return DEFAULT_AUTO_TEMPLATES.map((t) => ({ ...t }))
   try {
-    const parsed = JSON.parse(raw) as AutoMessageTemplate[]
+    const parsed = JSON.parse(raw) as { id: string; enabled?: boolean }[]
     return DEFAULT_AUTO_TEMPLATES.map((def) => {
       const saved = parsed.find((p) => p.id === def.id)
-      return saved ? { ...def, enabled: saved.enabled, channel: saved.channel } : { ...def }
+      return saved ? { ...def, enabled: saved.enabled ?? def.enabled } : { ...def }
     })
   } catch {
     return DEFAULT_AUTO_TEMPLATES.map((t) => ({ ...t }))
@@ -125,7 +82,7 @@ export function loadAutoMessageTemplates(): AutoMessageTemplate[] {
 
 export function saveAutoMessageTemplates(templates: AutoMessageTemplate[]): void {
   if (typeof window === 'undefined') return
-  const payload = templates.map(({ id, enabled, channel }) => ({ id, enabled, channel }))
+  const payload = templates.map(({ id, enabled }) => ({ id, enabled }))
   localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(payload))
 }
 
@@ -177,11 +134,8 @@ export function mergeTemplateBody(template: string): string {
     .replace(/\{\{review_link\}\}/g, 'https://g.page/review')
 }
 
-export function resolvePreviewChannel(channel: MessageChannel): SentMessageChannel {
-  if (channel === 'sms') return 'sms'
-  if (channel === 'email') return 'email'
-  return 'sms'
-}
+export const AUTO_MESSAGE_HINT =
+  'Sends by email when the client has an email on file. To text manually, use Text on the client profile.'
 
 export function formatMessageTimestamp(iso: string): string {
   const d = new Date(iso)
@@ -195,10 +149,4 @@ export function formatMessageTimestamp(iso: string): string {
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-export function channelHint(channel: MessageChannel): string {
-  if (channel === 'auto') return 'Uses phone when available, otherwise email'
-  if (channel === 'sms') return 'Only sends when client has a phone number on file'
-  return 'Only sends when client has an email on file'
 }

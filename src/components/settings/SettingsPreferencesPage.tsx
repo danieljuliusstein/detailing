@@ -9,7 +9,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '@/lib/push-client'
-import { requestTourReplay } from '@/lib/product-tour'
+import { requestTourReplay, TOUR_REPLAY_EVENT } from '@/lib/product-tour'
 import SettingsDetailShell from './SettingsDetailShell'
 import { useSettingsDraft } from './SettingsDraftProvider'
 
@@ -87,6 +87,19 @@ export default function SettingsPreferencesPage() {
         <div className="settings-divider" />
         <div className="settings-toggle-row">
           <div>
+            <div className="settings-toggle-row__label">Track supplies on jobs</div>
+            <div className="settings-toggle-row__hint">
+              Prompt to log product used when saving a job. Off by default.
+            </div>
+          </div>
+          <Toggle
+            on={settings.track_job_supplies === true}
+            onChange={(v) => update('track_job_supplies', v)}
+          />
+        </div>
+        <div className="settings-divider" />
+        <div className="settings-toggle-row">
+          <div>
             <div className="settings-toggle-row__label">Push notifications</div>
             <div className="settings-toggle-row__hint">
               {isPushSupported() ? (pushOn ? 'Subscribed on this device' : 'Not subscribed') : 'Not supported on this device'}
@@ -102,6 +115,7 @@ export default function SettingsPreferencesPage() {
           onClick={() => {
             requestTourReplay()
             router.push('/')
+            window.dispatchEvent(new Event(TOUR_REPLAY_EVENT))
           }}
         >
           <span>Replay app tour</span>

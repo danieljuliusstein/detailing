@@ -8,6 +8,7 @@ import ReportExpenseBreakdown from '@/components/reports/ReportExpenseBreakdown'
 import ReportRevenueByService from '@/components/reports/ReportRevenueByService'
 import ReportSection from '@/components/reports/ReportSection'
 import CurrencyAmount from '@/components/ui/CurrencyAmount'
+import { useAuthEmptyState } from '@/hooks/useAuthEmptyState'
 import { getJobs, getPLReportBundle, type DateRangeKey } from '@/lib/api'
 import { computeJobsExportData, formatJobsExportCSV } from '@/lib/api/aggregates'
 import { computeDashboardKpis, csvJobStatusLabel, rowTableNet } from '@/lib/jobs-dashboard-csv'
@@ -28,6 +29,7 @@ const MONEY_CHIPS = REPORT_FILTER_CHIPS.filter((c) =>
 export default function Reports() {
   const pathname = usePathname()
   const router = useRouter()
+  const { isLoggedOut } = useAuthEmptyState()
   const [range, setRange] = useState<DateRangeKey>('this_month')
   const [current, setCurrent] = useState<PLReport | null>(null)
   const [prior, setPrior] = useState<PLReport | null>(null)
@@ -152,6 +154,12 @@ export default function Reports() {
           </p>
         </div>
       </header>
+
+      {isLoggedOut ? (
+        <p className="money-auth-note" role="status">
+          Sign in to load your jobs, revenue, and expenses.
+        </p>
+      ) : null}
 
       <div className="chips">
         {MONEY_CHIPS.map((chip) => (

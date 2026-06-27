@@ -1,16 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { PencilSimple, Plus } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { FloatingAffixField, FloatingField, SheetSubmitButton } from '@/components/forms'
+import { useSettingsBack } from '@/hooks/useSettingsBack'
 import { createPackage, getAllPackages, updatePackage } from '@/lib/api'
 import { fmt } from '@/lib/calculations'
 import { CADENCE_PRESETS, cadencePresetLabel, DEFAULT_RETURN_DAYS } from '@/lib/package-cadence'
+import { PACKAGE_DURATION_PRESETS, durationPresetLabel } from '@/lib/package-duration'
+import { syncPrefilledFloatingLabels, syncSelectFloatingLabel } from '@/lib/floating-label'
 import type { Package } from '@/lib/types'
 
 export default function PackagesSettings() {
-  const router = useRouter()
+  const goBack = useSettingsBack()
+  const formRef = useRef<HTMLDivElement>(null)
+  const returnDaysRef = useRef<HTMLSelectElement>(null)
+  const durationRef = useRef<HTMLSelectElement>(null)
   const [packages, setPackages] = useState<Package[]>([])
   const [showAdd, setShowAdd] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -18,15 +24,34 @@ export default function PackagesSettings() {
   const [price, setPrice] = useState(0)
   const [description, setDescription] = useState('')
   const [returnDays, setReturnDays] = useState(DEFAULT_RETURN_DAYS)
+  const [durationMinutes, setDurationMinutes] = useState(120)
+  const [customDuration, setCustomDuration] = useState('')
 
   const load = async () => setPackages(await getAllPackages())
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (!showAdd && !editingId) return
+    syncPrefilledFloatingLabels(formRef.current)
+    syncSelectFloatingLabel(returnDaysRef.current)
+    syncSelectFloatingLabel(durationRef.current)
+  }, [showAdd, editingId, name, price, description, returnDays, durationMinutes, customDuration])
+
+  const resolvedDuration = (): number => {
+    if (durationMinutes === 0) {
+      const custom = Number(customDuration)
+      return custom > 0 ? custom : 120
+    }
+    return durationMinutes
+  }
 
   const resetForm = () => {
     setName('')
     setPrice(0)
     setDescription('')
     setReturnDays(DEFAULT_RETURN_DAYS)
+    setDurationMinutes(120)
+    setCustomDuration('')
   }
 
   const startEdit = (pkg: Package) => {
@@ -35,6 +60,14 @@ export default function PackagesSettings() {
     setPrice(pkg.base_price)
     setDescription(pkg.description ?? '')
     setReturnDays(pkg.expected_return_days)
+    const preset = PACKAGE_DURATION_PRESETS.find((p) => p.minutes === pkg.duration_minutes)
+    if (preset) {
+      setDurationMinutes(pkg.duration_minutes)
+      setCustomDuration('')
+    } else {
+      setDurationMinutes(0)
+      setCustomDuration(String(pkg.duration_minutes))
+    }
     setShowAdd(false)
   }
 
@@ -55,6 +88,7 @@ export default function PackagesSettings() {
       base_price: price,
       description: description.trim() || undefined,
       expected_return_days: returnDays,
+      duration_minutes: resolvedDuration(),
     })
     cancelEdit()
     await load()
@@ -67,6 +101,7 @@ export default function PackagesSettings() {
       base_price: price,
       description: description.trim() || undefined,
       expected_return_days: returnDays,
+      duration_minutes: resolvedDuration(),
       active: true,
     })
     setShowAdd(false)
@@ -77,7 +112,7 @@ export default function PackagesSettings() {
   return (
     <div className="screen page-content">
       <div style={{ display: 'flex', alignItems: 'center', paddingTop: 16, paddingBottom: 20, gap: 12 }}>
-        <BackButton onClick={() => router.back()} />
+        <BackButton onClick={goBack} />
         <div style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>Services &amp; pricing</div>
         <button
           onClick={() => { setShowAdd(!showAdd); cancelEdit() }}
@@ -93,36 +128,109 @@ export default function PackagesSettings() {
       </div>
 
       {(showAdd || editingId) && (
-        <div className="card" style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div ref={formRef} className="page-form-card page-form" style={{ marginBottom: 16 }}>
           <div className="section-title">{editingId ? 'Edit service' : 'New service'}</div>
-          <input className="input" placeholder="Service name" value={name} onChange={(e) => setName(e.target.value)} />
-          <input
-            className="input"
+
+          <FloatingField id="pkg-name" label="Service name" filled={name.trim().length > 0}>
+            <input
+              id="pkg-name"
+              className={`f-input${name.trim() ? ' hv' : ''}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+
+          <FloatingAffixField
+            id="pkg-price"
+            label="Price"
+            filled={price > 0}
             type="number"
             min={0}
             step={1}
-            placeholder="Price"
             value={price || ''}
             onChange={(e) => setPrice(Number(e.target.value))}
           />
-          <input className="input" placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Expected revisit</div>
-            <select className="input" value={returnDays} onChange={(e) => setReturnDays(Number(e.target.value))}>
+
+          <FloatingField id="pkg-description" label="Description" filled={description.trim().length > 0} optional>
+            <input
+              id="pkg-description"
+              className={`f-input${description.trim() ? ' hv' : ''}`}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder=" "
+            />
+          </FloatingField>
+
+          <FloatingField id="pkg-return-days" label="Expected revisit" filled={Boolean(returnDays)}>
+            <select
+              ref={returnDaysRef}
+              id="pkg-return-days"
+              className={`f-select${returnDays ? ' hv' : ''}`}
+              value={returnDays}
+              onChange={(e) => {
+                setReturnDays(Number(e.target.value))
+                syncSelectFloatingLabel(returnDaysRef.current)
+              }}
+            >
               {CADENCE_PRESETS.map((preset) => (
                 <option key={preset.days} value={preset.days}>
                   {preset.label} — {preset.hint}
                 </option>
               ))}
             </select>
-          </div>
+          </FloatingField>
+
+          <FloatingField id="pkg-duration" label="Booking duration" filled={Boolean(durationMinutes || customDuration)}>
+            <select
+              ref={durationRef}
+              id="pkg-duration"
+              className={`f-select${durationMinutes || customDuration ? ' hv' : ''}`}
+              value={durationMinutes}
+              onChange={(e) => {
+                setDurationMinutes(Number(e.target.value))
+                syncSelectFloatingLabel(durationRef.current)
+              }}
+            >
+              {PACKAGE_DURATION_PRESETS.map((preset) => (
+                <option key={preset.minutes} value={preset.minutes}>
+                  {preset.label}
+                </option>
+              ))}
+              <option value={0}>Custom</option>
+            </select>
+          </FloatingField>
+
+          {durationMinutes === 0 && (
+            <FloatingField id="pkg-duration-custom" label="Custom minutes" filled={customDuration.trim().length > 0}>
+              <input
+                id="pkg-duration-custom"
+                type="number"
+                min={15}
+                step={15}
+                className={`f-input${customDuration.trim() ? ' hv' : ''}`}
+                value={customDuration}
+                onChange={(e) => setCustomDuration(e.target.value)}
+                placeholder=" "
+              />
+            </FloatingField>
+          )}
+
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -4, marginBottom: 12, lineHeight: 1.5 }}>
+            Used to block your calendar when clients book online.
+          </p>
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-ghost" onClick={() => { showAdd ? setShowAdd(false) : cancelEdit() }} style={{ flex: 1 }}>
               Cancel
             </button>
-            <button className="btn-primary" onClick={editingId ? handleSaveEdit : handleAdd} style={{ flex: 1 }}>
-              {editingId ? 'Save' : 'Add service'}
-            </button>
+            <div className="page-form-save" style={{ flex: 1, margin: 0 }}>
+              <SheetSubmitButton
+                label={editingId ? 'Save' : 'Add service'}
+                ready={name.trim().length > 0}
+                onClick={() => void (editingId ? handleSaveEdit() : handleAdd())}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -135,6 +243,7 @@ export default function PackagesSettings() {
               {fmt(pkg.base_price)}
               {pkg.description ? ` · ${pkg.description}` : ''}
               {` · ${cadencePresetLabel(pkg.expected_return_days)}`}
+              {` · ${durationPresetLabel(pkg.duration_minutes)}`}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

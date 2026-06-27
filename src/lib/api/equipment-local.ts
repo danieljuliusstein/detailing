@@ -37,3 +37,21 @@ export function deleteEquipment(id: string): boolean {
   saveData(data)
   return true
 }
+
+async function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function uploadEquipmentPhoto(id: string, file: File): Promise<Equipment | null> {
+  const dataUrl = await readFileAsDataUrl(file)
+  return updateEquipment(id, { image_url: dataUrl })
+}
+
+export async function clearEquipmentPhoto(id: string): Promise<Equipment | null> {
+  return updateEquipment(id, { image_url: undefined })
+}

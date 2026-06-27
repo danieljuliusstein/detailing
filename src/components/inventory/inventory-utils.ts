@@ -166,6 +166,6 @@ export function catalogProducts(catalog: Supply[]): Supply[] {
 
 export type CategoryViewMode = 'grid' | 'list'
 
-export function defaultViewMode(sectionKey: SectionKey): CategoryViewMode {
-  return sectionKey === 'equipment' ? 'list' : 'grid'
+export function defaultViewMode(_sectionKey: SectionKey): CategoryViewMode {
+  return 'list'
 }

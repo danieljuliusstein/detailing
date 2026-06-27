@@ -18,7 +18,7 @@ export function EquipmentProductTile({ item, onPress, inExpenses = false }: Equi
       <div className="product-tile__media">
         {item.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.image_url} alt="" className="product-tile__img" />
+          <img src={item.image_url} alt="" className="product-tile__img" loading="lazy" />
         ) : (
           <div className="product-tile__monogram" style={{ background: monogramColor(item.name) }}>
             <Wrench size={24} weight="duotone" color="rgba(255,255,255,0.85)" aria-hidden />

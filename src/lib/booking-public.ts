@@ -1,8 +1,21 @@
 import { ensurePocketBaseAuth } from './pb-auth'
 import { getPocketBase } from './pocketbase'
 import { appJobCreateToPb, escapeFilterValue, pbClientToApp, pbJobToApp, pbPackageToApp, type PbRecord } from './api/mappers'
+import { tenantFilter } from './api/tenant-pocketbase'
+import {
+  computeAvailability,
+  DEFAULT_BOOKING_SCHEDULE,
+  DEFAULT_PACKAGE_DURATION_MINUTES,
+  normalizeBookingSchedule,
+  slotLabel,
+  type AvailabilityBlock,
+  type AvailabilityJob,
+  type AvailabilitySlot,
+} from './booking-availability'
 
-/** Default mobile-detailing time slots (24h HH:MM). */
+export type { AvailabilitySlot }
+
+/** @deprecated Use schedule-driven slots from computeAvailability */
 export const BOOKING_SLOT_TIMES = ['08:00', '10:00', '12:00', '14:00', '16:00']
 
 export interface PublicPackage {
@@ -10,12 +23,7 @@ export interface PublicPackage {
   name: string
   base_price: number
   description?: string
-}
-
-export interface AvailabilitySlot {
-  time: string
-  label: string
-  available: boolean
+  duration_minutes?: number
 }
 
 export interface PublicBusinessInfo {
@@ -24,6 +32,7 @@ export interface PublicBusinessInfo {
   email: string
   address: string
   logoUrl: string
+  accentColor?: string | null
 }
 
 export interface PublicBookingInput {
@@ -45,17 +54,13 @@ function pb() {
   return client
 }
 
-function slotLabel(time: string): string {
-  const [h, m] = time.split(':').map(Number)
-  const dt = new Date()
-  dt.setHours(h, m ?? 0, 0, 0)
-  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-}
-
 export async function getPublicBusinessInfo(): Promise<PublicBusinessInfo | null> {
   if (!(await ensurePocketBaseAuth())) return null
   try {
-    const records = await pb().collection('app_settings').getFullList<PbRecord>({ limit: 1 })
+    const records = await pb().collection('app_settings').getFullList<PbRecord>({
+      filter: tenantFilter(),
+      limit: 1,
+    })
     if (!records.length) return null
     const record = records[0]
     return {
@@ -72,7 +77,10 @@ export async function getPublicBusinessInfo(): Promise<PublicBusinessInfo | null
 
 export async function listPublicPackages(): Promise<PublicPackage[]> {
   if (!(await ensurePocketBaseAuth())) return []
-  const records = await pb().collection('packages').getFullList<PbRecord>({ sort: 'name' })
+  const records = await pb().collection('packages').getFullList<PbRecord>({
+    filter: tenantFilter(),
+    sort: 'name',
+  })
   return records
     .map(pbPackageToApp)
     .filter((p) => p.active)
@@ -81,30 +89,68 @@ export async function listPublicPackages(): Promise<PublicPackage[]> {
       name: p.name,
       base_price: p.base_price,
       description: p.description,
+      duration_minutes: p.duration_minutes,
     }))
 }
 
-export async function getAvailabilityForDate(date: string): Promise<AvailabilitySlot[]> {
+export async function getAvailabilityForDate(date: string, packageId?: string): Promise<AvailabilitySlot[]> {
   if (!(await ensurePocketBaseAuth())) {
     return BOOKING_SLOT_TIMES.map((time) => ({ time, label: slotLabel(time), available: false }))
   }
 
-  const escaped = escapeFilterValue(date)
-  const jobs = await pb().collection('jobs').getFullList<PbRecord>({
-    filter: `date = "${escaped}" && (status = "scheduled" || status = "in_progress")`,
+  const settingsRecords = await pb().collection('app_settings').getFullList<PbRecord>({
+    filter: tenantFilter(),
+    limit: 1,
   })
-
-  const taken = new Set(
-    jobs
-      .map((j) => String(j.start_time ?? '').trim())
-      .filter(Boolean)
+  const schedule = normalizeBookingSchedule(
+    settingsRecords[0]?.booking_schedule ?? DEFAULT_BOOKING_SCHEDULE,
   )
 
-  return BOOKING_SLOT_TIMES.map((time) => ({
-    time,
-    label: slotLabel(time),
-    available: !taken.has(time),
+  let packageDurationMinutes = DEFAULT_PACKAGE_DURATION_MINUTES
+  if (packageId) {
+    try {
+      const pkg = await pb().collection('packages').getOne<PbRecord>(packageId)
+      const mins = Number(pkg.duration_minutes)
+      if (mins > 0) packageDurationMinutes = mins
+    } catch {
+      // use default
+    }
+  }
+
+  const escaped = escapeFilterValue(date)
+  const jobs = await pb().collection('jobs').getFullList<PbRecord>({
+    filter: `${tenantFilter()} && date = "${escaped}" && (status = "scheduled" || status = "in_progress")`,
+    expand: 'package_id',
+  })
+
+  const blocks = await pb().collection('time_blocks').getFullList<PbRecord>({
+    filter: `${tenantFilter()} && date = "${escaped}"`,
+  })
+
+  const availabilityJobs: AvailabilityJob[] = jobs.map((j) => {
+    const expanded = j.expand?.package_id as PbRecord | undefined
+    const pkgDuration = expanded ? Number(expanded.duration_minutes) : undefined
+    return {
+      start_time: String(j.start_time ?? ''),
+      status: String(j.status ?? ''),
+      duration_minutes: pkgDuration && pkgDuration > 0 ? pkgDuration : undefined,
+    }
+  })
+
+  const availabilityBlocks: AvailabilityBlock[] = blocks.map((b) => ({
+    date: String(b.date ?? ''),
+    start_time: b.start_time ? String(b.start_time) : undefined,
+    end_time: b.end_time ? String(b.end_time) : undefined,
+    all_day: Boolean(b.all_day),
   }))
+
+  return computeAvailability({
+    schedule,
+    date,
+    packageDurationMinutes,
+    jobs: availabilityJobs,
+    blocks: availabilityBlocks,
+  })
 }
 
 export async function createPublicBooking(input: PublicBookingInput) {
@@ -122,7 +168,7 @@ export async function createPublicBooking(input: PublicBookingInput) {
   let clientRecord: PbRecord | null = null
   const phoneEsc = escapeFilterValue(phone)
   const matches = await pb().collection('clients').getFullList<PbRecord>({
-    filter: `phone = "${phoneEsc}"`,
+    filter: `${tenantFilter()} && phone = "${phoneEsc}"`,
     limit: 1,
   })
   if (matches.length > 0) {
@@ -145,7 +191,7 @@ export async function createPublicBooking(input: PublicBookingInput) {
   }
 
   const client = pbClientToApp(clientRecord)
-  const slots = await getAvailabilityForDate(input.date)
+  const slots = await getAvailabilityForDate(input.date, input.packageId)
   const slot = slots.find((s) => s.time === input.startTime)
   if (!slot?.available) throw new Error('That time slot is no longer available')
 

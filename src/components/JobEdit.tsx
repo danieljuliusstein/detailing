@@ -1,15 +1,19 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  CalendarBlank, MapPin, House, FloppyDisk,
+  CalendarBlank, MapPin, House,
 } from '@phosphor-icons/react'
 import BackButton from '@/components/BackButton'
+import { FloatingAffixField, FloatingField, SheetSubmitButton } from '@/components/forms'
+import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import JobSuppliesConfirmSheet from '@/components/jobs/JobSuppliesConfirmSheet'
 import JobSuppliesPicker from '@/components/jobs/JobSuppliesPicker'
 import { buildJobIcs, downloadIcs } from '@/lib/calendar-ics'
 import { isCompletingJob } from '@/lib/supplies-logic'
+import { loadSettingsAsync } from '@/lib/settings'
+import { useActionToast } from '@/providers/ActionToastProvider'
 import type { JobEditData, JobStatus, JobWithRelations, Package, Supply, SupplyUsage, VehicleType } from '@/lib/types'
 import { VEHICLE_TYPE_OPTIONS } from '@/lib/vehicle-type-icons'
 
@@ -32,6 +36,8 @@ interface JobEditProps {
 
 export default function JobEdit({ job, packages, supplies, onSave }: JobEditProps) {
   const router = useRouter()
+  const { handleWriteError } = useActionToast()
+  const formRef = useRef<HTMLDivElement>(null)
   const [date, setDate] = useState(job.date)
   const [packageId, setPackageId] = useState(job.package_id)
   const [vehicleType, setVehicleType] = useState(job.vehicle_type)
@@ -48,6 +54,12 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
   const [suppliesUsed, setSuppliesUsed] = useState<SupplyUsage[]>(job.supplies_used)
   const [suppliesSheetOpen, setSuppliesSheetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  useEffect(() => {
+    syncPrefilledFloatingLabels(formRef.current)
+  }, [date, revenue, tip, hoursWorked, startTime, notes, travelCost, marketingCost, equipmentCost])
 
   const handlePackageSelect = useCallback((pkg: Package) => {
     setPackageId(pkg.id)
@@ -62,6 +74,7 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
 
   const saveJob = async (used: SupplyUsage[]) => {
     setSaving(true)
+    setSaveError('')
     try {
       await onSave({
         date,
@@ -79,7 +92,11 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         marketing_cost: marketingCost,
         equipment_depreciation: equipmentCost,
       })
-      router.push(`/jobs/${job.id}`)
+      setSaved(true)
+      window.setTimeout(() => router.push(`/jobs/${job.id}`), 1500)
+    } catch (err) {
+      if (handleWriteError(err)) return
+      setSaveError(err instanceof Error ? err.message : 'Could not save job')
     } finally {
       setSaving(false)
     }
@@ -87,8 +104,11 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
 
   const handleSave = async () => {
     if (isCompletingJob(job.status, status)) {
-      setSuppliesSheetOpen(true)
-      return
+      const appSettings = await loadSettingsAsync()
+      if (appSettings.track_job_supplies) {
+        setSuppliesSheetOpen(true)
+        return
+      }
     }
     await saveJob(suppliesUsed)
   }
@@ -117,14 +137,17 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         {job.client?.name ?? 'Unknown'}
       </div>
 
-      <div className="section-title">Job date</div>
-      <input
-        type="date"
-        className="input"
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-        style={{ marginBottom: 12 }}
-      />
+      <div ref={formRef} className="page-form-card page-form">
+        <FloatingField id="job-edit-date" label="Job date" filled={date.trim().length > 0}>
+          <input
+            id="job-edit-date"
+            className={`f-input${date.trim() ? ' hv' : ''}`}
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
 
       {status === 'scheduled' && (
         <button
@@ -186,26 +209,49 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-        <div>
-          <div className="section-title">Revenue</div>
-          <input type="number" className="input money" value={revenue || ''} onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))} style={{ fontWeight: 700, color: 'var(--green)' }} />
-        </div>
-        <div>
-          <div className="section-title">Tip</div>
-          <input type="number" className="input money" value={tip || ''} onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))} />
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <FloatingAffixField
+          id="job-edit-revenue"
+          label="Revenue"
+          filled={revenue > 0}
+          type="number"
+          inputMode="decimal"
+          value={revenue || ''}
+          onChange={(e) => setRevenue(e.target.value === '' ? 0 : Number(e.target.value))}
+        />
+        <FloatingAffixField
+          id="job-edit-tip"
+          label="Tip"
+          filled={tip > 0}
+          type="number"
+          inputMode="decimal"
+          value={tip || ''}
+          onChange={(e) => setTip(e.target.value === '' ? 0 : Number(e.target.value))}
+        />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-        <div>
-          <div className="section-title">Hours worked</div>
-          <input type="number" step="0.5" className="input" value={hoursWorked || ''} onChange={(e) => setHoursWorked(e.target.value === '' ? 0 : Number(e.target.value))} />
-        </div>
-        <div>
-          <div className="section-title">Start time</div>
-          <input type="time" className="input" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <FloatingField id="job-edit-hours" label="Hours worked" filled={hoursWorked > 0}>
+          <input
+            id="job-edit-hours"
+            className={`f-input${hoursWorked > 0 ? ' hv' : ''}`}
+            type="number"
+            step="0.5"
+            value={hoursWorked || ''}
+            onChange={(e) => setHoursWorked(e.target.value === '' ? 0 : Number(e.target.value))}
+            placeholder=" "
+          />
+        </FloatingField>
+        <FloatingField id="job-edit-start-time" label="Start time" filled={startTime.trim().length > 0}>
+          <input
+            id="job-edit-start-time"
+            className={`f-input${startTime.trim() ? ' hv' : ''}`}
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            placeholder=" "
+          />
+        </FloatingField>
       </div>
 
       <div className="section-title">Status</div>
@@ -218,20 +264,34 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         ))}
       </div>
 
-      <div className="section-title">Job costs</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Travel</div>
-          <input type="number" className="input money" value={travelCost || ''} onChange={(e) => setTravelCost(e.target.value === '' ? 0 : Number(e.target.value))} />
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Marketing</div>
-          <input type="number" className="input money" value={marketingCost || ''} onChange={(e) => setMarketingCost(e.target.value === '' ? 0 : Number(e.target.value))} />
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Equipment</div>
-          <input type="number" className="input money" value={equipmentCost || ''} onChange={(e) => setEquipmentCost(e.target.value === '' ? 0 : Number(e.target.value))} />
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        <FloatingAffixField
+          id="job-edit-travel"
+          label="Travel"
+          filled={travelCost > 0}
+          type="number"
+          inputMode="decimal"
+          value={travelCost || ''}
+          onChange={(e) => setTravelCost(e.target.value === '' ? 0 : Number(e.target.value))}
+        />
+        <FloatingAffixField
+          id="job-edit-marketing"
+          label="Marketing"
+          filled={marketingCost > 0}
+          type="number"
+          inputMode="decimal"
+          value={marketingCost || ''}
+          onChange={(e) => setMarketingCost(e.target.value === '' ? 0 : Number(e.target.value))}
+        />
+        <FloatingAffixField
+          id="job-edit-equipment"
+          label="Equipment"
+          filled={equipmentCost > 0}
+          type="number"
+          inputMode="decimal"
+          value={equipmentCost || ''}
+          onChange={(e) => setEquipmentCost(e.target.value === '' ? 0 : Number(e.target.value))}
+        />
       </div>
 
       <div className="section-title">Supplies used</div>
@@ -239,13 +299,30 @@ export default function JobEdit({ job, packages, supplies, onSave }: JobEditProp
         <JobSuppliesPicker supplies={supplies} value={suppliesUsed} onChange={setSuppliesUsed} />
       </div>
 
-      <div className="section-title">Notes</div>
-      <textarea className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} style={{ marginBottom: 24, resize: 'vertical' }} />
+      <FloatingField id="job-edit-notes" label="Notes" filled={notes.trim().length > 0} optional textarea>
+        <textarea
+          id="job-edit-notes"
+          className={`f-textarea${notes.trim() ? ' hv' : ''}`}
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder=" "
+        />
+      </FloatingField>
+      </div>
 
-      <button className="btn-primary" onClick={handleSave} disabled={saving} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        <FloppyDisk size={18} weight="bold" />
-        {saving ? 'Saving…' : 'Save changes'}
-      </button>
+      {saveError ? <div className="error-banner" style={{ marginBottom: 12 }}>{saveError}</div> : null}
+
+      <div className="page-form-save">
+        <SheetSubmitButton
+          label={saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
+          ready
+          done={saved}
+          disabled={saving || saved}
+          onClick={() => void handleSave()}
+        />
+        {saved ? <p className="form-save-flash">Saved</p> : null}
+      </div>
 
       {suppliesSheetOpen && (
         <JobSuppliesConfirmSheet
