@@ -1,7 +1,13 @@
+import type PocketBase from 'pocketbase'
 import type Stripe from 'stripe'
 import type { PbRecord } from '../api/mappers'
 import { authenticateServerAdmin } from './pocketbase-admin'
 import { getStripe, stripeAppOrigin } from './stripe'
+
+async function orgPb(userPb?: PocketBase): Promise<PocketBase> {
+  if (userPb?.authStore.isValid) return userPb
+  return authenticateServerAdmin()
+}
 
 export interface StripeConnectStatus {
   accountId: string | null
@@ -59,9 +65,12 @@ async function resolveConnectAccountId(orgId: string, org: PbRecord): Promise<st
   return findConnectAccountIdInStripe(orgId)
 }
 
-export async function refreshConnectStatus(orgId: string): Promise<StripeConnectStatus> {
-  const admin = await authenticateServerAdmin()
-  const org = await admin.collection('organizations').getOne<PbRecord>(orgId)
+export async function refreshConnectStatus(
+  orgId: string,
+  userPb?: PocketBase,
+): Promise<StripeConnectStatus> {
+  const pb = await orgPb(userPb)
+  const org = await pb.collection('organizations').getOne<PbRecord>(orgId)
   const accountId = await resolveConnectAccountId(orgId, org)
 
   if (!accountId) {
@@ -89,9 +98,10 @@ export async function ensureConnectAccount(
   orgId: string,
   email: string,
   businessName: string,
+  userPb?: PocketBase,
 ): Promise<string> {
-  const admin = await authenticateServerAdmin()
-  const org = await admin.collection('organizations').getOne<PbRecord>(orgId)
+  const pb = await orgPb(userPb)
+  const org = await pb.collection('organizations').getOne<PbRecord>(orgId)
   const existing = await resolveConnectAccountId(orgId, org)
 
   const stripe = getStripe()
@@ -112,7 +122,7 @@ export async function ensureConnectAccount(
   })
 
   try {
-    await admin.collection('organizations').update(orgId, {
+    await pb.collection('organizations').update(orgId, {
       stripe_connect_account_id: account.id,
       stripe_connect_charges_enabled: false,
     })
@@ -123,7 +133,10 @@ export async function ensureConnectAccount(
   return account.id
 }
 
-export async function resolveConnectDestination(orgId: string): Promise<string | null> {
-  const status = await refreshConnectStatus(orgId)
+export async function resolveConnectDestination(
+  orgId: string,
+  userPb?: PocketBase,
+): Promise<string | null> {
+  const status = await refreshConnectStatus(orgId, userPb)
   return status.ready && status.accountId ? status.accountId : null
 }

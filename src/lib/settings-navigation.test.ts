@@ -7,6 +7,7 @@ describe('getSettingsBackHref', () => {
   })
 
   it('returns hub from top-level detail pages', () => {
+    expect(getSettingsBackHref('/settings/account')).toBe('/settings')
     expect(getSettingsBackHref('/settings/business')).toBe('/settings')
     expect(getSettingsBackHref('/settings/access')).toBe('/settings')
     expect(getSettingsBackHref('/settings/progress')).toBe('/')

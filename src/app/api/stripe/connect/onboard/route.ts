@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { authenticateRequestUser } from '@/lib/server/request-auth'
-import { authenticateServerAdmin } from '@/lib/server/pocketbase-admin'
 import {
   appOriginFromRequest,
   ensureConnectAccount,
@@ -33,8 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 })
     }
 
-    const admin = await authenticateServerAdmin()
-    const settings = await admin.collection('app_settings').getFullList({
+    const settings = await auth.pb.collection('app_settings').getFullList({
       filter: `organization_id = "${auth.organizationId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
       limit: 1,
     })
@@ -43,8 +41,8 @@ export async function POST(request: Request) {
     const connectEmail =
       businessEmail && !businessEmail.endsWith('@example.com') ? businessEmail : auth.email
 
-    const accountId = await ensureConnectAccount(auth.organizationId, connectEmail, businessName)
-    const status = await refreshConnectStatus(auth.organizationId)
+    const accountId = await ensureConnectAccount(auth.organizationId, connectEmail, businessName, auth.pb)
+    const status = await refreshConnectStatus(auth.organizationId, auth.pb)
     const origin = appOriginFromRequest(request)
     const returnPath = '/settings/invoicing'
 

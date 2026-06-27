@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import AppLogo from '@/components/AppLogo'
 import { FloatingField } from '@/components/forms'
 import { Button } from '@/components/ui'
-import { loginWithPassword } from '@/lib/pb-auth'
+import { loginWithPassword, requestPasswordReset } from '@/lib/pb-auth'
 import { markTourPending } from '@/lib/product-tour'
 import { syncPrefilledFloatingLabels } from '@/lib/floating-label'
 import { slugifyBusinessName } from '@/lib/tenant'
@@ -14,13 +14,16 @@ interface AccountAuthProps {
   onAuthenticated: () => void
 }
 
+type AuthMode = 'login' | 'signup' | 'forgot'
+
 export default function AccountAuth({ onAuthenticated }: AccountAuthProps) {
   const searchParams = useSearchParams()
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -37,8 +40,19 @@ export default function AccountAuth({ onAuthenticated }: AccountAuthProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setInfo('')
     setLoading(true)
     try {
+      if (mode === 'forgot') {
+        const result = await requestPasswordReset(email)
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
+        setInfo(`If an account exists for ${email.trim()}, a reset link is on its way.`)
+        return
+      }
+
       if (mode === 'signup') {
         const res = await fetch('/api/auth/signup', {
           method: 'POST',
@@ -70,17 +84,22 @@ export default function AccountAuth({ onAuthenticated }: AccountAuthProps) {
 
   const slugPreview = businessName.trim() ? slugifyBusinessName(businessName) : ''
 
+  const title =
+    mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Reset password'
+  const subtitle =
+    mode === 'login'
+      ? 'Sign in to load your jobs, clients, and business data'
+      : mode === 'signup'
+        ? 'Start your solo mobile detailing workspace'
+        : 'Enter your email and we will send a reset link'
+
   return (
     <div className="auth-screen">
       <div className="auth-screen__logo">
         <AppLogo size={56} priority />
       </div>
-      <h1 className="auth-screen__title">{mode === 'login' ? 'Sign in' : 'Create account'}</h1>
-      <p className="auth-screen__subtitle">
-        {mode === 'login'
-          ? 'Sign in to load your jobs, clients, and business data'
-          : 'Start your solo mobile detailing workspace'}
-      </p>
+      <h1 className="auth-screen__title">{title}</h1>
+      <p className="auth-screen__subtitle">{subtitle}</p>
 
       {mode === 'signup' ? (
         <ul className="auth-value-props">
@@ -122,6 +141,7 @@ export default function AccountAuth({ onAuthenticated }: AccountAuthProps) {
             autoComplete="email"
           />
         </FloatingField>
+        {mode !== 'forgot' ? (
         <FloatingField
           id="auth-password"
           label={mode === 'signup' ? 'Password (8+ characters)' : 'Password'}
@@ -139,23 +159,48 @@ export default function AccountAuth({ onAuthenticated }: AccountAuthProps) {
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           />
         </FloatingField>
+        ) : null}
 
         {error ? <p className="auth-error">{error}</p> : null}
+        {info ? <p className="auth-info">{info}</p> : null}
 
         <Button type="submit" loading={loading}>
-          {mode === 'login' ? 'Sign in' : 'Create account'}
+          {mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
         </Button>
       </form>
+
+      {mode === 'login' ? (
+        <button
+          type="button"
+          className="auth-link"
+          onClick={() => {
+            setMode('forgot')
+            setError('')
+            setInfo('')
+          }}
+        >
+          Forgot password?
+        </button>
+      ) : null}
 
       <button
         type="button"
         className="auth-link"
         onClick={() => {
-          setMode(mode === 'login' ? 'signup' : 'login')
+          if (mode === 'forgot') {
+            setMode('login')
+          } else {
+            setMode(mode === 'login' ? 'signup' : 'login')
+          }
           setError('')
+          setInfo('')
         }}
       >
-        {mode === 'login' ? 'New here? Create an account' : 'Already have an account? Sign in'}
+        {mode === 'login'
+          ? 'New here? Create an account'
+          : mode === 'signup'
+            ? 'Already have an account? Sign in'
+            : 'Back to sign in'}
       </button>
     </div>
   )

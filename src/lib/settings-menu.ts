@@ -11,6 +11,7 @@ import {
   Sparkle,
   Storefront,
   Trophy,
+  UserCircle,
   Wallet,
 } from '@phosphor-icons/react'
 
@@ -18,7 +19,7 @@ export type SettingsIconTone = 'green' | 'amber' | 'blue' | 'purple'
 
 export interface SettingsMenuItem {
   id: string
-  group: 'business' | 'preferences' | 'management' | 'support'
+  group: 'account' | 'business' | 'preferences' | 'management' | 'support'
   title: string
   subtitle: string
   href: string
@@ -28,6 +29,7 @@ export interface SettingsMenuItem {
 }
 
 export const SETTINGS_MENU_GROUPS = [
+  { id: 'account', label: 'Account' },
   { id: 'business', label: 'Business' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'management', label: 'Management' },
@@ -35,6 +37,16 @@ export const SETTINGS_MENU_GROUPS = [
 ] as const
 
 export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
+  {
+    id: 'account',
+    group: 'account',
+    title: 'Account',
+    subtitle: 'Email, password, and sign-in',
+    href: '/settings/account',
+    Icon: UserCircle,
+    tone: 'purple',
+    searchKeys: ['account', 'email', 'password', 'sign in', 'login', 'reset', 'forgot'],
+  },
   {
     id: 'business',
     group: 'business',
@@ -114,7 +126,7 @@ export const SETTINGS_MENU_ITEMS: SettingsMenuItem[] = [
     href: '/settings/access',
     Icon: Shield,
     tone: 'purple',
-    searchKeys: ['password', 'backup', 'export', 'privacy', 'sign in', 'account'],
+    searchKeys: ['backup', 'export', 'privacy', 'data', 'delete account'],
   },
   {
     id: 'inventory',

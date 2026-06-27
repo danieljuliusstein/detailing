@@ -2,6 +2,7 @@ import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.
 
 /** Parent route when leaving a settings screen (deterministic — avoids history traps). */
 const SETTINGS_BACK_PARENT: Record<string, string> = {
+  '/settings/account': '/settings',
   '/settings/business': '/settings',
   '/settings/invoicing': '/settings',
   '/settings/progress': '/',

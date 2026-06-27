@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const status = await refreshConnectStatus(auth.organizationId)
+    const status = await refreshConnectStatus(auth.organizationId, auth.pb)
     return NextResponse.json(status)
   } catch (e) {
     console.error('[stripe/connect/status]', e)

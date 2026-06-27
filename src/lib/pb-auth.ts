@@ -79,3 +79,94 @@ export function clearPocketBaseAuth(): void {
     sessionStorage.removeItem(AUTH_FLAG_KEY)
   }
 }
+
+export function getCurrentUserEmail(): string | null {
+  const pb = getPocketBase()
+  if (!pb?.authStore.isValid) return null
+  const email = pb.authStore.record?.email
+  return typeof email === 'string' && email.trim() ? email.trim() : null
+}
+
+function pocketBaseErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    message?: string
+    data?: { data?: Record<string, { message?: string }> }
+  }
+  const fields = e.data?.data
+  if (fields) {
+    for (const key of ['oldPassword', 'password', 'passwordConfirm', 'email']) {
+      const msg = fields[key]?.message
+      if (msg) return msg
+    }
+  }
+  return e.message ?? fallback
+}
+
+export async function changePassword(input: {
+  oldPassword: string
+  password: string
+  passwordConfirm: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pb = getPocketBase()
+  const userId = pb?.authStore.record?.id
+  if (!pb?.authStore.isValid || typeof userId !== 'string') {
+    return { ok: false, error: 'Not signed in' }
+  }
+  try {
+    await withTimeout(
+      pb.collection('users').update(userId, {
+        oldPassword: input.oldPassword,
+        password: input.password,
+        passwordConfirm: input.passwordConfirm,
+      }),
+      8000,
+      'Password change',
+    )
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: pocketBaseErrorMessage(err, 'Could not update password') }
+  }
+}
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pb = getPocketBase()
+  if (!pb) return { ok: false, error: 'Cloud login is not configured' }
+  const trimmed = email.trim()
+  if (!trimmed) return { ok: false, error: 'Enter your email address' }
+  try {
+    await withTimeout(
+      pb.collection('users').requestPasswordReset(trimmed),
+      8000,
+      'Password reset request',
+    )
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: pocketBaseErrorMessage(err, 'Could not send reset email') }
+  }
+}
+
+export async function confirmPasswordReset(input: {
+  token: string
+  password: string
+  passwordConfirm: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pb = getPocketBase()
+  if (!pb) return { ok: false, error: 'Cloud login is not configured' }
+  if (!input.token.trim()) return { ok: false, error: 'Reset link is invalid or expired' }
+  try {
+    await withTimeout(
+      pb.collection('users').confirmPasswordReset(
+        input.token.trim(),
+        input.password,
+        input.passwordConfirm,
+      ),
+      8000,
+      'Password reset',
+    )
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: pocketBaseErrorMessage(err, 'Could not reset password') }
+  }
+}

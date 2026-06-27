@@ -32,6 +32,7 @@ function isPublicPath(pathname: string): boolean {
 
 function isBillingGracePath(pathname: string): boolean {
   return (
+    pathname === '/settings/account' ||
     pathname === '/settings/billing' ||
     pathname === '/settings/access' ||
     pathname === '/settings/support' ||
